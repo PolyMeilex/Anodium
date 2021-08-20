@@ -1,0 +1,42 @@
+[package]
+name = "anodium"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+bitflags = "1.2.1"
+input = { version = "0.6.0", features = ["udev"], optional = true }
+thiserror = "1"
+xcursor = { version = "0.3.3", optional = true }
+image = { version = "0.23.14", default-features = false, optional = true }
+fps_ticker = { version = "1.0.0", optional = true }
+rand = "0.8.4"
+slog = { version = "2.1.1" }
+slog-term = "2.8"
+slog-async = "2.2"
+slog-stdlog = "4.1.0"
+slog-scope = "4.4.0"
+xkbcommon = "0.4.0"
+generational-arena = "0.2.8"
+glow = "0.10.0"
+cgmath = "0.18.0"
+
+[dependencies.smithay]
+path = ".."
+default-features = false
+features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog"]
+
+[dependencies.x11rb]
+optional = true
+version = "0.7"
+default-features = false
+features = [ "composite" ]
+
+[features]
+default = ["udev","winit","xwayland"]
+# default = ["udev","winit"]
+winit = [ "smithay/backend_winit" ]
+udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_libseat", "input", "image", "xcursor" ]
+debug = [ "fps_ticker", "image/png" ]
+
+xwayland = [ "smithay/xwayland", "x11rb" ]
