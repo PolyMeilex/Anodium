@@ -30,9 +30,9 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 use crate::{
     backend::Backend,
     desktop_layout::{DesktopLayout, Output},
-    maps::NotMappedList,
     render::renderer::RenderFrame,
     shell::init_shell,
+    shell::not_mapped_list::NotMappedList,
 };
 
 pub struct MainState {

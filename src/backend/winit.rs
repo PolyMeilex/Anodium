@@ -21,7 +21,7 @@ use smithay::{
 use slog::Logger;
 
 use super::Backend;
-use crate::{drawing::*, render::AnodiumRenderer, state::BackendState};
+use crate::{render::AnodiumRenderer, render::*, state::BackendState};
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -142,9 +142,7 @@ pub fn run_winit(
 
             let result = renderer
                 .render_winit(|frame| {
-                    state
-                        .main_state
-                        .render(frame, (output_geometry, output_scale))?;
+                    state.main_state.render(frame, (output_geometry, output_scale))?;
 
                     let (x, y) = state.main_state.pointer_location().into();
                     // draw the dnd icon if any

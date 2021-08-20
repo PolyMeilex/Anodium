@@ -320,6 +320,7 @@ pub fn draw_dnd_icon(
     draw_surface_tree(frame, surface, location, output_scale, log)
 }
 
+// TODO: Move this to diferent module, this is not wayland specyfic
 #[cfg(feature = "debug")]
 pub static FPS_NUMBERS_PNG: &[u8] = include_bytes!("../resources/numbers.png");
 
@@ -358,6 +359,7 @@ pub fn draw_fps(
     Ok(())
 }
 
+// TODO: Move this to diferent module, this is not wayland specyfic
 #[cfg(feature = "image")]
 pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
     renderer: &mut Gles2Renderer,

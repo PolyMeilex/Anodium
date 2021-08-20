@@ -6,3 +6,6 @@ pub use renderer::AnodiumRenderer;
 
 mod quad;
 pub use quad::QuadPipeline;
+
+pub mod wayland;
+pub use wayland::*;

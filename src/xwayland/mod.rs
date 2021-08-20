@@ -20,7 +20,7 @@ use x11rb::{
     rust_connection::{DefaultStream, RustConnection},
 };
 
-use crate::{desktop_layout::Toplevel, maps::NotMappedList, state::BackendState};
+use crate::{desktop_layout::Toplevel, shell::not_mapped_list::NotMappedList, state::BackendState};
 
 use x11rb_event_source::X11Source;
 

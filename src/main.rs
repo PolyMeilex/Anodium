@@ -5,14 +5,11 @@ use slog::Drain;
 
 #[cfg(feature = "udev")]
 mod cursor;
-mod drawing;
 mod input_handler;
 mod shell;
 mod state;
 
 mod backend;
-
-mod maps;
 
 mod render;
 mod utils;

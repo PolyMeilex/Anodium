@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub mod move_surface_grab;
+pub mod not_mapped_list;
 pub mod resize_surface_grab;
 
 pub mod surface_data;

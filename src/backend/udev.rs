@@ -64,7 +64,7 @@ use smithay::{
 };
 
 use super::Backend;
-use crate::{drawing::*, render::renderer::HasGles2Renderer, state::BackendState};
+use crate::{render::renderer::HasGles2Renderer, render::*, state::BackendState};
 use crate::{render::AnodiumRenderer, state::MainState};
 
 #[derive(Clone)]
