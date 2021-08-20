@@ -30,7 +30,7 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 use crate::{
     backend::Backend,
     desktop_layout::{DesktopLayout, Output},
-    render::renderer::RenderFrame,
+    render::{self, renderer::RenderFrame},
     shell::init_shell,
     shell::not_mapped_list::NotMappedList,
 };
@@ -97,13 +97,6 @@ impl MainState {
         //     )?;
         // }
 
-        // let anodium = &mut *self.anodium.borrow_mut();
-
-        // let glow = anodium.glow_contexts.get(dev);
-        // anodium
-        //     .maximize_animation
-        //     .render(renderer, glow, (scene_size, output_scale));
-
         // Grab Debug:
         if let Some(state) = self.desktop_layout.grabed_window.borrow().as_ref() {
             let loc: Point<i32, Logical> = state.window.location() + state.window.geometry().loc;
@@ -118,6 +111,28 @@ impl MainState {
                     &frame.context,
                     0.1,
                 );
+            }
+        }
+
+        // Pointer Related:
+        if output_geometry.to_f64().contains(self.pointer_location()) {
+            let (ptr_x, ptr_y) = self.pointer_location().into();
+            let relative_ptr_location =
+                Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
+            // draw the dnd icon if applicable
+            {
+                let guard = self.dnd_icon.lock().unwrap();
+                if let Some(ref wl_surface) = *guard {
+                    if wl_surface.as_ref().is_alive() {
+                        render::draw_dnd_icon(
+                            frame,
+                            wl_surface,
+                            relative_ptr_location,
+                            output_scale,
+                            &self.log,
+                        )?;
+                    }
+                }
             }
         }
 

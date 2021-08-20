@@ -747,7 +747,6 @@ impl MainState {
                 |frame| {
                     self.render(frame, (output_geometry, output_scale))?;
 
-                    let dnd_icon = self.dnd_icon.lock().unwrap();
                     let mut cursor_status = self.cursor_status.lock().unwrap();
 
                     // set cursor
@@ -755,20 +754,6 @@ impl MainState {
                         let (ptr_x, ptr_y) = self.pointer_location().into();
                         let relative_ptr_location =
                             Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
-                        // draw the dnd icon if applicable
-                        {
-                            if let Some(ref wl_surface) = dnd_icon.as_ref() {
-                                if wl_surface.as_ref().is_alive() {
-                                    draw_dnd_icon(
-                                        frame,
-                                        wl_surface,
-                                        relative_ptr_location,
-                                        output_scale,
-                                        logger,
-                                    )?;
-                                }
-                            }
-                        }
                         // draw the cursor as relevant
                         {
                             // reset the cursor if the surface is no longer alive

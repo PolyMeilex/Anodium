@@ -145,21 +145,6 @@ pub fn run_winit(
                     state.main_state.render(frame, (output_geometry, output_scale))?;
 
                     let (x, y) = state.main_state.pointer_location().into();
-                    // draw the dnd icon if any
-                    {
-                        let guard = state.main_state.dnd_icon.lock().unwrap();
-                        if let Some(ref surface) = *guard {
-                            if surface.as_ref().is_alive() {
-                                draw_dnd_icon(
-                                    frame,
-                                    surface,
-                                    (x as i32, y as i32).into(),
-                                    output_scale,
-                                    &log,
-                                )?;
-                            }
-                        }
-                    }
 
                     // draw the cursor as relevant
                     {
