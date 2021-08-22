@@ -21,6 +21,9 @@ generational-arena = "0.2.8"
 glow = "0.10.0"
 cgmath = "0.18.0"
 
+imgui = "0.7.0"
+imgui-smithay-renderer = {path="./imgui-smithay-renderer", optional = true}
+
 [dependencies.smithay]
 path = ".."
 default-features = false
@@ -37,6 +40,6 @@ default = ["udev","winit","xwayland"]
 # default = ["udev","winit"]
 winit = [ "smithay/backend_winit" ]
 udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_libseat", "input", "image", "xcursor" ]
-debug = [ "fps_ticker", "image/png" ]
+debug = [ "fps_ticker", "image/png", "imgui-smithay-renderer"]
 
 xwayland = [ "smithay/xwayland", "x11rb" ]

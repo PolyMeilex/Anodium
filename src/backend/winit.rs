@@ -1,7 +1,5 @@
 use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
 
-#[cfg(feature = "debug")]
-use smithay::backend::renderer::gles2::Gles2Texture;
 use smithay::{
     backend::renderer::{ImportDma, ImportEgl},
     wayland::dmabuf::init_dmabuf_global,
@@ -26,8 +24,6 @@ use crate::{render::AnodiumRenderer, render::*, state::BackendState};
 pub const OUTPUT_NAME: &str = "winit";
 
 pub struct WinitData {
-    #[cfg(feature = "debug")]
-    fps_texture: Gles2Texture,
     #[cfg(feature = "debug")]
     pub fps: fps_ticker::Fps,
 }
@@ -80,15 +76,6 @@ pub fn run_winit(
      */
 
     let data = WinitData {
-        #[cfg(feature = "debug")]
-        fps_texture: import_bitmap(
-            &mut renderer.borrow_mut().renderer(),
-            &image::io::Reader::with_format(std::io::Cursor::new(FPS_NUMBERS_PNG), image::ImageFormat::Png)
-                .decode()
-                .unwrap()
-                .to_rgba8(),
-        )
-        .expect("Unable to upload FPS texture"),
         #[cfg(feature = "debug")]
         fps: fps_ticker::Fps::default(),
     };
@@ -170,7 +157,7 @@ pub fn run_winit(
                     #[cfg(feature = "debug")]
                     {
                         let fps = state.backend_data.fps.avg().round() as u32;
-                        draw_fps(frame, &state.backend_data.fps_texture, output_scale as f64, fps)?;
+                        draw_fps(frame, output_scale as f64, fps)?;
                     }
 
                     Ok(())

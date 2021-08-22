@@ -257,8 +257,6 @@ struct BackendData {
     _restart_token: SignalToken,
     surfaces: Rc<RefCell<HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>>>>,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
-    #[cfg(feature = "debug")]
-    fps_texture: Gles2Texture,
     renderer: Rc<RefCell<AnodiumRenderer<Gles2Renderer>>>,
     gbm: GbmDevice<SessionFd>,
     registration_token: RegistrationToken,
@@ -502,19 +500,6 @@ impl BackendState<UdevData> {
                 schedule_initial_render(backend.clone(), renderer.clone(), &self.handle, self.log.clone());
             }
 
-            #[cfg(feature = "debug")]
-            let fps_texture = import_bitmap(
-                &mut renderer.borrow_mut(),
-                &image::io::Reader::with_format(
-                    std::io::Cursor::new(FPS_NUMBERS_PNG),
-                    image::ImageFormat::Png,
-                )
-                .decode()
-                .unwrap()
-                .to_rgba8(),
-            )
-            .expect("Unable to upload FPS texture");
-
             self.backend_data.backends.insert(
                 dev_id,
                 BackendData {
@@ -525,8 +510,6 @@ impl BackendState<UdevData> {
                     renderer,
                     gbm,
                     pointer_images: Vec::new(),
-                    #[cfg(feature = "debug")]
-                    fps_texture,
                     dev_id,
                 },
             );
@@ -650,8 +633,6 @@ impl BackendState<UdevData> {
                 device_backend.dev_id,
                 crtc,
                 &pointer_image,
-                #[cfg(feature = "debug")]
-                &device_backend.fps_texture,
                 &self.log,
             );
             if let Err(err) = result {
@@ -719,7 +700,6 @@ impl MainState {
         device_id: dev_t,
         crtc: crtc::Handle,
         pointer_image: &Gles2Texture,
-        #[cfg(feature = "debug")] fps_texture: &Gles2Texture,
         logger: &slog::Logger,
     ) -> Result<(), SwapBuffersError> {
         surface.surface.frame_submitted()?;
@@ -785,12 +765,7 @@ impl MainState {
 
                     #[cfg(feature = "debug")]
                     {
-                        draw_fps(
-                            frame,
-                            fps_texture,
-                            output_scale as f64,
-                            surface.fps.avg().round() as u32,
-                        )?;
+                        draw_fps(frame, output_scale as f64, surface.fps.avg().round() as u32)?;
                         surface.fps.tick();
                     }
                     Ok(())

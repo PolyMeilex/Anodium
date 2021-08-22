@@ -322,39 +322,16 @@ pub fn draw_dnd_icon(
 
 // TODO: Move this to diferent module, this is not wayland specyfic
 #[cfg(feature = "debug")]
-pub static FPS_NUMBERS_PNG: &[u8] = include_bytes!("../resources/numbers.png");
+pub fn draw_fps(frame: &mut RenderFrame, _output_scale: f64, value: u32) -> Result<(), Gles2Error> {
+    let ui = &frame.imgui_frame;
 
-#[cfg(feature = "debug")]
-pub fn draw_fps(
-    frame: &mut RenderFrame,
-    texture: &Gles2Texture,
-    output_scale: f64,
-    value: u32,
-) -> Result<(), Gles2Error> {
-    let value_str = value.to_string();
-    let mut offset_x = 0f64;
-    for digit in value_str.chars().map(|d| d.to_digit(10).unwrap()) {
-        frame.render_texture_from_to(
-            texture,
-            match digit {
-                9 => Rectangle::from_loc_and_size((0, 0), (22, 35)),
-                6 => Rectangle::from_loc_and_size((22, 0), (22, 35)),
-                3 => Rectangle::from_loc_and_size((44, 0), (22, 35)),
-                1 => Rectangle::from_loc_and_size((66, 0), (22, 35)),
-                8 => Rectangle::from_loc_and_size((0, 35), (22, 35)),
-                0 => Rectangle::from_loc_and_size((22, 35), (22, 35)),
-                2 => Rectangle::from_loc_and_size((44, 35), (22, 35)),
-                7 => Rectangle::from_loc_and_size((0, 70), (22, 35)),
-                4 => Rectangle::from_loc_and_size((22, 70), (22, 35)),
-                5 => Rectangle::from_loc_and_size((44, 70), (22, 35)),
-                _ => unreachable!(),
-            },
-            Rectangle::from_loc_and_size((offset_x, 0.0), (22.0 * output_scale, 35.0 * output_scale)),
-            Transform::Normal,
-            1.0,
-        )?;
-        offset_x += 24.0 * output_scale;
-    }
+    imgui::Window::new(imgui::im_str!("FPS"))
+        .size([50.0, 20.0], imgui::Condition::Always)
+        .position([0.0, 0.0], imgui::Condition::Always)
+        .title_bar(false)
+        .build(&ui, || {
+            ui.text(&format!("{}FPS", value));
+        });
 
     Ok(())
 }

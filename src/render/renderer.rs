@@ -24,6 +24,11 @@ pub struct AnodiumRenderer<B> {
     inner: B,
     glow: glow::Context,
     quad_pipeline: QuadPipeline,
+
+    #[cfg(feature = "debug")]
+    imgui_pipeline: imgui_smithay_renderer::Renderer,
+    #[cfg(feature = "debug")]
+    imgui: imgui::Context,
 }
 
 impl<B: HasGles2Renderer> AnodiumRenderer<B> {
@@ -43,10 +48,34 @@ impl<B: HasGles2Renderer> AnodiumRenderer<B> {
             })
             .unwrap();
 
+        #[cfg(feature = "debug")]
+        let mut imgui = imgui::Context::create();
+
+        #[cfg(feature = "debug")]
+        {
+            imgui.set_ini_filename(None);
+            let io = imgui.io_mut();
+            let hidpi_factor = 1.0;
+            io.display_framebuffer_scale = [hidpi_factor as f32, hidpi_factor as f32];
+            let logical_size = (1920, 1080);
+            io.display_size = [logical_size.0 as f32, logical_size.1 as f32];
+        }
+
+        #[cfg(feature = "debug")]
+        let imgui_pipeline = inner
+            .gles_renderer()
+            .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
+            .unwrap();
+
         Self {
             inner,
             glow,
             quad_pipeline,
+
+            #[cfg(feature = "debug")]
+            imgui_pipeline,
+            #[cfg(feature = "debug")]
+            imgui,
         }
     }
 
@@ -72,17 +101,38 @@ impl<B: HasGles2Renderer> AnodiumRenderer<B> {
         use smithay::backend::renderer::Renderer;
         let glow = &self.glow;
         let quad_pipeline = &self.quad_pipeline;
+
+        #[cfg(feature = "debug")]
+        let imgui = &mut self.imgui;
+        #[cfg(feature = "debug")]
+        let imgui_pipeline = &self.imgui_pipeline;
+
         self.inner
             .gles_renderer()
             .render(size, transform, |renderer, frame| {
                 renderer
                     .with_context(|renderer, gles| {
-                        func(&mut RenderFrame {
+                        #[cfg(feature = "debug")]
+                        let imgui_frame = imgui.frame();
+
+                        let ret = func(&mut RenderFrame {
                             transform,
                             frame,
                             context: RenderContext { renderer, gles, glow },
+
                             quad_pipeline,
-                        })
+
+                            #[cfg(feature = "debug")]
+                            imgui_frame: &imgui_frame,
+                        });
+
+                        #[cfg(feature = "debug")]
+                        {
+                            let draw_data = imgui_frame.render();
+                            imgui_pipeline.render(transform, gles, draw_data);
+                        }
+
+                        ret
                     })
                     .unwrap()
             })
@@ -115,6 +165,9 @@ pub struct RenderFrame<'a> {
     pub context: RenderContext<'a>,
 
     pub quad_pipeline: &'a QuadPipeline,
+
+    #[cfg(feature = "debug")]
+    pub imgui_frame: &'a imgui::Ui<'a>,
 }
 
 impl<'a> Frame for RenderFrame<'a> {
@@ -155,17 +208,39 @@ impl AnodiumRenderer<WinitGraphicsBackend> {
     {
         let glow = &self.glow;
         let quad_pipeline = &self.quad_pipeline;
-        self.inner.render(|renderer, frame| {
+
+        #[cfg(feature = "debug")]
+        let imgui = &mut self.imgui;
+        #[cfg(feature = "debug")]
+        let imgui_pipeline = &self.imgui_pipeline;
+
+        let ret = self.inner.render(|renderer, frame| {
             renderer
                 .with_context(|renderer, gles| {
-                    func(&mut RenderFrame {
+                    #[cfg(feature = "debug")]
+                    let imgui_frame = imgui.frame();
+
+                    let ret = func(&mut RenderFrame {
                         transform: Transform::Normal,
                         frame,
                         context: RenderContext { renderer, gles, glow },
+
                         quad_pipeline,
-                    })
+                        #[cfg(feature = "debug")]
+                        imgui_frame: &imgui_frame,
+                    });
+
+                    #[cfg(feature = "debug")]
+                    {
+                        let draw_data = imgui_frame.render();
+                        imgui_pipeline.render(Transform::Normal, gles, draw_data);
+                    }
+
+                    ret
                 })
                 .unwrap()
-        })
+        });
+
+        ret
     }
 }
