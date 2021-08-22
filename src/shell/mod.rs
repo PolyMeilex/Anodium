@@ -126,8 +126,8 @@ impl MainState {
                                 let pending = not_mapped_list.remove(&toplevel);
 
                                 if let Some(win) = pending {
-                                    let space = self.desktop_layout.active_workspace();
-                                    space.map_toplevel(win, true);
+                                    let mut space = self.desktop_layout.borrow_mut();
+                                    space.active_workspace().map_toplevel(win, true);
                                 }
                             }
                         }
@@ -136,8 +136,8 @@ impl MainState {
                             let pending = not_mapped_list.remove(&toplevel);
 
                             if let Some(win) = pending {
-                                let space = self.desktop_layout.active_workspace();
-                                space.map_toplevel(win, true);
+                                let mut space = self.desktop_layout.borrow_mut();
+                                space.active_workspace().map_toplevel(win, true);
                             }
                         }
                     }
@@ -147,7 +147,7 @@ impl MainState {
 
         // Update maped windows
         {
-            for workspace in self.desktop_layout.visible_workspaces() {
+            for workspace in self.desktop_layout.borrow_mut().visible_workspaces() {
                 let mut window_map = workspace.windows_mut();
                 if let Some(window) = window_map.find_mut(surface) {
                     window.self_update();

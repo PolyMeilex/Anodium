@@ -65,20 +65,18 @@ impl MainState {
 
                 let toplevel = Toplevel::Xdg(surface);
 
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                let mut desktop_layout = self.desktop_layout.borrow_mut();
+
+                if let Some(space) = desktop_layout.find_workspace_by_surface_mut(&toplevel) {
                     if let Some(res) = space.move_request(&toplevel, &seat, serial, &start_data) {
                         if let Some(window) = space.unmap_toplevel(&toplevel) {
-                            let grabed_window = &self.desktop_layout.grabed_window;
-
-                            grabed_window
-                                .borrow_mut()
-                                .replace(GrabState { window, done: false });
+                            desktop_layout.grabed_window = Some(GrabState { window, done: false });
 
                             let grab = MoveSurfaceGrab {
                                 start_data,
                                 toplevel,
                                 initial_window_location: res.initial_window_location,
-                                grabed_window: grabed_window.clone(),
+                                desktop_layout: self.desktop_layout.clone(),
                             };
                             pointer.set_grab(grab, serial);
                         }
@@ -115,19 +113,31 @@ impl MainState {
                 }
 
                 let toplevel = Toplevel::Xdg(surface.clone());
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                if let Some(space) = self
+                    .desktop_layout
+                    .borrow_mut()
+                    .find_workspace_by_surface_mut(&toplevel)
+                {
                     space.resize_request(&toplevel, &seat, serial, start_data, edges);
                 }
             }
             XdgRequest::Maximize { surface } => {
                 let toplevel = Toplevel::Xdg(surface.clone());
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                if let Some(space) = self
+                    .desktop_layout
+                    .borrow_mut()
+                    .find_workspace_by_surface_mut(&toplevel)
+                {
                     space.maximize_request(&toplevel);
                 }
             }
             XdgRequest::UnMaximize { surface } => {
                 let toplevel = Toplevel::Xdg(surface.clone());
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                if let Some(space) = self
+                    .desktop_layout
+                    .borrow_mut()
+                    .find_workspace_by_surface_mut(&toplevel)
+                {
                     space.unmaximize_request(&toplevel);
                 }
             }

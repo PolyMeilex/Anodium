@@ -229,13 +229,13 @@ impl MainState {
         };
 
         // redraw the frame, in a simple but inneficient way
-        for workspace in self.desktop_layout.visible_workspaces() {
+        for workspace in self.desktop_layout.borrow().visible_workspaces() {
             for window in workspace.windows().iter().rev() {
                 render(window);
             }
         }
 
-        if let Some(state) = self.desktop_layout.grabed_window.borrow().as_ref() {
+        if let Some(state) = self.desktop_layout.borrow().grabed_window.as_ref() {
             render(&state.window);
         }
 

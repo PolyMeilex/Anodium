@@ -122,6 +122,7 @@ pub fn run_winit(
             let (output_geometry, output_scale) = state
                 .main_state
                 .desktop_layout
+                .borrow()
                 .output_map
                 .find_by_name(OUTPUT_NAME)
                 .map(|output| (output.geometry(), output.scale()))

@@ -9,16 +9,15 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{GrabState, Toplevel};
+use crate::desktop_layout::{DesktopLayout, GrabState, Toplevel};
 
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,
 
     pub toplevel: Toplevel,
     pub initial_window_location: Point<i32, Logical>,
-    // pub output_map: Rc<RefCell<OutputMap>>,
-    // pub pointer_position: Point<f64, Logical>,
-    pub grabed_window: Rc<RefCell<Option<GrabState>>>,
+
+    pub desktop_layout: Rc<RefCell<DesktopLayout>>,
 }
 
 impl PointerGrab for MoveSurfaceGrab {
@@ -33,7 +32,7 @@ impl PointerGrab for MoveSurfaceGrab {
         let delta = location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
 
-        if let Some(state) = self.grabed_window.borrow_mut().as_mut() {
+        if let Some(state) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
             state.window.set_location(new_location.to_i32_round());
         }
 
@@ -81,7 +80,7 @@ impl PointerGrab for MoveSurfaceGrab {
             // anodium.maximize_animation.stop();
             // }
 
-            if let Some(state) = self.grabed_window.borrow_mut().as_mut() {
+            if let Some(state) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
                 state.done = true;
             }
             // No more buttons are pressed, release the grab.

@@ -36,7 +36,7 @@ pub struct DesktopLayout {
     workspaces: HashMap<String, Box<dyn Positioner>>,
     active_workspaces: Option<String>,
 
-    pub grabed_window: Rc<RefCell<Option<GrabState>>>,
+    pub grabed_window: Option<GrabState>,
 }
 
 impl DesktopLayout {
@@ -88,14 +88,8 @@ impl DesktopLayout {
             w.update(delta);
         }
 
-        if self
-            .grabed_window
-            .borrow()
-            .as_ref()
-            .map(|s| s.done)
-            .unwrap_or(false)
-        {
-            let state = self.grabed_window.borrow_mut().take().unwrap();
+        if self.grabed_window.as_ref().map(|s| s.done).unwrap_or(false) {
+            let state = self.grabed_window.take().unwrap();
 
             let location = state.window.location() + state.window.geometry().loc;
 

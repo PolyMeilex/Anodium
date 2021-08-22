@@ -42,7 +42,7 @@ pub struct MainState {
 
     pub not_mapped_list: Rc<RefCell<NotMappedList>>,
 
-    pub desktop_layout: DesktopLayout,
+    pub desktop_layout: Rc<RefCell<DesktopLayout>>,
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
     pub log: slog::Logger,
@@ -98,7 +98,7 @@ impl MainState {
         // }
 
         // Grab Debug:
-        if let Some(state) = self.desktop_layout.grabed_window.borrow().as_ref() {
+        if let Some(state) = self.desktop_layout.borrow().grabed_window.as_ref() {
             let loc: Point<i32, Logical> = state.window.location() + state.window.geometry().loc;
             let size: Size<i32, Logical> = state.window.geometry().size;
             let quad: Rectangle<i32, Logical> = Rectangle::from_loc_and_size(loc, size);
@@ -157,18 +157,20 @@ impl MainState {
         N: AsRef<str>,
         CB: FnOnce(&Output),
     {
-        self.desktop_layout.add_output(name, physical, mode, after);
+        self.desktop_layout
+            .borrow_mut()
+            .add_output(name, physical, mode, after);
     }
 
     pub fn retain_outputs<F>(&mut self, f: F)
     where
         F: FnMut(&Output) -> bool,
     {
-        self.desktop_layout.retain_outputs(f);
+        self.desktop_layout.borrow_mut().retain_outputs(f);
     }
 
     pub fn send_frames(&self, time: u32) {
-        self.desktop_layout.send_frames(time);
+        self.desktop_layout.borrow().send_frames(time);
     }
 }
 
@@ -295,7 +297,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
             backend_data,
             main_state: MainState {
                 running: Arc::new(AtomicBool::new(true)),
-                desktop_layout: DesktopLayout::new(display.clone(), log.clone()),
+                desktop_layout: Rc::new(RefCell::new(DesktopLayout::new(display.clone(), log.clone()))),
 
                 display,
                 not_mapped_list: Default::default(),
@@ -340,7 +342,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
 
                 // anodium.maximize_animation.update(elapsed);
 
-                self.main_state.desktop_layout.update(elapsed);
+                self.main_state.desktop_layout.borrow_mut().update(elapsed);
 
                 self.main_state.instant = Instant::now();
             }

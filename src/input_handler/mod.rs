@@ -39,6 +39,7 @@ impl MainState {
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output_size = self
                     .desktop_layout
+                    .borrow()
                     .output_map
                     .find_by_name(crate::backend::winit::OUTPUT_NAME)
                     .map(|o| o.size());
@@ -114,7 +115,7 @@ impl MainState {
                 if !self.pointer.is_grabbed() {
                     let pointer_location = self.pointer_location();
 
-                    let under = self.desktop_layout.surface_under(pointer_location);
+                    let under = self.desktop_layout.borrow().surface_under(pointer_location);
 
                     self.keyboard
                         .set_focus(under.as_ref().map(|&(ref s, _)| s), serial);
@@ -125,7 +126,7 @@ impl MainState {
         };
         self.pointer.button(button, state, serial, evt.time());
 
-        for w in self.desktop_layout.visible_workspaces_mut() {
+        for w in self.desktop_layout.borrow_mut().visible_workspaces_mut() {
             w.on_pointer_button(evt.button(), evt.state());
         }
     }
@@ -172,19 +173,19 @@ impl MainState {
 
         let pointer_location = self.pointer_location();
 
-        self.desktop_layout.on_pointer_move(pointer_location);
+        self.desktop_layout.borrow_mut().on_pointer_move(pointer_location);
 
-        let under = self.desktop_layout.surface_under(pointer_location);
+        let under = self.desktop_layout.borrow().surface_under(pointer_location);
         self.pointer.motion(pointer_location, under, serial, time);
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {
-        if self.desktop_layout.output_map.is_empty() {
+        if self.desktop_layout.borrow().output_map.is_empty() {
             return pos;
         }
 
         let (pos_x, pos_y) = pos.into();
-        let output_map = &self.desktop_layout.output_map;
+        let output_map = &self.desktop_layout.borrow().output_map;
         let max_x = output_map.width();
         let clamped_x = pos_x.max(0.0).min(max_x as f64);
         let max_y = output_map.height(clamped_x as i32);

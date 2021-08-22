@@ -706,6 +706,7 @@ impl MainState {
 
         let output = self
             .desktop_layout
+            .borrow_mut()
             .output_map
             .find(|o| o.userdata().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc }))
             .map(|output| (output.geometry(), output.scale(), output.current_mode()));
