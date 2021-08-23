@@ -68,6 +68,9 @@ impl Output {
     pub fn active_workspace(&self) -> &str {
         &self.active_workspace
     }
+    pub fn set_active_workspace(&mut self, key: String) {
+        self.active_workspace = key;
+    }
 
     pub fn userdata(&self) -> &UserDataMap {
         &self.userdata
@@ -264,6 +267,9 @@ impl OutputMap {
 
     pub fn iter(&self) -> std::slice::Iter<Output> {
         self.outputs.iter()
+    }
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Output> {
+        self.outputs.iter_mut()
     }
 
     pub fn update<F>(&mut self, mode: Option<Mode>, scale: Option<f64>, mut f: F)

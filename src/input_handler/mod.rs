@@ -221,7 +221,7 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> KeyAc
         // KeyAction::Run("alacritty".into())
         // KeyAction::Run("weston-terminal".into())
     } else if modifiers.logo && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
-        KeyAction::Workspace((keysym - xkb::KEY_1) as usize)
+        KeyAction::Workspace((keysym - xkb::KEY_1) as usize + 1)
     } else if modifiers.logo && modifiers.shift && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
         KeyAction::MoveToWorkspace((keysym - xkb::KEY_1) as usize)
     } else {
@@ -255,10 +255,11 @@ impl Anodium {
             // let mut window_map = self.window_map.borrow_mut();
             // }
             // TODO:
-            // KeyAction::Workspace(num) => {
-            // let mut window_map = self.window_map.borrow_mut();
-            // window_map.workspace = num % 5;
-            // }
+            KeyAction::Workspace(num) => {
+                self.desktop_layout
+                    .borrow_mut()
+                    .switch_workspace(&format!("{}", num));
+            }
             action => {
                 warn!(self.log, "Key action {:?} unsupported on winit backend.", action);
             }

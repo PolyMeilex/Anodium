@@ -31,9 +31,11 @@ pub struct DesktopLayout {
     pub output_map: OutputMap,
 
     pub workspaces: HashMap<String, Box<dyn Positioner>>,
-    active_workspaces: Option<String>,
+    active_workspace: Option<String>,
 
     pub grabed_window: Option<Window>,
+
+    pointer_location: Point<f64, Logical>,
 }
 
 impl DesktopLayout {
@@ -42,18 +44,21 @@ impl DesktopLayout {
             output_map: OutputMap::new(display, log),
 
             workspaces: Default::default(),
-            active_workspaces: None,
+            active_workspace: None,
 
             grabed_window: Default::default(),
+            pointer_location: Default::default(),
         }
     }
 
     pub fn on_pointer_move(&mut self, pos: Point<f64, Logical>) {
+        self.pointer_location = pos;
+
         for (id, w) in self.workspaces.iter_mut() {
             w.on_pointer_move(pos);
 
             if w.geometry().contains(pos.to_i32_round()) {
-                self.active_workspaces = Some(id.clone());
+                self.active_workspace = Some(id.clone());
             }
         }
     }
@@ -120,7 +125,7 @@ impl DesktopLayout {
 impl DesktopLayout {
     pub fn active_workspace(&mut self) -> &mut dyn Positioner {
         self.workspaces
-            .get_mut(self.active_workspaces.as_ref().unwrap())
+            .get_mut(self.active_workspace.as_ref().unwrap())
             .unwrap()
             .as_mut()
     }
@@ -154,6 +159,31 @@ impl DesktopLayout {
         }
         None
     }
+
+    pub fn update_workspaces_geometry(&mut self) {
+        for output in self.output_map.iter() {
+            let key = output.active_workspace();
+            if let Some(w) = self.workspaces.get_mut(key) {
+                w.set_geometry(output.usable_geometry());
+            }
+        }
+    }
+
+    pub fn switch_workspace(&mut self, key: &str) {
+        for o in self.output_map.iter_mut() {
+            if o.geometry().to_f64().contains(self.pointer_location) {
+                if self.workspaces.get(key).is_none() {
+                    let positioner = Universal::new(Default::default(), Default::default());
+                    self.workspaces.insert(key.into(), Box::new(positioner));
+                }
+                o.set_active_workspace(key.into());
+                break;
+            }
+        }
+
+        self.active_workspace = Some(key.into());
+        self.update_workspaces_geometry();
+    }
 }
 
 // Outputs
@@ -171,8 +201,8 @@ impl DesktopLayout {
         let id = self.workspaces.len() + 1;
         let id = format!("{}", id);
 
-        if self.active_workspaces.is_none() {
-            self.active_workspaces = Some(id.clone());
+        if self.active_workspace.is_none() {
+            self.active_workspace = Some(id.clone());
         }
 
         let output = self.output_map.add(name, physical, mode, id.clone());
@@ -204,13 +234,7 @@ impl DesktopLayout {
 impl DesktopLayout {
     pub fn arrange_layers(&mut self) {
         self.output_map.arrange_layers();
-
-        for output in self.output_map.iter() {
-            let key = output.active_workspace();
-            if let Some(w) = self.workspaces.get_mut(key) {
-                w.set_geometry(output.usable_geometry());
-            }
-        }
+        self.update_workspaces_geometry();
     }
 
     pub fn insert_layer(
@@ -220,12 +244,6 @@ impl DesktopLayout {
         layer: wlr_layer::Layer,
     ) {
         self.output_map.insert_layer(output, surface, layer);
-
-        for output in self.output_map.iter() {
-            let key = output.active_workspace();
-            if let Some(w) = self.workspaces.get_mut(key) {
-                w.set_geometry(output.usable_geometry());
-            }
-        }
+        self.update_workspaces_geometry();
     }
 }

@@ -26,10 +26,7 @@ pub const OUTPUT_NAME: &str = "winit";
 
 mod input;
 
-pub struct WinitData {
-    #[cfg(feature = "debug")]
-    pub fps: fps_ticker::Fps,
-}
+pub struct WinitData {}
 
 impl Backend for WinitData {
     fn seat_name(&self) -> String {
