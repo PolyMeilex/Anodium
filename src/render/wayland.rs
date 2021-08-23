@@ -235,8 +235,8 @@ impl Anodium {
             }
         }
 
-        if let Some(state) = self.desktop_layout.borrow().grabed_window.as_ref() {
-            render(&state.window);
+        if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
+            render(window);
         }
 
         Ok(())

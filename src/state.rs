@@ -111,9 +111,9 @@ impl Anodium {
         // }
 
         // Grab Debug:
-        if let Some(state) = self.desktop_layout.borrow().grabed_window.as_ref() {
-            let loc: Point<i32, Logical> = state.window.location() + state.window.geometry().loc;
-            let size: Size<i32, Logical> = state.window.geometry().size;
+        if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
+            let loc: Point<i32, Logical> = window.location() + window.geometry().loc;
+            let size: Size<i32, Logical> = window.geometry().size;
             let quad: Rectangle<i32, Logical> = Rectangle::from_loc_and_size(loc, size);
 
             if output_geometry.overlaps(quad) {

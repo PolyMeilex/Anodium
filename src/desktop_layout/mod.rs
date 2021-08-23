@@ -24,19 +24,13 @@ pub mod window;
 pub use window::{Toplevel, Window, WindowList};
 
 #[derive(Debug)]
-pub struct GrabState {
-    pub window: Window,
-    pub done: bool,
-}
-
-#[derive(Debug)]
 pub struct DesktopLayout {
     pub output_map: OutputMap,
 
-    workspaces: HashMap<String, Box<dyn Positioner>>,
+    pub workspaces: HashMap<String, Box<dyn Positioner>>,
     active_workspaces: Option<String>,
 
-    pub grabed_window: Option<GrabState>,
+    pub grabed_window: Option<Window>,
 }
 
 impl DesktopLayout {
@@ -86,25 +80,6 @@ impl DesktopLayout {
     pub fn update(&mut self, delta: f64) {
         for (_, w) in self.workspaces.iter_mut() {
             w.update(delta);
-        }
-
-        if self.grabed_window.as_ref().map(|s| s.done).unwrap_or(false) {
-            let state = self.grabed_window.take().unwrap();
-
-            let location = state.window.location() + state.window.geometry().loc;
-
-            if let Some(key) = self
-                .output_map
-                .find_by_position(location)
-                .map(|o| o.active_workspace())
-            {
-                self.workspaces
-                    .get_mut(key)
-                    .unwrap()
-                    .map_toplevel(state.window, false);
-            } else {
-                self.active_workspace().map_toplevel(state.window, false);
-            }
         }
     }
 }

@@ -9,10 +9,7 @@ use smithay::{
     },
 };
 
-use crate::{
-    desktop_layout::{GrabState, Toplevel},
-    state::Anodium,
-};
+use crate::{desktop_layout::Toplevel, state::Anodium};
 
 use super::{
     move_surface_grab::MoveSurfaceGrab,
@@ -70,7 +67,7 @@ impl Anodium {
                 if let Some(space) = desktop_layout.find_workspace_by_surface_mut(&toplevel) {
                     if let Some(res) = space.move_request(&toplevel, &seat, serial, &start_data) {
                         if let Some(window) = space.unmap_toplevel(&toplevel) {
-                            desktop_layout.grabed_window = Some(GrabState { window, done: false });
+                            desktop_layout.grabed_window = Some(window);
 
                             let grab = MoveSurfaceGrab {
                                 start_data,

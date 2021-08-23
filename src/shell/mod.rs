@@ -219,7 +219,7 @@ impl Anodium {
 
             // Update currently grabed window
             if let Some(grab) = self.desktop_layout.borrow().grabed_window.as_ref() {
-                if let Some(s) = grab.window.toplevel().get_surface() {
+                if let Some(s) = grab.toplevel().get_surface() {
                     if s == surface {
                         with_states(surface, |states| {
                             let mut data = states

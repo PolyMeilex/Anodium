@@ -34,8 +34,8 @@ impl PointerGrab for MoveSurfaceGrab {
     ) {
         let delta = location - self.start_data.location;
 
-        if let Some(state) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
-            if let Some(surface) = state.window.toplevel().get_surface() {
+        if let Some(window) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
+            if let Some(surface) = window.toplevel().get_surface() {
                 // Check if there is MoveAfterResize in progress
                 let started = compositor::with_states(surface, |states| {
                     let data = states.data_map.get::<RefCell<SurfaceData>>().unwrap().borrow();
@@ -52,7 +52,7 @@ impl PointerGrab for MoveSurfaceGrab {
 
                 if started {
                     let new_location = self.initial_window_location.to_f64() + delta;
-                    state.window.set_location(new_location.to_i32_round());
+                    window.set_location(new_location.to_i32_round());
                 }
             }
         }
@@ -101,9 +101,28 @@ impl PointerGrab for MoveSurfaceGrab {
             // anodium.maximize_animation.stop();
             // }
 
-            if let Some(state) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
-                state.done = true;
+            {
+                let desktop_layout = &mut *self.desktop_layout.borrow_mut();
+
+                let window = desktop_layout.grabed_window.take().unwrap();
+
+                let location = window.location() + window.geometry().loc;
+
+                if let Some(key) = desktop_layout
+                    .output_map
+                    .find_by_position(location)
+                    .map(|o| o.active_workspace())
+                {
+                    desktop_layout
+                        .workspaces
+                        .get_mut(key)
+                        .unwrap()
+                        .map_toplevel(window, false);
+                } else {
+                    desktop_layout.active_workspace().map_toplevel(window, false);
+                }
             }
+
             // No more buttons are pressed, release the grab.
             handle.unset_grab(serial, time);
         }
