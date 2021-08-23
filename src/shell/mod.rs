@@ -8,7 +8,7 @@ use smithay::{
             TraversalAction,
         },
         shell::{
-            wlr_layer::{wlr_layer_shell_init, LayerShellRequest},
+            wlr_layer::{wlr_layer_shell_init, LayerShellRequest, LayerSurfaceAttributes},
             xdg::{xdg_shell_init, XdgToplevelSurfaceRoleAttributes},
         },
     },
@@ -42,20 +42,6 @@ impl Anodium {
                 self.desktop_layout
                     .borrow_mut()
                     .insert_layer(output, surface, layer);
-                // TODO:
-                // let output_map = self.output_map.borrow();
-
-                // let output = output.and_then(|output| output_map.find_by_output(&output));
-                // let output = output.unwrap_or_else(|| {
-                //     output_map
-                //         .find_by_position(self.pointer_location().to_i32_round())
-                //         .unwrap_or_else(|| output_map.with_primary().unwrap())
-                // });
-
-                // if let Some(wl_surface) = surface.get_surface() {
-                // output.add_layer_surface(wl_surface.clone());
-                // self.window_map.borrow_mut().layers.insert(surface, layer);
-                // }
             }
             LayerShellRequest::AckConfigure { .. } => {
                 self.desktop_layout.borrow_mut().arrange_layers();
@@ -265,28 +251,31 @@ impl Anodium {
         //     }
         // }
 
-        // TODO:
-        // let mut window_map = self.window_map.borrow_mut();
-        // if let Some(layer) = window_map.layers.find(surface) {
-        //     // send the initial configure if relevant
-        //     let initial_configure_sent = with_states(surface, |states| {
-        //         states
-        //             .data_map
-        //             .get::<Mutex<LayerSurfaceAttributes>>()
-        //             .unwrap()
-        //             .lock()
-        //             .unwrap()
-        //             .initial_configure_sent
-        //     })
-        //     .unwrap();
-        //     if !initial_configure_sent {
-        //         layer.surface.send_configure();
-        //     }
+        let found = self.desktop_layout.borrow().output_map.iter().any(|o| {
+            let layer = o.layer_map().find(surface);
 
-        //     if let Some(output) = self.output_map.borrow().find_by_layer_surface(surface) {
-        //         window_map.layers.arange_layers(output);
-        //     }
-        // }
+            if let Some(layer) = layer.as_ref() {
+                let initial_configure_sent = with_states(surface, |states| {
+                    states
+                        .data_map
+                        .get::<Mutex<LayerSurfaceAttributes>>()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .initial_configure_sent
+                })
+                .unwrap();
+                if !initial_configure_sent {
+                    layer.surface.send_configure();
+                }
+            }
+
+            layer.is_some()
+        });
+
+        if found {
+            self.desktop_layout.borrow_mut().arrange_layers();
+        }
     }
 }
 
