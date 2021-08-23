@@ -16,7 +16,7 @@ use smithay::{
 
 use crate::{
     desktop_layout::Toplevel,
-    state::{BackendState, Anodium},
+    state::{Anodium, BackendState},
 };
 
 pub mod move_surface_grab;
@@ -25,7 +25,7 @@ pub mod resize_surface_grab;
 
 pub mod surface_data;
 pub use surface_data::SurfaceData;
-pub use surface_data::{MaximizeState, MaximizedData};
+pub use surface_data::{MoveAfterResizeData, MoveAfterResizeState};
 use surface_data::{ResizeData, ResizeEdge, ResizeState};
 
 mod xdg_shell;
@@ -147,6 +147,7 @@ impl Anodium {
 
         // Update maped windows
         {
+            // In visible workspaces
             for workspace in self.desktop_layout.borrow_mut().visible_workspaces() {
                 let mut window_map = workspace.windows_mut();
                 if let Some(window) = window_map.find_mut(surface) {
@@ -197,11 +198,11 @@ impl Anodium {
                             data.resize_state = ResizeState::NotResizing;
                         }
 
-                        // If the window was fullscreened move it
-                        match data.maximize_state {
-                            MaximizeState::WaitingForCommit(mdata) => {
+                        // If the compositor requested MoveAfterReszie
+                        match data.move_after_resize_state {
+                            MoveAfterResizeState::WaitingForCommit(mdata) => {
                                 new_location = Some(mdata.target_window_location);
-                                data.maximize_state = MaximizeState::Current(mdata);
+                                data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
                             }
                             _ => {}
                         }
@@ -212,6 +213,29 @@ impl Anodium {
 
                     if let Some(location) = new_location {
                         window.set_location(location);
+                    }
+                }
+            }
+
+            // Update currently grabed window
+            if let Some(grab) = self.desktop_layout.borrow().grabed_window.as_ref() {
+                if let Some(s) = grab.window.toplevel().get_surface() {
+                    if s == surface {
+                        with_states(surface, |states| {
+                            let mut data = states
+                                .data_map
+                                .get::<RefCell<SurfaceData>>()
+                                .unwrap()
+                                .borrow_mut();
+
+                            // If the compositor requested MoveAfterReszie
+                            if let MoveAfterResizeState::WaitingForCommit(mdata) =
+                                data.move_after_resize_state
+                            {
+                                data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
+                            }
+                        })
+                        .unwrap();
                     }
                 }
             }

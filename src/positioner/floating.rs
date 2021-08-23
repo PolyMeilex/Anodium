@@ -19,7 +19,7 @@ use crate::{
     shell::{
         resize_surface_grab::ResizeSurfaceGrab,
         surface_data::{ResizeData, ResizeState},
-        MaximizeState, SurfaceData,
+        MoveAfterResizeData, MoveAfterResizeState, SurfaceData,
     },
 };
 
@@ -81,31 +81,29 @@ impl Positioner for Floating {
         if let Some(window) = self.windows.borrow().find(toplevel) {
             let pointer = seat.get_pointer().unwrap();
 
-            let mut initial_window_location = window.location();
+            let mut target_window_location = window.location();
 
             // If surface is maximized then unmaximize it
             if let Toplevel::Xdg(ref surface) = toplevel {
                 if let Some(current_state) = surface.current_state() {
                     if current_state.states.contains(xdg_toplevel::State::Maximized) {
                         let new_size = surface.get_surface().and_then(|surface| {
-                            let fullscreen_state = compositor::with_states(&surface, |states| {
+                            compositor::with_states(&surface, |states| {
                                 let mut data = states
                                     .data_map
                                     .get::<RefCell<SurfaceData>>()
                                     .unwrap()
                                     .borrow_mut();
-                                let fullscreen_state = data.maximize_state;
-                                data.maximize_state = MaximizeState::NotMaximized;
+                                let fullscreen_state = data.move_after_resize_state;
+                                data.move_after_resize_state = MoveAfterResizeState::None;
 
-                                fullscreen_state
+                                if let MoveAfterResizeState::Current(rdata) = fullscreen_state {
+                                    Some(rdata.initial_size)
+                                } else {
+                                    None
+                                }
                             })
-                            .unwrap();
-
-                            if let MaximizeState::Current(data) = fullscreen_state {
-                                Some(data.initial_size)
-                            } else {
-                                None
-                            }
+                            .unwrap()
                         });
 
                         let fs_changed = surface.with_pending_state(|state| {
@@ -118,17 +116,36 @@ impl Positioner for Floating {
 
                             let pointer_pos = pointer.current_location();
 
-                            if let (Some(current_size), Some(new_size)) = (current_state.size, new_size) {
-                                let current_size = current_size.to_f64();
-                                let window_location = initial_window_location.to_f64();
-                                let pointer_win_pos = pointer_pos - window_location;
+                            if let (Some(initial_size), Some(target_size)) = (current_state.size, new_size) {
+                                let initial_window_location = target_window_location;
+                                let pointer_win_pos = pointer_pos - initial_window_location.to_f64();
 
-                                let p = pointer_win_pos.x / current_size.w;
-                                let w = new_size.w as f64;
+                                let p = pointer_win_pos.x / initial_size.w as f64;
+                                let w = target_size.w as f64;
 
-                                initial_window_location.x = (pointer_pos.x - w * p) as i32;
-                            } else {
-                                initial_window_location = pointer_pos.to_i32_round();
+                                target_window_location.x = (pointer_pos.x - w * p) as i32;
+
+                                if let Some(surface) = surface.get_surface() {
+                                    compositor::with_states(&surface, |states| {
+                                        let mut data = states
+                                            .data_map
+                                            .get::<RefCell<SurfaceData>>()
+                                            .unwrap()
+                                            .borrow_mut();
+
+                                        data.move_after_resize_state =
+                                            MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
+                                                initial_window_location,
+                                                initial_size,
+
+                                                target_window_location,
+                                                target_size,
+                                            });
+                                    })
+                                    .unwrap();
+                                } else {
+                                    target_window_location = pointer_pos.to_i32_round();
+                                }
                             }
                         }
                     }
@@ -136,7 +153,7 @@ impl Positioner for Floating {
             }
 
             Some(MoveResponse {
-                initial_window_location,
+                initial_window_location: target_window_location,
                 windows: self.windows.clone(),
             })
         } else {

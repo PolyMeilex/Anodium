@@ -16,7 +16,7 @@ use smithay::{
 use crate::xwayland::X11Surface;
 use crate::{
     animations::enter_exit::EnterExitAnimation,
-    shell::{MaximizeState, MaximizedData, SurfaceData},
+    shell::{MoveAfterResizeState, MoveAfterResizeData, SurfaceData},
 };
 
 mod list;
@@ -171,7 +171,7 @@ impl Window {
                 let surface_data = states.data_map.get::<RefCell<SurfaceData>>();
 
                 if let Some(data) = surface_data {
-                    data.borrow_mut().maximize_state = MaximizeState::WaitingForFinalAck(MaximizedData {
+                    data.borrow_mut().move_after_resize_state = MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
                         initial_window_location,
                         initial_size,
 
@@ -197,10 +197,10 @@ impl Window {
                     .get::<RefCell<SurfaceData>>()
                     .unwrap()
                     .borrow_mut();
-                let fullscreen_state = data.maximize_state;
+                let fullscreen_state = data.move_after_resize_state;
 
-                if let MaximizeState::Current(mdata) = fullscreen_state {
-                    data.maximize_state = MaximizeState::WaitingForFinalAck(MaximizedData {
+                if let MoveAfterResizeState::Current(mdata) = fullscreen_state {
+                    data.move_after_resize_state = MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
                         initial_window_location,
                         initial_size,
 
@@ -213,7 +213,7 @@ impl Window {
             })
             .unwrap();
 
-            if let MaximizeState::Current(data) = fullscreen_state {
+            if let MoveAfterResizeState::Current(data) = fullscreen_state {
                 Some(data.initial_size)
             } else {
                 None

@@ -4,12 +4,15 @@ use smithay::{
     reexports::wayland_server::protocol::{wl_pointer::ButtonState, wl_surface},
     utils::{Logical, Point},
     wayland::{
+        compositor,
         seat::{AxisFrame, GrabStartData, PointerGrab, PointerInnerHandle},
         Serial,
     },
 };
 
 use crate::desktop_layout::{DesktopLayout, Toplevel};
+
+use super::{MoveAfterResizeState, SurfaceData};
 
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,
@@ -30,10 +33,28 @@ impl PointerGrab for MoveSurfaceGrab {
         _time: u32,
     ) {
         let delta = location - self.start_data.location;
-        let new_location = self.initial_window_location.to_f64() + delta;
 
         if let Some(state) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
-            state.window.set_location(new_location.to_i32_round());
+            if let Some(surface) = state.window.toplevel().get_surface() {
+                // Check if there is MoveAfterResize in progress
+                let started = compositor::with_states(surface, |states| {
+                    let data = states.data_map.get::<RefCell<SurfaceData>>().unwrap().borrow();
+                    match &data.move_after_resize_state {
+                        // If done
+                        MoveAfterResizeState::Current(_) => true,
+                        // If non-existent
+                        MoveAfterResizeState::None => true,
+                        // If in proggres
+                        _ => false,
+                    }
+                })
+                .unwrap();
+
+                if started {
+                    let new_location = self.initial_window_location.to_f64() + delta;
+                    state.window.set_location(new_location.to_i32_round());
+                }
+            }
         }
 
         // TODO:

@@ -17,7 +17,7 @@ use crate::{
 use super::{
     move_surface_grab::MoveSurfaceGrab,
     surface_data::{ResizeState, SurfaceData},
-    MaximizeState,
+    MoveAfterResizeState,
 };
 
 impl Anodium {
@@ -202,8 +202,8 @@ impl Anodium {
                 with_states(&surface, |states| {
                     if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
                         let mut data = data.borrow_mut();
-                        if let MaximizeState::WaitingForFinalAck(mdata) = data.maximize_state {
-                            data.maximize_state = MaximizeState::WaitingForCommit(mdata);
+                        if let MoveAfterResizeState::WaitingForAck(mdata) = data.move_after_resize_state {
+                            data.move_after_resize_state = MoveAfterResizeState::WaitingForCommit(mdata);
                         }
                     }
                 })

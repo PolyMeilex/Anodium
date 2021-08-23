@@ -16,7 +16,7 @@ use smithay::{
 
 use crate::{
     desktop_layout::{Toplevel, Window, WindowList},
-    shell::{MaximizeState, SurfaceData},
+    shell::{MoveAfterResizeState, SurfaceData},
 };
 
 use super::{MoveResponse, Positioner};
@@ -121,14 +121,14 @@ impl Positioner for Tiling {
                                     .get::<RefCell<SurfaceData>>()
                                     .unwrap()
                                     .borrow_mut();
-                                let fullscreen_state = data.maximize_state;
-                                data.maximize_state = MaximizeState::NotMaximized;
+                                let fullscreen_state = data.move_after_resize_state;
+                                data.move_after_resize_state = MoveAfterResizeState::None;
 
                                 fullscreen_state
                             })
                             .unwrap();
 
-                            if let MaximizeState::Current(data) = fullscreen_state {
+                            if let MoveAfterResizeState::Current(data) = fullscreen_state {
                                 Some(data.initial_size)
                             } else {
                                 None

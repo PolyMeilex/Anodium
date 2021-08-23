@@ -17,7 +17,7 @@ pub struct SurfaceData {
     pub texture: Option<Box<dyn std::any::Any + 'static>>,
     pub geometry: Option<Rectangle<i32, Logical>>,
     pub resize_state: ResizeState,
-    pub maximize_state: MaximizeState,
+    pub move_after_resize_state: MoveAfterResizeState,
     pub buffer_dimensions: Option<Size<i32, Physical>>,
     pub buffer_scale: i32,
 }
@@ -91,7 +91,7 @@ impl SurfaceData {
 
 /// Information about the fullscrean operation.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct MaximizedData {
+pub struct MoveAfterResizeData {
     /// The initial window location.
     pub initial_window_location: Point<i32, Logical>,
     /// The initial window geometry.
@@ -105,20 +105,20 @@ pub struct MaximizedData {
 
 /// State of the resize operation.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum MaximizeState {
-    /// The surface is not fullscreen
-    NotMaximized,
-    /// The surface is fullscreen
-    Current(MaximizedData),
-    /// The resize has finished, and the surface needs to ack the final configure.
-    WaitingForFinalAck(MaximizedData),
-    /// Waiting for resize
-    WaitingForCommit(MaximizedData),
+pub enum MoveAfterResizeState {
+    /// Idle
+    None,
+    /// The surface was resized and moved
+    Current(MoveAfterResizeData),
+    /// The resize and move was requested, and the surface needs to ack the configure
+    WaitingForAck(MoveAfterResizeData),
+    /// Waiting for commit
+    WaitingForCommit(MoveAfterResizeData),
 }
 
-impl Default for MaximizeState {
+impl Default for MoveAfterResizeState {
     fn default() -> Self {
-        Self::NotMaximized
+        Self::None
     }
 }
 
