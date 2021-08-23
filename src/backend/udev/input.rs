@@ -9,7 +9,7 @@ impl BackendState<UdevData> {
     {
         match event {
             event => {
-                self.main_state.process_input_event(&mut self.backend_data, event);
+                self.anodium.process_input_event(&mut self.backend_data, event);
             }
         }
     }

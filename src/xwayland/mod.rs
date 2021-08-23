@@ -36,7 +36,7 @@ impl<BackendData: 'static> BackendState<BackendData> {
     pub fn xwayland_ready(&mut self, connection: UnixStream, client: Client) {
         let (wm, source) = X11State::start_wm(
             connection,
-            self.main_state.not_mapped_list.clone(),
+            self.anodium.not_mapped_list.clone(),
             self.log.clone(),
         )
         .unwrap();

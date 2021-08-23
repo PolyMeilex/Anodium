@@ -24,6 +24,8 @@ use crate::{render::AnodiumRenderer, render::*, state::BackendState};
 
 pub const OUTPUT_NAME: &str = "winit";
 
+mod input;
+
 pub struct WinitData {
     #[cfg(feature = "debug")]
     pub fps: fps_ticker::Fps,
@@ -84,7 +86,7 @@ pub fn run_winit(
         refresh: 60_000,
     };
 
-    state.main_state.add_output(
+    state.anodium.add_output(
         OUTPUT_NAME,
         PhysicalProperties {
             size: (0, 0).into(),
@@ -114,7 +116,7 @@ pub fn run_winit(
                     Ok(()) => {
                         let mut renderer = renderer.borrow_mut();
                         let outputs: Vec<_> = state
-                            .main_state
+                            .anodium
                             .desktop_layout
                             .borrow()
                             .output_map
@@ -126,14 +128,14 @@ pub fn run_winit(
                             renderer
                                 .render_winit(|frame| {
                                     state
-                                        .main_state
+                                        .anodium
                                         .render(frame, (output_geometry, output_scale))
                                         .unwrap();
 
                                     // draw the cursor as relevant
                                     {
-                                        let (x, y) = state.main_state.pointer_location().into();
-                                        let mut guard = state.main_state.cursor_status.lock().unwrap();
+                                        let (x, y) = state.anodium.pointer_location.into();
+                                        let mut guard = state.anodium.cursor_status.lock().unwrap();
                                         // reset the cursor if the surface is no longer alive
                                         let mut reset = false;
                                         if let CursorImageStatus::Image(ref surface) = *guard {
@@ -156,7 +158,7 @@ pub fn run_winit(
                                         }
                                     }
 
-                                    let fps = state.main_state.fps.avg().round() as u32;
+                                    let fps = state.anodium.fps.avg().round() as u32;
 
                                     #[cfg(feature = "debug")]
                                     {
@@ -171,15 +173,15 @@ pub fn run_winit(
                         }
 
                         let time = start_time.elapsed().as_millis() as u32;
-                        state.main_state.send_frames(time);
+                        state.anodium.send_frames(time);
 
-                        state.main_state.display.borrow_mut().flush_clients(&mut ());
-                        state.main_state.update();
+                        state.anodium.display.borrow_mut().flush_clients(&mut ());
+                        state.anodium.update();
 
                         handle.add_timeout(Duration::from_millis(16), ());
                     }
                     Err(winit::WinitInputError::WindowClosed) => {
-                        state.main_state.running.store(false, Ordering::SeqCst);
+                        state.anodium.running.store(false, Ordering::SeqCst);
                     }
                 }
             })

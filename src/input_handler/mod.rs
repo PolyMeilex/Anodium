@@ -1,12 +1,6 @@
-#[cfg(feature = "winit")]
-mod winit;
-
-#[cfg(feature = "udev")]
-mod udev;
-
 use std::{process::Command, sync::atomic::Ordering};
 
-use crate::{backend::Backend, MainState};
+use crate::{backend::Backend, Anodium};
 
 use smithay::{
     backend::input::{
@@ -21,7 +15,7 @@ use smithay::{
     },
 };
 
-impl MainState {
+impl Anodium {
     pub fn process_input_event<B: Backend, I: InputBackend>(
         &mut self,
         backend: &mut B,
@@ -32,8 +26,7 @@ impl MainState {
                 action => self.shortcut_handler(backend, action),
             },
             InputEvent::PointerMotion { event, .. } => {
-                self.set_pointer_location(self.pointer_location() + event.delta());
-                self.set_pointer_location(self.clamp_coords(self.pointer_location()));
+                self.pointer_location = self.clamp_coords(self.pointer_location + event.delta());
                 self.on_pointer_move(event.time());
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
@@ -45,7 +38,7 @@ impl MainState {
                     .map(|o| o.size());
 
                 if let Some(output_size) = output_size {
-                    self.set_pointer_location(event.position_transformed(output_size));
+                    self.pointer_location = event.position_transformed(output_size);
                     self.on_pointer_move(event.time());
                 }
             }
@@ -113,9 +106,7 @@ impl MainState {
             input::ButtonState::Pressed => {
                 // change the keyboard focus unless the pointer is grabbed
                 if !self.pointer.is_grabbed() {
-                    let pointer_location = self.pointer_location();
-
-                    let under = self.desktop_layout.borrow().surface_under(pointer_location);
+                    let under = self.desktop_layout.borrow().surface_under(self.pointer_location);
 
                     self.keyboard
                         .set_focus(under.as_ref().map(|&(ref s, _)| s), serial);
@@ -171,12 +162,12 @@ impl MainState {
     fn on_pointer_move(&mut self, time: u32) {
         let serial = SCOUNTER.next_serial();
 
-        let pointer_location = self.pointer_location();
+        self.desktop_layout
+            .borrow_mut()
+            .on_pointer_move(self.pointer_location);
 
-        self.desktop_layout.borrow_mut().on_pointer_move(pointer_location);
-
-        let under = self.desktop_layout.borrow().surface_under(pointer_location);
-        self.pointer.motion(pointer_location, under, serial, time);
+        let under = self.desktop_layout.borrow().surface_under(self.pointer_location);
+        self.pointer.motion(self.pointer_location, under, serial, time);
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {
@@ -238,7 +229,7 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> KeyAc
     }
 }
 
-impl MainState {
+impl Anodium {
     fn shortcut_handler<B: Backend>(&mut self, backend: &mut B, action: KeyAction) {
         match action {
             KeyAction::None | KeyAction::Forward => {}

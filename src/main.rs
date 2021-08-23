@@ -23,7 +23,7 @@ mod positioner;
 
 mod wayland;
 
-use state::MainState;
+use state::Anodium;
 
 fn main() {
     // A logger facility, here we use the terminal here

@@ -16,7 +16,7 @@ use smithay::{
 
 use crate::{
     desktop_layout::Toplevel,
-    state::{BackendState, MainState},
+    state::{BackendState, Anodium},
 };
 
 pub mod move_surface_grab;
@@ -30,7 +30,7 @@ use surface_data::{ResizeData, ResizeEdge, ResizeState};
 
 mod xdg_shell;
 
-impl MainState {
+impl Anodium {
     fn wlr_layer_shell_request(&mut self, request: LayerShellRequest) {
         match request {
             LayerShellRequest::NewLayerSurface {
@@ -267,7 +267,7 @@ pub fn init_shell<BackendData: 'static>(display: Rc<RefCell<Display>>, log: ::sl
         &mut *display.borrow_mut(),
         move |surface, mut ddata| {
             let state = ddata.get::<BackendState<BackendData>>().unwrap();
-            state.main_state.surface_commit(&surface);
+            state.anodium.surface_commit(&surface);
         },
         log.clone(),
     );
@@ -277,7 +277,7 @@ pub fn init_shell<BackendData: 'static>(display: Rc<RefCell<Display>>, log: ::sl
         &mut *display.borrow_mut(),
         move |request, mut dispatch_data| {
             let state = dispatch_data.get::<BackendState<BackendData>>().unwrap();
-            state.main_state.xdg_shell_request(request);
+            state.anodium.xdg_shell_request(request);
         },
         log.clone(),
     );
@@ -286,7 +286,7 @@ pub fn init_shell<BackendData: 'static>(display: Rc<RefCell<Display>>, log: ::sl
         &mut *display.borrow_mut(),
         move |request, mut ddata| {
             let state = ddata.get::<BackendState<BackendData>>().unwrap();
-            state.main_state.wlr_layer_shell_request(request);
+            state.anodium.wlr_layer_shell_request(request);
         },
         log.clone(),
     );

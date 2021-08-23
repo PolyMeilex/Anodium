@@ -15,7 +15,7 @@ impl BackendState<WinitData> {
     {
         match event {
             InputEvent::Special(WinitEvent::Resized { size, .. }) => {
-                self.main_state
+                self.anodium
                     .desktop_layout
                     .borrow_mut()
                     .update_output_mode_by_name(
@@ -27,7 +27,7 @@ impl BackendState<WinitData> {
                     );
             }
             event => {
-                self.main_state.process_input_event(&mut self.backend_data, event);
+                self.anodium.process_input_event(&mut self.backend_data, event);
             }
         }
     }

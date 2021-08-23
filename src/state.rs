@@ -35,8 +35,7 @@ use crate::{
     shell::not_mapped_list::NotMappedList,
 };
 
-pub struct MainState {
-    pub socket_name: String,
+pub struct Anodium {
     pub running: Arc<AtomicBool>,
     pub display: Rc<RefCell<Display>>,
 
@@ -47,29 +46,31 @@ pub struct MainState {
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
     pub log: slog::Logger,
 
-    // input-related fields
-    pointer_location: Point<f64, Logical>,
+    pub pointer_location: Point<f64, Logical>,
+
     pub pointer: PointerHandle,
     pub keyboard: KeyboardHandle,
+
     pub suppressed_keys: Vec<u32>,
     pub cursor_status: Arc<Mutex<CursorImageStatus>>,
+
     pub seat_name: String,
     pub seat: Seat,
 
     pub start_time: std::time::Instant,
     pub fps: fps_ticker::Fps,
-    instant: Instant,
+    last_update: Instant,
 }
 
-impl MainState {
+impl Anodium {
     pub fn update(&mut self) {
-        let elapsed = self.instant.elapsed().as_secs_f64();
+        let elapsed = self.last_update.elapsed().as_secs_f64();
 
         // anodium.maximize_animation.update(elapsed);
 
         self.desktop_layout.borrow_mut().update(elapsed);
 
-        self.instant = Instant::now();
+        self.last_update = Instant::now();
         self.fps.tick();
     }
 
@@ -127,8 +128,8 @@ impl MainState {
         }
 
         // Pointer Related:
-        if output_geometry.to_f64().contains(self.pointer_location()) {
-            let (ptr_x, ptr_y) = self.pointer_location().into();
+        if output_geometry.to_f64().contains(self.pointer_location) {
+            let (ptr_x, ptr_y) = self.pointer_location.into();
             let relative_ptr_location =
                 Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
             // draw the dnd icon if applicable
@@ -149,14 +150,6 @@ impl MainState {
         }
 
         Ok(())
-    }
-
-    pub fn pointer_location(&self) -> Point<f64, Logical> {
-        self.pointer_location
-    }
-
-    pub fn set_pointer_location(&mut self, pos: Point<f64, Logical>) {
-        self.pointer_location = pos;
     }
 
     pub fn add_output<N, CB>(
@@ -189,7 +182,8 @@ impl MainState {
 pub struct BackendState<BackendData> {
     pub handle: LoopHandle<'static, Self>,
     pub backend_data: BackendData,
-    pub main_state: MainState,
+
+    pub anodium: Anodium,
 
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
@@ -209,13 +203,13 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
             .insert_source(
                 Generic::from_fd(display.borrow().get_poll_fd(), Interest::READ, Mode::Level),
                 move |_, _, state: &mut Self| {
-                    let display = state.main_state.display.clone();
+                    let display = state.anodium.display.clone();
                     let mut display = display.borrow_mut();
                     match display.dispatch(std::time::Duration::from_millis(0), state) {
                         Ok(_) => Ok(PostAction::Continue),
                         Err(e) => {
-                            error!(state.main_state.log, "I/O error on the Wayland display: {}", e);
-                            state.main_state.running.store(false, Ordering::SeqCst);
+                            error!(state.anodium.log, "I/O error on the Wayland display: {}", e);
+                            state.anodium.running.store(false, Ordering::SeqCst);
                             Err(e)
                         }
                     }
@@ -225,7 +219,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
 
         // Init the basic compositor globals
 
-        init_shm_global(&mut (*display).borrow_mut(), vec![], log.clone());
+        init_shm_global(&mut display.borrow_mut(), vec![], log.clone());
 
         init_shell::<BackendData>(display.clone(), log.clone());
 
@@ -307,7 +301,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
         BackendState {
             handle,
             backend_data,
-            main_state: MainState {
+            anodium: Anodium {
                 running: Arc::new(AtomicBool::new(true)),
                 desktop_layout: Rc::new(RefCell::new(DesktopLayout::new(display.clone(), log.clone()))),
 
@@ -317,7 +311,6 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                 // output_map: output_map.clone(),
                 dnd_icon,
                 log: log.clone(),
-                socket_name,
 
                 pointer_location: (0.0, 0.0).into(),
                 pointer: pointer.clone(),
@@ -329,7 +322,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
 
                 start_time: Instant::now(),
                 fps: fps_ticker::Fps::default(),
-                instant: Instant::now(),
+                last_update: Instant::now(),
             },
             log,
             #[cfg(feature = "xwayland")]

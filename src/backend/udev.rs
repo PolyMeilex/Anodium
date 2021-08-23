@@ -64,7 +64,9 @@ use smithay::{
 
 use super::Backend;
 use crate::{render::renderer::HasGles2Renderer, render::*, state::BackendState};
-use crate::{render::AnodiumRenderer, state::MainState};
+use crate::{render::AnodiumRenderer, state::Anodium};
+
+mod input;
 
 #[derive(Clone)]
 pub struct SessionFd(RawFd);
@@ -151,7 +153,7 @@ pub fn run_udev(
     /*
      * Initialize the udev backend
      */
-    let udev_backend = UdevBackend::new(state.main_state.seat_name.clone(), log.clone()).map_err(|_| ())?;
+    let udev_backend = UdevBackend::new(state.anodium.seat_name.clone(), log.clone()).map_err(|_| ())?;
 
     /*
      * Initialize a fake output (we render one screen to every device in this example)
@@ -164,7 +166,7 @@ pub fn run_udev(
         state.backend_data.session.clone().into(),
     );
     libinput_context
-        .udev_assign_seat(&state.main_state.seat_name)
+        .udev_assign_seat(&state.anodium.seat_name)
         .unwrap();
     let mut libinput_backend = LibinputInputBackend::new(libinput_context, log.clone());
     libinput_backend.link(session_signal);
@@ -234,8 +236,8 @@ pub fn run_udev(
         event_loop
             .handle()
             .insert_source(timer, move |_: (), handle, state| {
-                state.main_state.display.borrow_mut().flush_clients(&mut ());
-                state.main_state.update();
+                state.anodium.display.borrow_mut().flush_clients(&mut ());
+                state.anodium.update();
 
                 handle.add_timeout(Duration::from_millis(16), ());
             })
@@ -275,7 +277,7 @@ fn scan_connectors(
     device: &mut DrmDevice<SessionFd>,
     gbm: &GbmDevice<SessionFd>,
     renderer: &mut AnodiumRenderer<Gles2Renderer>,
-    main_state: &mut MainState,
+    main_state: &mut Anodium,
     signaler: &Signaler<SessionSignal>,
     logger: &::slog::Logger,
 ) -> HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>> {
@@ -463,7 +465,7 @@ impl BackendState<UdevData> {
                 info!(self.log, "Initializing EGL Hardware Acceleration via {:?}", path);
                 if renderer
                     .borrow_mut()
-                    .bind_wl_display(&*self.main_state.display.borrow())
+                    .bind_wl_display(&*self.anodium.display.borrow())
                     .is_ok()
                 {
                     info!(self.log, "EGL hardware-acceleration enabled");
@@ -474,7 +476,7 @@ impl BackendState<UdevData> {
                 &mut device,
                 &gbm,
                 &mut *renderer.borrow_mut(),
-                &mut self.main_state,
+                &mut self.anodium,
                 &self.backend_data.signaler,
                 &self.log,
             )));
@@ -531,7 +533,7 @@ impl BackendState<UdevData> {
             let loop_handle = self.handle.clone();
             let signaler = self.backend_data.signaler.clone();
 
-            self.main_state.retain_outputs(|output| {
+            self.anodium.retain_outputs(|output| {
                 output
                     .userdata()
                     .get::<UdevOutputId>()
@@ -545,7 +547,7 @@ impl BackendState<UdevData> {
                 &mut *source,
                 &backend_data.gbm,
                 &mut *backend_data.renderer.borrow_mut(),
-                &mut self.main_state,
+                &mut self.anodium,
                 &signaler,
                 &logger,
             );
@@ -570,7 +572,7 @@ impl BackendState<UdevData> {
             backend_data.surfaces.borrow_mut().clear();
             debug!(self.log, "Surfaces dropped");
 
-            self.main_state.retain_outputs(|output| {
+            self.anodium.retain_outputs(|output| {
                 output
                     .userdata()
                     .get::<UdevOutputId>()
@@ -618,7 +620,7 @@ impl BackendState<UdevData> {
             // TODO get scale from the rendersurface when supporting HiDPI
             let frame = self.backend_data.pointer_image.get_image(
                 1, /*scale*/
-                self.main_state.start_time.elapsed().as_millis() as u32,
+                self.anodium.start_time.elapsed().as_millis() as u32,
             );
             let renderer = &mut *device_backend.renderer.borrow_mut();
             let pointer_images = &mut device_backend.pointer_images;
@@ -634,7 +636,7 @@ impl BackendState<UdevData> {
                     texture
                 });
 
-            let result = self.main_state.render_surface(
+            let result = self.anodium.render_surface(
                 &mut *surface.borrow_mut(),
                 renderer,
                 device_backend.dev_id,
@@ -666,8 +668,8 @@ impl BackendState<UdevData> {
                 }
             } else {
                 // Send frame events so that client start drawing their next frame
-                let time = self.main_state.start_time.elapsed().as_millis() as u32;
-                self.main_state.send_frames(time);
+                let time = self.anodium.start_time.elapsed().as_millis() as u32;
+                self.anodium.send_frames(time);
             }
         }
     }
@@ -698,7 +700,7 @@ fn schedule_initial_render<Data: 'static>(
     }
 }
 
-impl MainState {
+impl Anodium {
     #[allow(clippy::too_many_arguments)]
     fn render_surface(
         &mut self,
@@ -738,8 +740,8 @@ impl MainState {
                     let mut cursor_status = self.cursor_status.lock().unwrap();
 
                     // set cursor
-                    if output_geometry.to_f64().contains(self.pointer_location()) {
-                        let (ptr_x, ptr_y) = self.pointer_location().into();
+                    if output_geometry.to_f64().contains(self.pointer_location) {
+                        let (ptr_x, ptr_y) = self.pointer_location.into();
                         let relative_ptr_location =
                             Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
                         // draw the cursor as relevant

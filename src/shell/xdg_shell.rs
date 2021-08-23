@@ -11,7 +11,7 @@ use smithay::{
 
 use crate::{
     desktop_layout::{GrabState, Toplevel},
-    state::MainState,
+    state::Anodium,
 };
 
 use super::{
@@ -20,7 +20,7 @@ use super::{
     MaximizeState,
 };
 
-impl MainState {
+impl Anodium {
     pub fn xdg_shell_request(&mut self, request: XdgRequest) {
         match request {
             XdgRequest::NewToplevel { surface } => {

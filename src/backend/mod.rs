@@ -61,8 +61,8 @@ fn run_loop<D>(mut state: BackendState<D>, mut event_loop: EventLoop<'static, Ba
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
-            if state.main_state.desktop_layout.borrow().output_map.is_empty()
-                || !state.main_state.running.load(Ordering::SeqCst)
+            if state.anodium.desktop_layout.borrow().output_map.is_empty()
+                || !state.anodium.running.load(Ordering::SeqCst)
             {
                 signal.stop();
             }

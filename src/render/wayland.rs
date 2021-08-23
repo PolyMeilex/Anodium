@@ -23,7 +23,7 @@ use smithay::{
     },
 };
 
-use crate::{desktop_layout::Window, render::renderer::RenderFrame, shell::SurfaceData, state::MainState};
+use crate::{desktop_layout::Window, render::renderer::RenderFrame, shell::SurfaceData, state::Anodium};
 
 struct BufferTextures<T> {
     buffer: Option<wl_buffer::WlBuffer>,
@@ -178,7 +178,7 @@ fn draw_surface_tree(
     result
 }
 
-impl MainState {
+impl Anodium {
     pub fn draw_windows(
         &self,
         frame: &mut RenderFrame,
