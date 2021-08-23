@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::output::Mode;
-use smithay::wayland::shell::wlr_layer::Layer;
+use smithay::wayland::shell::wlr_layer::{self, Layer};
 use smithay::{reexports::wayland_server::Display, wayland::output::PhysicalProperties};
 
 mod output_map;
@@ -179,7 +179,7 @@ impl DesktopLayout {
         after(output);
 
         let mut positioner = Universal::new(Default::default(), Default::default());
-        positioner.set_geometry(output.geometry());
+        positioner.set_geometry(output.usable_geometry());
 
         self.workspaces.insert(id.into(), Box::new(positioner));
     }
@@ -190,7 +190,7 @@ impl DesktopLayout {
 
         let output = self.output_map.find_by_name(name).unwrap();
         let space = self.workspaces.get_mut(output.active_workspace()).unwrap();
-        space.set_geometry(output.geometry());
+        space.set_geometry(output.usable_geometry());
     }
 
     pub fn retain_outputs<F>(&mut self, f: F)
@@ -198,5 +198,34 @@ impl DesktopLayout {
         F: FnMut(&Output) -> bool,
     {
         self.output_map.retain(f);
+    }
+}
+
+impl DesktopLayout {
+    pub fn arrange_layers(&mut self) {
+        self.output_map.arrange_layers();
+
+        for output in self.output_map.iter() {
+            let key = output.active_workspace();
+            if let Some(w) = self.workspaces.get_mut(key) {
+                w.set_geometry(output.usable_geometry());
+            }
+        }
+    }
+
+    pub fn insert_layer(
+        &mut self,
+        output: Option<smithay::reexports::wayland_server::protocol::wl_output::WlOutput>,
+        surface: wlr_layer::LayerSurface,
+        layer: wlr_layer::Layer,
+    ) {
+        self.output_map.insert_layer(output, surface, layer);
+
+        for output in self.output_map.iter() {
+            let key = output.active_workspace();
+            if let Some(w) = self.workspaces.get_mut(key) {
+                w.set_geometry(output.usable_geometry());
+            }
+        }
     }
 }

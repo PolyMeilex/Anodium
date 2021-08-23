@@ -5,12 +5,19 @@ use smithay::{
     utils::{Logical, Point, Rectangle},
     wayland::{
         compositor::{with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction},
-        shell::wlr_layer::{self, Anchor, LayerSurfaceCachedState},
+        shell::wlr_layer::{self, Anchor, ExclusiveZone, LayerSurfaceCachedState},
     },
 };
 
-use super::output_map::Output;
 use crate::shell::SurfaceData;
+
+#[derive(Default, Debug)]
+pub struct LayerExclusiveZone {
+    pub top: u32,
+    pub bottom: u32,
+    pub left: u32,
+    pub right: u32,
+}
 
 #[derive(Debug)]
 pub struct LayerSurface {
@@ -127,6 +134,13 @@ impl LayerSurface {
 #[derive(Default, Debug)]
 pub struct LayerMap {
     surfaces: Vec<LayerSurface>,
+    exclusive_zone: LayerExclusiveZone,
+}
+
+impl LayerMap {
+    pub fn exclusive_zone(&self) -> &LayerExclusiveZone {
+        &self.exclusive_zone
+    }
 }
 
 impl LayerMap {
@@ -171,6 +185,7 @@ impl LayerMap {
         }
     }
 
+    #[allow(dead_code)]
     /// Finds the layer corresponding to the given `WlSurface`.
     pub fn find(&self, surface: &wl_surface::WlSurface) -> Option<&LayerSurface> {
         self.surfaces.iter().find_map(|l| {
@@ -187,6 +202,8 @@ impl LayerMap {
     }
 
     pub fn arange(&mut self, output_rect: Rectangle<i32, Logical>) {
+        self.exclusive_zone = Default::default();
+
         for layer in self.surfaces.iter_mut() {
             let surface = if let Some(surface) = layer.surface.get_surface() {
                 surface
@@ -227,6 +244,42 @@ impl LayerMap {
             layer.surface.send_configure();
 
             layer.location = location;
+
+            if let ExclusiveZone::Exclusive(v) = data.exclusive_zone {
+                let anchor = data.anchor;
+
+                // Top
+                if anchor == (Anchor::TOP) {
+                    self.exclusive_zone.top += v;
+                }
+                if anchor == (Anchor::TOP | Anchor::LEFT | Anchor::RIGHT) {
+                    self.exclusive_zone.top += v;
+                }
+
+                // Bottom
+                if anchor == (Anchor::BOTTOM) {
+                    self.exclusive_zone.bottom += v;
+                }
+                if anchor == (Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT) {
+                    self.exclusive_zone.bottom += v;
+                }
+
+                // Left
+                if anchor == (Anchor::LEFT) {
+                    self.exclusive_zone.left += v;
+                }
+                if anchor == (Anchor::LEFT | Anchor::BOTTOM | Anchor::TOP) {
+                    self.exclusive_zone.left += v;
+                }
+
+                // Right
+                if anchor == (Anchor::RIGHT) {
+                    self.exclusive_zone.right += v;
+                }
+                if anchor == (Anchor::RIGHT | Anchor::BOTTOM | Anchor::TOP) {
+                    self.exclusive_zone.right += v;
+                }
+            }
         }
     }
 

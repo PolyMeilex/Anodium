@@ -80,6 +80,21 @@ impl Output {
         Rectangle { loc, size }
     }
 
+    pub fn usable_geometry(&self) -> Rectangle<i32, Logical> {
+        let mut ret = self.geometry();
+
+        ret.loc.x += self.layer_map.exclusive_zone().left as i32;
+        ret.size.w -= self.layer_map.exclusive_zone().left as i32;
+
+        ret.loc.y += self.layer_map.exclusive_zone().top as i32;
+        ret.size.h -= self.layer_map.exclusive_zone().top as i32;
+
+        ret.size.w -= self.layer_map.exclusive_zone().left as i32;
+        ret.size.h -= self.layer_map.exclusive_zone().bottom as i32;
+
+        ret
+    }
+
     pub fn size(&self) -> Size<i32, Logical> {
         self.current_mode
             .size
@@ -296,13 +311,13 @@ impl OutputMap {
 }
 
 impl OutputMap {
-    pub fn arrange_layers(&mut self) {
+    pub(super) fn arrange_layers(&mut self) {
         for output in self.outputs.iter_mut() {
             output.layer_map.arange(output.geometry())
         }
     }
 
-    pub fn insert_layer(
+    pub(super) fn insert_layer(
         &mut self,
         output: Option<WlOutput>,
         surface: wlr_layer::LayerSurface,
@@ -319,7 +334,7 @@ impl OutputMap {
         }
     }
 
-    pub fn send_frames(&self, time: u32) {
+    pub(super) fn send_frames(&self, time: u32) {
         for output in self.outputs.iter() {
             output.layer_map.send_frames(time);
         }
