@@ -5,13 +5,13 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use smithay::{
     backend::renderer::Frame,
     reexports::{
-        calloop::{generic::Generic, EventLoop, Interest, LoopHandle, Mode, PostAction},
+        calloop::{generic::Generic, Interest, LoopHandle, Mode, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
     utils::{Logical, Point, Rectangle, Size},
@@ -57,10 +57,22 @@ pub struct MainState {
     pub seat: Seat,
 
     pub start_time: std::time::Instant,
+    pub fps: fps_ticker::Fps,
     instant: Instant,
 }
 
 impl MainState {
+    pub fn update(&mut self) {
+        let elapsed = self.instant.elapsed().as_secs_f64();
+
+        // anodium.maximize_animation.update(elapsed);
+
+        self.desktop_layout.borrow_mut().update(elapsed);
+
+        self.instant = Instant::now();
+        self.fps.tick();
+    }
+
     pub fn render(
         &mut self,
         frame: &mut RenderFrame,
@@ -316,36 +328,12 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                 seat,
 
                 start_time: Instant::now(),
+                fps: fps_ticker::Fps::default(),
                 instant: Instant::now(),
             },
             log,
             #[cfg(feature = "xwayland")]
             xwayland,
-        }
-    }
-
-    pub fn update(&mut self, event_loop: &mut EventLoop<Self>) {
-        if event_loop
-            .dispatch(Some(Duration::from_millis(16)), self)
-            .is_err()
-        {
-            self.main_state.running.store(false, Ordering::SeqCst);
-        } else {
-            {
-                let display = self.main_state.display.clone();
-                let mut display = display.borrow_mut();
-                display.flush_clients(self);
-            }
-
-            {
-                let elapsed = self.main_state.instant.elapsed().as_secs_f64();
-
-                // anodium.maximize_animation.update(elapsed);
-
-                self.main_state.desktop_layout.borrow_mut().update(elapsed);
-
-                self.main_state.instant = Instant::now();
-            }
         }
     }
 }

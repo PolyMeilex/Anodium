@@ -1,11 +1,12 @@
-use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
+use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering, time::Duration};
 
 use smithay::{
     backend::renderer::{ImportDma, ImportEgl},
+    reexports::calloop::timer::Timer,
     wayland::dmabuf::init_dmabuf_global,
 };
 use smithay::{
-    backend::{input::InputBackend, winit, SwapBuffersError},
+    backend::{input::InputBackend, winit},
     reexports::{
         calloop::EventLoop,
         wayland_server::{protocol::wl_output, Display},
@@ -40,7 +41,7 @@ pub fn run_winit(
     display: Rc<RefCell<Display>>,
     event_loop: &mut EventLoop<'static, BackendState<WinitData>>,
     log: Logger,
-) -> Result<(), ()> {
+) -> Result<BackendState<WinitData>, ()> {
     let (renderer, mut input) = winit::init(log.clone()).map_err(|err| {
         slog::crit!(log, "Failed to initialize Winit backend: {}", err);
     })?;
@@ -75,10 +76,7 @@ pub fn run_winit(
      * Initialize the globals
      */
 
-    let data = WinitData {
-        #[cfg(feature = "debug")]
-        fps: fps_ticker::Fps::default(),
-    };
+    let data = WinitData {};
     let mut state = BackendState::init(display.clone(), event_loop.handle(), data, log.clone());
 
     let mode = Mode {
@@ -99,91 +97,95 @@ pub fn run_winit(
     );
 
     let start_time = std::time::Instant::now();
-    let mut cursor_visible = true;
 
     #[cfg(feature = "xwayland")]
     state.start_xwayland();
 
     info!(log, "Initialization completed, starting the main loop.");
 
-    while state.main_state.running.load(Ordering::SeqCst) {
-        if input
-            .dispatch_new_events(|event| state.process_input_event(event))
-            .is_err()
-        {
-            state.main_state.running.store(false, Ordering::SeqCst);
-            break;
-        }
+    let timer = Timer::new().unwrap();
+    let timer_handle = timer.handle();
 
-        // drawing logic
-        {
-            let mut renderer = renderer.borrow_mut();
-            // This is safe to do as with winit we are guaranteed to have exactly one output
-            let (output_geometry, output_scale) = state
-                .main_state
-                .desktop_layout
-                .borrow()
-                .output_map
-                .find_by_name(OUTPUT_NAME)
-                .map(|output| (output.geometry(), output.scale()))
-                .unwrap();
+    {
+        event_loop
+            .handle()
+            .insert_source(timer, move |_: (), handle, state| {
+                match input.dispatch_new_events(|event| state.process_input_event(event)) {
+                    Ok(()) => {
+                        let mut renderer = renderer.borrow_mut();
+                        let outputs: Vec<_> = state
+                            .main_state
+                            .desktop_layout
+                            .borrow()
+                            .output_map
+                            .iter()
+                            .map(|o| (o.geometry(), o.scale()))
+                            .collect();
 
-            let result = renderer
-                .render_winit(|frame| {
-                    state.main_state.render(frame, (output_geometry, output_scale))?;
+                        for (output_geometry, output_scale) in outputs {
+                            renderer
+                                .render_winit(|frame| {
+                                    state
+                                        .main_state
+                                        .render(frame, (output_geometry, output_scale))
+                                        .unwrap();
 
-                    let (x, y) = state.main_state.pointer_location().into();
+                                    // draw the cursor as relevant
+                                    {
+                                        let (x, y) = state.main_state.pointer_location().into();
+                                        let mut guard = state.main_state.cursor_status.lock().unwrap();
+                                        // reset the cursor if the surface is no longer alive
+                                        let mut reset = false;
+                                        if let CursorImageStatus::Image(ref surface) = *guard {
+                                            reset = !surface.as_ref().is_alive();
+                                        }
+                                        if reset {
+                                            *guard = CursorImageStatus::Default;
+                                        }
 
-                    // draw the cursor as relevant
-                    {
-                        let mut guard = state.main_state.cursor_status.lock().unwrap();
-                        // reset the cursor if the surface is no longer alive
-                        let mut reset = false;
-                        if let CursorImageStatus::Image(ref surface) = *guard {
-                            reset = !surface.as_ref().is_alive();
+                                        // draw as relevant
+                                        if let CursorImageStatus::Image(ref surface) = *guard {
+                                            draw_cursor(
+                                                frame,
+                                                surface,
+                                                (x as i32, y as i32).into(),
+                                                output_scale,
+                                                &log,
+                                            )
+                                            .unwrap();
+                                        }
+                                    }
+
+                                    let fps = state.main_state.fps.avg().round() as u32;
+
+                                    #[cfg(feature = "debug")]
+                                    {
+                                        draw_fps(frame, output_scale as f64, fps).unwrap();
+                                    }
+                                    #[cfg(not(feature = "debug"))]
+                                    let _ = fps;
+
+                                    //
+                                })
+                                .unwrap();
                         }
-                        if reset {
-                            *guard = CursorImageStatus::Default;
-                        }
 
-                        // draw as relevant
-                        if let CursorImageStatus::Image(ref surface) = *guard {
-                            cursor_visible = false;
-                            draw_cursor(frame, surface, (x as i32, y as i32).into(), output_scale, &log)?;
-                        } else {
-                            cursor_visible = true;
-                        }
+                        let time = start_time.elapsed().as_millis() as u32;
+                        state.main_state.send_frames(time);
+
+                        state.main_state.display.borrow_mut().flush_clients(&mut ());
+                        state.main_state.update();
+
+                        handle.add_timeout(Duration::from_millis(16), ());
                     }
-
-                    #[cfg(feature = "debug")]
-                    {
-                        let fps = state.backend_data.fps.avg().round() as u32;
-                        draw_fps(frame, output_scale as f64, fps)?;
+                    Err(winit::WinitInputError::WindowClosed) => {
+                        state.main_state.running.store(false, Ordering::SeqCst);
                     }
-
-                    Ok(())
-                })
-                .map_err(Into::<SwapBuffersError>::into)
-                .and_then(|x| x);
-
-            renderer.window().set_cursor_visible(cursor_visible);
-
-            if let Err(SwapBuffersError::ContextLost(err)) = result {
-                error!(log, "Critical Rendering Error: {}", err);
-                state.main_state.running.store(false, Ordering::SeqCst);
-            }
-        }
-
-        // Send frame events so that client start drawing their next frame
-        let time = start_time.elapsed().as_millis() as u32;
-        state.main_state.send_frames(time);
-        display.borrow_mut().flush_clients(&mut state);
-
-        state.update(event_loop);
-
-        #[cfg(feature = "debug")]
-        state.backend_data.fps.tick();
+                }
+            })
+            .unwrap();
+        timer_handle.add_timeout(Duration::ZERO, ());
     }
 
-    Ok(())
+    Ok(state)
 }

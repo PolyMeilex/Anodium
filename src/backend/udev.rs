@@ -5,7 +5,6 @@ use std::{
     os::unix::io::{AsRawFd, RawFd},
     path::PathBuf,
     rc::Rc,
-    sync::atomic::Ordering,
     time::Duration,
 };
 
@@ -107,7 +106,7 @@ pub fn run_udev(
     display: Rc<RefCell<Display>>,
     event_loop: &mut EventLoop<'static, BackendState<UdevData>>,
     log: Logger,
-) -> Result<(), ()> {
+) -> Result<BackendState<UdevData>, ()> {
     let name = display
         .borrow_mut()
         .add_socket_auto()
@@ -173,13 +172,13 @@ pub fn run_udev(
     /*
      * Bind all our objects that get driven by the event loop
      */
-    let libinput_event_source = event_loop
+    let _libinput_event_source = event_loop
         .handle()
         .insert_source(libinput_backend, move |event, _, state| {
             state.process_input_event(event)
         })
         .unwrap();
-    let session_event_source = event_loop
+    let _session_event_source = event_loop
         .handle()
         .insert_source(notifier, |(), &mut (), _anvil_state| {})
         .unwrap();
@@ -212,7 +211,7 @@ pub fn run_udev(
         );
     }
 
-    let udev_event_source = event_loop
+    let _udev_event_source = event_loop
         .handle()
         .insert_source(udev_backend, move |event, _, state| match event {
             UdevEvent::Added { device_id, path } => state.device_added(device_id, path),
@@ -228,21 +227,29 @@ pub fn run_udev(
     #[cfg(feature = "xwayland")]
     state.start_xwayland();
 
-    /*
-     * And run our loop
-     */
+    let timer = Timer::new().unwrap();
+    let timer_handle = timer.handle();
 
-    while state.main_state.running.load(Ordering::SeqCst) {
-        state.update(event_loop);
+    {
+        event_loop
+            .handle()
+            .insert_source(timer, move |_: (), handle, state| {
+                state.main_state.display.borrow_mut().flush_clients(&mut ());
+                state.main_state.update();
+
+                handle.add_timeout(Duration::from_millis(16), ());
+            })
+            .unwrap();
+        timer_handle.add_timeout(Duration::ZERO, ());
     }
 
     // Cleanup stuff
 
-    event_loop.handle().remove(session_event_source);
-    event_loop.handle().remove(libinput_event_source);
-    event_loop.handle().remove(udev_event_source);
+    // event_loop.handle().remove(session_event_source);
+    // event_loop.handle().remove(libinput_event_source);
+    // event_loop.handle().remove(udev_event_source);
 
-    Ok(())
+    Ok(state)
 }
 
 pub type RenderSurface = GbmBufferedSurface<SessionFd>;

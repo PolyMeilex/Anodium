@@ -9,7 +9,7 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{DesktopLayout, GrabState, Toplevel};
+use crate::desktop_layout::{DesktopLayout, Toplevel};
 
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,
