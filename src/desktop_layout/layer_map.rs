@@ -9,8 +9,10 @@ use smithay::{
     },
 };
 
-use crate::{maps::output_map::Output, shell::SurfaceData};
+use super::output_map::Output;
+use crate::shell::SurfaceData;
 
+#[derive(Debug)]
 pub struct LayerSurface {
     pub surface: wlr_layer::LayerSurface,
     pub location: Point<i32, Logical>,
@@ -122,7 +124,7 @@ impl LayerSurface {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct LayerMap {
     surfaces: Vec<LayerSurface>,
 }
@@ -184,25 +186,8 @@ impl LayerMap {
         })
     }
 
-    pub fn arange_layers(&mut self, output: &Output) {
-        let output_rect = output.geometry();
-
-        // Get all layer surfaces assigned to this output
-        let surfaces: Vec<_> = output
-            .layer_surfaces()
-            .into_iter()
-            .map(|s| s.as_ref().clone())
-            .collect();
-
-        // Find layers for this output
-        let filtered_layers = self.surfaces.iter_mut().filter(|l| {
-            l.surface
-                .get_surface()
-                .map(|s| surfaces.contains(s.as_ref()))
-                .unwrap_or(false)
-        });
-
-        for layer in filtered_layers {
+    pub fn arange(&mut self, output_rect: Rectangle<i32, Logical>) {
+        for layer in self.surfaces.iter_mut() {
             let surface = if let Some(surface) = layer.surface.get_surface() {
                 surface
             } else {

@@ -4,6 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::output::Mode;
+use smithay::wayland::shell::wlr_layer::Layer;
 use smithay::{reexports::wayland_server::Display, wayland::output::PhysicalProperties};
 
 mod output_map;
@@ -22,6 +23,8 @@ pub use popup::{Popup, PopupKind, PopupList};
 
 pub mod window;
 pub use window::{Toplevel, Window, WindowList};
+
+mod layer_map;
 
 #[derive(Debug)]
 pub struct DesktopLayout {
@@ -59,15 +62,42 @@ impl DesktopLayout {
         for w in self.visible_workspaces() {
             w.send_frames(time);
         }
+        self.output_map.send_frames(time);
     }
 
     pub fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+        // Layers above windows
+        for o in self.output_map.iter() {
+            let overlay = o.layer_map().get_surface_under(&Layer::Overlay, point);
+            if overlay.is_some() {
+                return overlay;
+            }
+            let top = o.layer_map().get_surface_under(&Layer::Top, point);
+            if top.is_some() {
+                return top;
+            }
+        }
+
+        // Windows
         for w in self.visible_workspaces() {
             let under = w.windows().surface_under(point);
             if under.is_some() {
                 return under;
             }
         }
+
+        // Layers below windows
+        for o in self.output_map.iter() {
+            let bottom = o.layer_map().get_surface_under(&Layer::Bottom, point);
+            if bottom.is_some() {
+                return bottom;
+            }
+            let background = o.layer_map().get_surface_under(&Layer::Background, point);
+            if background.is_some() {
+                return background;
+            }
+        }
+
         None
     }
 
@@ -81,6 +111,8 @@ impl DesktopLayout {
         for (_, w) in self.workspaces.iter_mut() {
             w.update(delta);
         }
+
+        self.output_map.refresh();
     }
 }
 

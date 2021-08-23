@@ -19,6 +19,7 @@ use smithay::{
         data_device::{default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent},
         output::{xdg::init_xdg_output_manager, PhysicalProperties},
         seat::{CursorImageStatus, KeyboardHandle, PointerHandle, Seat, XkbConfig},
+        shell::wlr_layer::Layer,
         shm::init_shm_global,
         tablet_manager::{init_tablet_manager_global, TabletSeatTrait},
     },
@@ -81,34 +82,18 @@ impl Anodium {
     ) -> Result<(), smithay::backend::SwapBuffersError> {
         frame.clear([0.1, 0.1, 0.1, 1.0])?;
 
-        // TODO:
-        // for layer in [Layer::Background, Layer::Bottom] {
-        //     drawing::draw_layers(
-        //         renderer,
-        //         frame,
-        //         window_map,
-        //         layer,
-        //         output_geometry,
-        //         output_scale,
-        //         &self.log,
-        //     )?;
-        // }
+        // Layers bellow windows
+        for layer in [Layer::Background, Layer::Bottom] {
+            self.draw_layers(frame, layer, output_geometry, output_scale, &self.log)?;
+        }
 
         // draw the windows
         self.draw_windows(frame, output_geometry, output_scale, &self.log)?;
 
-        // TODO:
-        // for layer in [Layer::Top, Layer::Overlay] {
-        //     drawing::draw_layers(
-        //         renderer,
-        //         frame,
-        //         window_map,
-        //         layer,
-        //         output_geometry,
-        //         output_scale,
-        //         &self.log,
-        //     )?;
-        // }
+        // Layers above windows
+        for layer in [Layer::Top, Layer::Overlay] {
+            self.draw_layers(frame, layer, output_geometry, output_scale, &self.log)?;
+        }
 
         // Grab Debug:
         if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {

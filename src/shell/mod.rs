@@ -34,11 +34,15 @@ impl Anodium {
     fn wlr_layer_shell_request(&mut self, request: LayerShellRequest) {
         match request {
             LayerShellRequest::NewLayerSurface {
-                // surface,
-                // output,
-                // layer,
+                surface,
+                output,
+                layer,
                 ..
             } => {
+                self.desktop_layout
+                    .borrow_mut()
+                    .output_map
+                    .insert_layer(output, surface, layer);
                 // TODO:
                 // let output_map = self.output_map.borrow();
 
@@ -54,7 +58,9 @@ impl Anodium {
                 // self.window_map.borrow_mut().layers.insert(surface, layer);
                 // }
             }
-            LayerShellRequest::AckConfigure { .. } => {}
+            LayerShellRequest::AckConfigure { .. } => {
+                self.desktop_layout.borrow_mut().output_map.arrange_layers();
+            }
         }
     }
 

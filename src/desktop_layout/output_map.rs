@@ -1,10 +1,18 @@
 use std::{cell::RefCell, rc::Rc};
 
 use smithay::{
-    reexports::wayland_server::{protocol::wl_output, Display, Global, UserDataMap},
+    reexports::wayland_server::{
+        protocol::wl_output::{self, WlOutput},
+        Display, Global, UserDataMap,
+    },
     utils::{Logical, Point, Rectangle, Size},
-    wayland::output::{self, Mode, PhysicalProperties},
+    wayland::{
+        output::{self, Mode, PhysicalProperties},
+        shell::wlr_layer,
+    },
 };
+
+use super::layer_map::LayerMap;
 
 #[derive(Debug)]
 
@@ -18,6 +26,8 @@ pub struct Output {
 
     active_workspace: String,
     userdata: UserDataMap,
+
+    layer_map: LayerMap,
 }
 
 impl Output {
@@ -50,6 +60,8 @@ impl Output {
 
             active_workspace,
             userdata: Default::default(),
+
+            layer_map: Default::default(),
         }
     }
 
@@ -91,6 +103,10 @@ impl Output {
     pub fn current_mode(&self) -> Mode {
         self.current_mode
     }
+
+    pub fn layer_map(&self) -> &LayerMap {
+        &self.layer_map
+    }
 }
 
 impl Drop for Output {
@@ -128,6 +144,8 @@ impl OutputMap {
                 .change_current_state(None, None, None, Some(output.location));
 
             output_x += output.size().w;
+
+            output.layer_map.arange(output.geometry())
         }
     }
 
@@ -266,7 +284,44 @@ impl OutputMap {
         self.arrange();
     }
 
+    pub fn refresh(&mut self) {
+        for output in self.outputs.iter_mut() {
+            output.layer_map.refresh();
+        }
+    }
+
     pub fn update_by_name<N: AsRef<str>>(&mut self, mode: Option<Mode>, scale: Option<f64>, name: N) {
         self.update(mode, scale, |o| o.name() == name.as_ref())
+    }
+}
+
+impl OutputMap {
+    pub fn arrange_layers(&mut self) {
+        for output in self.outputs.iter_mut() {
+            output.layer_map.arange(output.geometry())
+        }
+    }
+
+    pub fn insert_layer(
+        &mut self,
+        output: Option<WlOutput>,
+        surface: wlr_layer::LayerSurface,
+        layer: wlr_layer::Layer,
+    ) {
+        let output = output.and_then(|output| self.outputs.iter_mut().find(|o| o.output.owns(&output)));
+
+        if let Some(output) = output {
+            output.layer_map.insert(surface, layer);
+            output.layer_map.arange(output.geometry());
+        } else if let Some(output) = self.outputs.get_mut(0) {
+            output.layer_map.insert(surface, layer);
+            output.layer_map.arange(output.geometry());
+        }
+    }
+
+    pub fn send_frames(&self, time: u32) {
+        for output in self.outputs.iter() {
+            output.layer_map.send_frames(time);
+        }
     }
 }
