@@ -313,17 +313,41 @@ fn scan_connectors(
                         connector_info.interface_id(),
                         crtc,
                     );
-                    let mut surface = match device.create_surface(
-                        crtc,
-                        connector_info.modes()[0],
-                        &[connector_info.handle()],
-                    ) {
-                        Ok(surface) => surface,
-                        Err(err) => {
-                            warn!(logger, "Failed to create drm surface: {}", err);
-                            continue;
-                        }
+
+                    let output_name = {
+                        let other_short_name;
+                        let interface_short_name = match connector_info.interface() {
+                            drm::control::connector::Interface::DVII => "DVI-I",
+                            drm::control::connector::Interface::DVID => "DVI-D",
+                            drm::control::connector::Interface::DVIA => "DVI-A",
+                            drm::control::connector::Interface::SVideo => "S-VIDEO",
+                            drm::control::connector::Interface::DisplayPort => "DP",
+                            drm::control::connector::Interface::HDMIA => "HDMI-A",
+                            drm::control::connector::Interface::HDMIB => "HDMI-B",
+                            drm::control::connector::Interface::EmbeddedDisplayPort => "eDP",
+                            other => {
+                                other_short_name = format!("{:?}", other);
+                                &other_short_name
+                            }
+                        };
+                        format!("{}-{}", interface_short_name, connector_info.interface_id())
                     };
+
+                    let modes = connector_info.modes();
+                    let mode_id = main_state.config.configure_output(&output_name, modes).unwrap();
+
+                    let mode = modes.get(mode_id).unwrap();
+
+                    println!("{:#?}", mode);
+
+                    let mut surface =
+                        match device.create_surface(crtc, mode.clone(), &[connector_info.handle()]) {
+                            Ok(surface) => surface,
+                            Err(err) => {
+                                warn!(logger, "Failed to create drm surface: {}", err);
+                                continue;
+                            }
+                        };
                     surface.link(signaler.clone());
 
                     let renderer_formats = Bind::<Dmabuf>::supported_formats(renderer.gles_renderer())
@@ -339,30 +363,11 @@ fn scan_connectors(
                             }
                         };
 
-                    let mode = connector_info.modes()[0];
                     let size = mode.size();
                     let mode = Mode {
                         size: (size.0 as i32, size.1 as i32).into(),
                         refresh: (mode.vrefresh() * 1000) as i32,
                     };
-
-                    let other_short_name;
-                    let interface_short_name = match connector_info.interface() {
-                        drm::control::connector::Interface::DVII => "DVI-I",
-                        drm::control::connector::Interface::DVID => "DVI-D",
-                        drm::control::connector::Interface::DVIA => "DVI-A",
-                        drm::control::connector::Interface::SVideo => "S-VIDEO",
-                        drm::control::connector::Interface::DisplayPort => "DP",
-                        drm::control::connector::Interface::HDMIA => "HDMI-A",
-                        drm::control::connector::Interface::HDMIB => "HDMI-B",
-                        drm::control::connector::Interface::EmbeddedDisplayPort => "eDP",
-                        other => {
-                            other_short_name = format!("{:?}", other);
-                            &other_short_name
-                        }
-                    };
-
-                    let output_name = format!("{}-{}", interface_short_name, connector_info.interface_id());
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 

@@ -23,6 +23,8 @@ mod positioner;
 
 mod wayland;
 
+mod config;
+
 use state::Anodium;
 
 fn main() {

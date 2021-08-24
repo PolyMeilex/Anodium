@@ -30,6 +30,7 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
     backend::Backend,
+    config::ConfigVM,
     desktop_layout::{DesktopLayout, Output},
     render::{self, renderer::RenderFrame},
     shell::init_shell,
@@ -45,7 +46,6 @@ pub struct Anodium {
     pub desktop_layout: Rc<RefCell<DesktopLayout>>,
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
-    pub log: slog::Logger,
 
     pub pointer_location: Point<f64, Logical>,
 
@@ -61,6 +61,9 @@ pub struct Anodium {
     pub start_time: std::time::Instant,
     pub fps: fps_ticker::Fps,
     last_update: Instant,
+
+    pub config: ConfigVM,
+    pub log: slog::Logger,
 }
 
 impl Anodium {
@@ -302,19 +305,23 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
             xwayland
         };
 
+        let config = ConfigVM::new().unwrap();
+
         BackendState {
             handle,
             backend_data,
             anodium: Anodium {
                 running: Arc::new(AtomicBool::new(true)),
-                desktop_layout: Rc::new(RefCell::new(DesktopLayout::new(display.clone(), log.clone()))),
+                desktop_layout: Rc::new(RefCell::new(DesktopLayout::new(
+                    display.clone(),
+                    config.clone(),
+                    log.clone(),
+                ))),
 
                 display,
                 not_mapped_list: Default::default(),
 
-                // output_map: output_map.clone(),
                 dnd_icon,
-                log: log.clone(),
 
                 pointer_location: (0.0, 0.0).into(),
                 pointer: pointer.clone(),
@@ -327,6 +334,9 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                 start_time: Instant::now(),
                 fps: fps_ticker::Fps::default(),
                 last_update: Instant::now(),
+
+                config,
+                log: log.clone(),
             },
             log,
             #[cfg(feature = "xwayland")]

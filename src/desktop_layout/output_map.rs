@@ -12,6 +12,8 @@ use smithay::{
     },
 };
 
+use crate::config::ConfigVM;
+
 use super::layer_map::LayerMap;
 
 #[derive(Debug)]
@@ -138,32 +140,34 @@ impl Drop for Output {
 pub struct OutputMap {
     display: Rc<RefCell<Display>>,
     outputs: Vec<Output>,
+
+    config: ConfigVM,
     logger: slog::Logger,
 }
 
 impl OutputMap {
-    pub fn new(display: Rc<RefCell<Display>>, logger: ::slog::Logger) -> Self {
+    pub fn new(display: Rc<RefCell<Display>>, config: ConfigVM, logger: ::slog::Logger) -> Self {
         Self {
             display,
             outputs: Vec::new(),
+
+            config,
             logger,
         }
     }
 
     fn arrange(&mut self) {
-        // Recalculate the outputs location
-        let mut output_x = 0;
-        for output in self.outputs.iter_mut() {
-            output.location.x = output_x;
-            output.location.y = 0;
+        let configs = self.config.arrange_outputs(&self.outputs).unwrap();
 
-            output
-                .output
-                .change_current_state(None, None, None, Some(output.location));
+        for config in configs {
+            if let Some(output) = self.outputs.get_mut(config.id()) {
+                output.location = config.location();
+                output
+                    .output
+                    .change_current_state(None, None, None, Some(output.location));
 
-            output_x += output.size().w;
-
-            output.layer_map.arange(output.geometry())
+                output.layer_map.arange(output.geometry())
+            }
         }
     }
 

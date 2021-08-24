@@ -13,6 +13,7 @@ pub use output_map::{Output, OutputMap};
 mod iterators;
 use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};
 
+use crate::config::ConfigVM;
 use crate::positioner::floating::Floating as Universal;
 // use crate::positioner::universal::Universal;
 use crate::positioner::Positioner;
@@ -39,9 +40,9 @@ pub struct DesktopLayout {
 }
 
 impl DesktopLayout {
-    pub fn new(display: Rc<RefCell<Display>>, log: slog::Logger) -> Self {
+    pub fn new(display: Rc<RefCell<Display>>, config: ConfigVM, log: slog::Logger) -> Self {
         Self {
-            output_map: OutputMap::new(display, log),
+            output_map: OutputMap::new(display, config, log),
 
             workspaces: Default::default(),
             active_workspace: None,

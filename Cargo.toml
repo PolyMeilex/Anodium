@@ -23,6 +23,7 @@ cgmath = "0.18.0"
 
 imgui = "0.7.0"
 imgui-smithay-renderer = {path="./imgui-smithay-renderer", optional = true}
+rhai = "1.0.2"
 
 [dependencies.smithay]
 path = ".."
