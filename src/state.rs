@@ -37,6 +37,14 @@ use crate::{
     shell::not_mapped_list::NotMappedList,
 };
 
+pub struct InputState {
+    pub pointer_location: Point<f64, Logical>,
+    pub pointer: PointerHandle,
+    pub keyboard: KeyboardHandle,
+
+    pub suppressed_keys: Vec<u32>,
+}
+
 pub struct Anodium {
     pub running: Arc<AtomicBool>,
     pub display: Rc<RefCell<Display>>,
@@ -47,13 +55,7 @@ pub struct Anodium {
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
 
-    pub pointer_location: Point<f64, Logical>,
-
-    pub pointer: PointerHandle,
-    pub keyboard: KeyboardHandle,
-
-    pub suppressed_keys: Vec<u32>,
-    pub cursor_status: Arc<Mutex<CursorImageStatus>>,
+    pub input_state: InputState,
 
     pub seat_name: String,
     pub seat: Seat,
@@ -135,8 +137,11 @@ impl Anodium {
         }
 
         // Pointer Related:
-        if output_geometry.to_f64().contains(self.pointer_location) {
-            let (ptr_x, ptr_y) = self.pointer_location.into();
+        if output_geometry
+            .to_f64()
+            .contains(self.input_state.pointer_location)
+        {
+            let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
             let relative_ptr_location =
                 Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
             // draw the dnd icon if applicable
@@ -189,6 +194,7 @@ impl Anodium {
 pub struct BackendState<BackendData> {
     pub handle: LoopHandle<'static, Self>,
     pub backend_data: BackendData,
+    pub cursor_status: Arc<Mutex<CursorImageStatus>>,
 
     pub anodium: Anodium,
 
@@ -310,6 +316,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
         BackendState {
             handle,
             backend_data,
+            cursor_status,
             anodium: Anodium {
                 running: Arc::new(AtomicBool::new(true)),
                 desktop_layout: Rc::new(RefCell::new(DesktopLayout::new(
@@ -323,11 +330,13 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
 
                 dnd_icon,
 
-                pointer_location: (0.0, 0.0).into(),
-                pointer: pointer.clone(),
-                keyboard,
-                suppressed_keys: Vec::new(),
-                cursor_status,
+                input_state: InputState {
+                    pointer_location: (0.0, 0.0).into(),
+                    pointer: pointer,
+                    keyboard: keyboard,
+                    suppressed_keys: Vec::new(),
+                },
+
                 seat_name,
                 seat,
 

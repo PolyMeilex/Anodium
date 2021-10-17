@@ -26,7 +26,8 @@ impl Anodium {
                 action => self.shortcut_handler(backend, action),
             },
             InputEvent::PointerMotion { event, .. } => {
-                self.pointer_location = self.clamp_coords(self.pointer_location + event.delta());
+                self.input_state.pointer_location =
+                    self.clamp_coords(self.input_state.pointer_location + event.delta());
                 self.on_pointer_move(event.time());
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
@@ -38,7 +39,7 @@ impl Anodium {
                     .map(|o| o.size());
 
                 if let Some(output_size) = output_size {
-                    self.pointer_location = event.position_transformed(output_size);
+                    self.input_state.pointer_location = event.position_transformed(output_size);
                     self.on_pointer_move(event.time());
                 }
             }
@@ -56,8 +57,9 @@ impl Anodium {
         let log = &self.log;
         let time = Event::time(&evt);
         let mut action = KeyAction::None;
-        let suppressed_keys = &mut self.suppressed_keys;
-        self.keyboard
+        let suppressed_keys = &mut self.input_state.suppressed_keys;
+        self.input_state
+            .keyboard
             .input(keycode, state, serial, time, |modifiers, keysym| {
                 debug!(log, "keysym";
                     "state" => format!("{:?}", state),
@@ -105,17 +107,21 @@ impl Anodium {
         let state = match evt.state() {
             input::ButtonState::Pressed => {
                 // change the keyboard focus unless the pointer is grabbed
-                if !self.pointer.is_grabbed() {
-                    let under = self.desktop_layout.borrow().surface_under(self.pointer_location);
+                if !self.input_state.pointer.is_grabbed() {
+                    let under = self
+                        .desktop_layout
+                        .borrow()
+                        .surface_under(self.input_state.pointer_location);
 
-                    self.keyboard
+                    self.input_state
+                        .keyboard
                         .set_focus(under.as_ref().map(|&(ref s, _)| s), serial);
                 }
                 wl_pointer::ButtonState::Pressed
             }
             input::ButtonState::Released => wl_pointer::ButtonState::Released,
         };
-        self.pointer.button(button, state, serial, evt.time());
+        self.input_state.pointer.button(button, state, serial, evt.time());
 
         for w in self.desktop_layout.borrow_mut().visible_workspaces_mut() {
             w.on_pointer_button(evt.button(), evt.state());
@@ -155,7 +161,7 @@ impl Anodium {
             } else if source == wl_pointer::AxisSource::Finger {
                 frame = frame.stop(wl_pointer::Axis::VerticalScroll);
             }
-            self.pointer.axis(frame);
+            self.input_state.pointer.axis(frame);
         }
     }
 
@@ -164,10 +170,15 @@ impl Anodium {
 
         self.desktop_layout
             .borrow_mut()
-            .on_pointer_move(self.pointer_location);
+            .on_pointer_move(self.input_state.pointer_location);
 
-        let under = self.desktop_layout.borrow().surface_under(self.pointer_location);
-        self.pointer.motion(self.pointer_location, under, serial, time);
+        let under = self
+            .desktop_layout
+            .borrow()
+            .surface_under(self.input_state.pointer_location);
+        self.input_state
+            .pointer
+            .motion(self.input_state.pointer_location, under, serial, time);
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {

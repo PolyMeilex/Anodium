@@ -131,8 +131,8 @@ pub fn run_winit(
 
                                     // draw the cursor as relevant
                                     {
-                                        let (x, y) = state.anodium.pointer_location.into();
-                                        let mut guard = state.anodium.cursor_status.lock().unwrap();
+                                        let (x, y) = state.anodium.input_state.pointer_location.into();
+                                        let mut guard = state.cursor_status.lock().unwrap();
                                         // reset the cursor if the surface is no longer alive
                                         let mut reset = false;
                                         if let CursorImageStatus::Image(ref surface) = *guard {

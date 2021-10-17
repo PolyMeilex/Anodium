@@ -647,6 +647,7 @@ impl BackendState<UdevData> {
                 device_backend.dev_id,
                 crtc,
                 &pointer_image,
+                &mut self.cursor_status.lock().unwrap(),
                 &self.log,
             );
             if let Err(err) = result {
@@ -714,6 +715,7 @@ impl Anodium {
         device_id: dev_t,
         crtc: crtc::Handle,
         pointer_image: &Gles2Texture,
+        cursor_status: &mut CursorImageStatus,
         logger: &slog::Logger,
     ) -> Result<(), SwapBuffersError> {
         surface.surface.frame_submitted()?;
@@ -742,11 +744,12 @@ impl Anodium {
                 |frame| {
                     self.render(frame, (output_geometry, output_scale))?;
 
-                    let mut cursor_status = self.cursor_status.lock().unwrap();
-
                     // set cursor
-                    if output_geometry.to_f64().contains(self.pointer_location) {
-                        let (ptr_x, ptr_y) = self.pointer_location.into();
+                    if output_geometry
+                        .to_f64()
+                        .contains(self.input_state.pointer_location)
+                    {
+                        let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
                         let relative_ptr_location =
                             Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
                         // draw the cursor as relevant
