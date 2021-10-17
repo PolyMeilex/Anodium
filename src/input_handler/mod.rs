@@ -57,6 +57,8 @@ impl Anodium {
         let log = &self.log;
         let time = Event::time(&evt);
         let mut action = KeyAction::None;
+
+        let modifiers_state = &mut self.input_state.modifiers_state;
         let suppressed_keys = &mut self.input_state.suppressed_keys;
         self.input_state
             .keyboard
@@ -66,6 +68,8 @@ impl Anodium {
                     "mods" => format!("{:?}", modifiers),
                     "keysym" => ::xkbcommon::xkb::keysym_get_name(keysym)
                 );
+
+                *modifiers_state = *modifiers;
 
                 // If the key is pressed and triggered a action
                 // we will not forward the key to the client.
@@ -98,6 +102,9 @@ impl Anodium {
 
     fn on_pointer_button<I: InputBackend>(&mut self, evt: I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
+
+        debug!(self.log, "Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
+
         let button = match evt.button() {
             input::MouseButton::Left => 0x110,
             input::MouseButton::Right => 0x111,

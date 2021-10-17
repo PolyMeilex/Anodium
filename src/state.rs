@@ -18,7 +18,7 @@ use smithay::{
     wayland::{
         data_device::{default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent},
         output::{xdg::init_xdg_output_manager, PhysicalProperties},
-        seat::{CursorImageStatus, KeyboardHandle, PointerHandle, Seat, XkbConfig},
+        seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
         shell::wlr_layer::Layer,
         shm::init_shm_global,
         tablet_manager::{init_tablet_manager_global, TabletSeatTrait},
@@ -40,7 +40,9 @@ use crate::{
 pub struct InputState {
     pub pointer_location: Point<f64, Logical>,
     pub pointer: PointerHandle,
+
     pub keyboard: KeyboardHandle,
+    pub modifiers_state: ModifiersState,
 
     pub suppressed_keys: Vec<u32>,
 }
@@ -334,6 +336,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                     pointer_location: (0.0, 0.0).into(),
                     pointer: pointer,
                     keyboard: keyboard,
+                    modifiers_state: Default::default(),
                     suppressed_keys: Vec::new(),
                 },
 
