@@ -16,7 +16,7 @@ use smithay::{
 use crate::xwayland::X11Surface;
 use crate::{
     animations::enter_exit::EnterExitAnimation,
-    shell::{MoveAfterResizeState, MoveAfterResizeData, SurfaceData},
+    shell::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
 };
 
 mod list;
@@ -171,13 +171,14 @@ impl Window {
                 let surface_data = states.data_map.get::<RefCell<SurfaceData>>();
 
                 if let Some(data) = surface_data {
-                    data.borrow_mut().move_after_resize_state = MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
-                        initial_window_location,
-                        initial_size,
+                    data.borrow_mut().move_after_resize_state =
+                        MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
+                            initial_window_location,
+                            initial_size,
 
-                        target_window_location: target_geometry.loc,
-                        target_size: target_geometry.size,
-                    });
+                            target_window_location: target_geometry.loc,
+                            target_size: target_geometry.size,
+                        });
                 }
             })
             .unwrap();

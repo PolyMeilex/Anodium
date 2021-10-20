@@ -34,12 +34,8 @@ impl<BackendData: 'static> BackendState<BackendData> {
     }
 
     pub fn xwayland_ready(&mut self, connection: UnixStream, client: Client) {
-        let (wm, source) = X11State::start_wm(
-            connection,
-            self.anodium.not_mapped_list.clone(),
-            self.log.clone(),
-        )
-        .unwrap();
+        let (wm, source) =
+            X11State::start_wm(connection, self.anodium.not_mapped_list.clone(), self.log.clone()).unwrap();
         let wm = Rc::new(RefCell::new(wm));
         client.data_map().insert_if_missing(|| Rc::clone(&wm));
         self.handle
