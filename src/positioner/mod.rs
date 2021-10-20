@@ -1,6 +1,9 @@
 use smithay::{
     backend::input::{ButtonState, MouseButton},
-    reexports::wayland_protocols::xdg_shell::server::xdg_toplevel::ResizeEdge,
+    reexports::{
+        wayland_protocols::xdg_shell::server::xdg_toplevel::ResizeEdge,
+        wayland_server::protocol::wl_surface::WlSurface,
+    },
     utils::{Logical, Point, Rectangle},
     wayland::{
         seat::{GrabStartData, Seat},
@@ -8,7 +11,7 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{Toplevel, Window, WindowList};
+use crate::desktop_layout::{Toplevel, Window};
 
 pub mod floating;
 pub mod tiling;
@@ -40,8 +43,18 @@ pub trait Positioner: std::fmt::Debug {
     fn maximize_request(&mut self, toplevel: &Toplevel) {}
     fn unmaximize_request(&mut self, toplevel: &Toplevel) {}
 
-    fn windows<'a>(&'a self) -> &'a WindowList;
-    fn windows_mut<'a>(&'a mut self) -> &'a mut WindowList;
+    fn with_windows_rev(&self, cb: &mut dyn FnMut(&Window));
+
+    fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+        None
+    }
+
+    fn find_window(&self, surface: &WlSurface) -> Option<&Window> {
+        None
+    }
+    fn find_window_mut(&mut self, surface: &WlSurface) -> Option<&mut Window> {
+        None
+    }
 
     fn on_pointer_move(&mut self, pos: Point<f64, Logical>) {}
     fn on_pointer_button(&mut self, button: MouseButton, state: ButtonState) {}

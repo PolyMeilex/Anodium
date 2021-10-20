@@ -140,8 +140,7 @@ impl Anodium {
         {
             // In visible workspaces
             for workspace in self.desktop_layout.borrow_mut().visible_workspaces_mut() {
-                let window_map = workspace.windows_mut();
-                if let Some(window) = window_map.find_mut(surface) {
+                if let Some(window) = workspace.find_window_mut(surface) {
                     window.self_update();
 
                     let geometry = window.geometry();

@@ -2,7 +2,10 @@ use std::cell::RefCell;
 
 use smithay::{
     backend::input,
-    reexports::wayland_protocols::xdg_shell::server::xdg_toplevel::{self, ResizeEdge},
+    reexports::{
+        wayland_protocols::xdg_shell::server::xdg_toplevel::{self, ResizeEdge},
+        wayland_server::protocol::wl_surface::WlSurface,
+    },
     utils::{Logical, Point, Rectangle},
     wayland::{
         compositor,
@@ -231,12 +234,22 @@ impl Positioner for Floating {
         self.geometry
     }
 
-    fn windows(&self) -> &WindowList {
-        &self.windows
+    fn with_windows_rev(&self, cb: &mut dyn FnMut(&Window)) {
+        for w in self.windows.iter().rev() {
+            cb(w)
+        }
     }
 
-    fn windows_mut(&mut self) -> &mut WindowList {
-        &mut self.windows
+    fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+        self.windows.surface_under(point)
+    }
+
+    fn find_window(&self, surface: &WlSurface) -> Option<&Window> {
+        self.windows.find(surface)
+    }
+
+    fn find_window_mut(&mut self, surface: &WlSurface) -> Option<&mut Window> {
+        self.windows.find_mut(surface)
     }
 
     fn send_frames(&self, time: u32) {

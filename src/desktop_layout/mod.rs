@@ -86,7 +86,7 @@ impl DesktopLayout {
 
         // Windows
         for w in self.visible_workspaces() {
-            let under = w.windows().surface_under(point);
+            let under = w.surface_under(point);
             if under.is_some() {
                 return under;
             }
@@ -142,8 +142,10 @@ impl DesktopLayout {
     #[allow(dead_code)]
     pub fn find_workspace_by_surface<S: AsWlSurface>(&self, surface: &S) -> Option<&dyn Positioner> {
         for w in self.visible_workspaces() {
-            if w.windows().find(surface).is_some() {
-                return Some(w);
+            if let Some(surface) = surface.as_surface() {
+                if w.find_window(surface).is_some() {
+                    return Some(w);
+                }
             }
         }
         None
@@ -154,8 +156,10 @@ impl DesktopLayout {
         surface: &S,
     ) -> Option<&mut dyn Positioner> {
         for w in self.visible_workspaces_mut() {
-            if w.windows().find(surface).is_some() {
-                return Some(w);
+            if let Some(surface) = surface.as_surface() {
+                if w.find_window(surface).is_some() {
+                    return Some(w);
+                }
             }
         }
         None

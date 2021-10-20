@@ -1,8 +1,11 @@
-use smithay::utils::{Logical, Point, Rectangle};
+use smithay::{
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    utils::{Logical, Point, Rectangle},
+};
 
 use super::{floating::Floating, tiling::Tiling, MoveResponse, Positioner};
 
-use crate::desktop_layout::{Toplevel, Window, WindowList};
+use crate::desktop_layout::{Toplevel, Window};
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -88,14 +91,39 @@ impl Positioner for Universal {
         self.tiling.unmaximize_request(toplevel);
     }
 
-    fn windows<'a>(&'a self) -> &'a WindowList {
-        // self.floating.windows();
-        unimplemented!("");
+    fn with_windows_rev(&self, cb: &mut dyn FnMut(&Window)) {
+        self.tiling.with_windows_rev(cb);
+        self.floating.with_windows_rev(cb);
     }
 
-    fn windows_mut<'a>(&'a mut self) -> &'a mut WindowList {
-        // self.floating.windows_mut()
-        unimplemented!("");
+    fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+        let fr = self.floating.surface_under(point);
+
+        if fr.is_some() {
+            fr
+        } else {
+            self.tiling.surface_under(point)
+        }
+    }
+
+    fn find_window(&self, surface: &WlSurface) -> Option<&Window> {
+        let fr = self.floating.find_window(surface);
+
+        if fr.is_some() {
+            fr
+        } else {
+            self.tiling.find_window(surface)
+        }
+    }
+
+    fn find_window_mut(&mut self, surface: &WlSurface) -> Option<&mut Window> {
+        let fr = self.floating.find_window_mut(surface);
+
+        if fr.is_some() {
+            fr
+        } else {
+            self.tiling.find_window_mut(surface)
+        }
     }
 
     fn on_pointer_move(&mut self, pos: smithay::utils::Point<f64, smithay::utils::Logical>) {

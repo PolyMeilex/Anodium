@@ -231,9 +231,7 @@ impl Anodium {
 
         // redraw the frame, in a simple but inneficient way
         for workspace in self.desktop_layout.borrow().visible_workspaces() {
-            for window in workspace.windows().iter().rev() {
-                render(window);
-            }
+            workspace.with_windows_rev(&mut |window| render(window))
         }
 
         if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
