@@ -139,8 +139,8 @@ impl Anodium {
         // Update maped windows
         {
             // In visible workspaces
-            for workspace in self.desktop_layout.borrow_mut().visible_workspaces() {
-                let mut window_map = workspace.windows_mut();
+            for workspace in self.desktop_layout.borrow_mut().visible_workspaces_mut() {
+                let window_map = workspace.windows_mut();
                 if let Some(window) = window_map.find_mut(surface) {
                     window.self_update();
 

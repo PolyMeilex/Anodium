@@ -88,12 +88,12 @@ impl Positioner for Universal {
         self.tiling.unmaximize_request(toplevel);
     }
 
-    fn windows<'a>(&'a self) -> std::cell::Ref<'a, WindowList> {
+    fn windows<'a>(&'a self) -> &'a WindowList {
         // self.floating.windows();
         unimplemented!("");
     }
 
-    fn windows_mut<'a>(&'a self) -> std::cell::RefMut<'a, WindowList> {
+    fn windows_mut<'a>(&'a mut self) -> &'a mut WindowList {
         // self.floating.windows_mut()
         unimplemented!("");
     }

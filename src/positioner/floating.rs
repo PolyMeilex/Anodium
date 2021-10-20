@@ -1,7 +1,4 @@
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
+use std::cell::RefCell;
 
 use smithay::{
     backend::input,
@@ -29,7 +26,7 @@ use super::{MoveResponse, Positioner};
 pub struct Floating {
     geometry: Rectangle<i32, Logical>,
     pointer_position: Point<f64, Logical>,
-    windows: Rc<RefCell<WindowList>>,
+    windows: WindowList,
 }
 
 impl Floating {
@@ -64,11 +61,11 @@ impl Positioner for Floating {
             window.set_location((x, y).into());
         }
 
-        self.windows.borrow_mut().insert(window);
+        self.windows.insert(window);
     }
 
     fn unmap_toplevel(&mut self, toplevel: &Toplevel) -> Option<Window> {
-        self.windows.borrow_mut().remove(toplevel)
+        self.windows.remove(toplevel)
     }
 
     fn move_request(
@@ -78,7 +75,7 @@ impl Positioner for Floating {
         _serial: Serial,
         _start_data: &GrabStartData,
     ) -> Option<MoveResponse> {
-        if let Some(window) = self.windows.borrow().find(toplevel) {
+        if let Some(window) = self.windows.find(toplevel) {
             let pointer = seat.get_pointer().unwrap();
 
             let mut target_window_location = window.location();
@@ -154,7 +151,6 @@ impl Positioner for Floating {
 
             Some(MoveResponse {
                 initial_window_location: target_window_location,
-                windows: self.windows.clone(),
             })
         } else {
             None
@@ -169,7 +165,7 @@ impl Positioner for Floating {
         start_data: GrabStartData,
         edges: ResizeEdge,
     ) {
-        if let Some(window) = self.windows.borrow().find(toplevel) {
+        if let Some(window) = self.windows.find(toplevel) {
             let initial_window_location = window.location();
             let initial_window_size = window.geometry().size;
 
@@ -201,13 +197,13 @@ impl Positioner for Floating {
     }
 
     fn maximize_request(&mut self, toplevle: &Toplevel) {
-        if let Some(window) = self.windows.borrow_mut().find_mut(toplevle) {
+        if let Some(window) = self.windows.find_mut(toplevle) {
             window.maximize(self.geometry);
         }
     }
 
     fn unmaximize_request(&mut self, toplevle: &Toplevel) {
-        if let Some(window) = self.windows.borrow_mut().find_mut(toplevle) {
+        if let Some(window) = self.windows.find_mut(toplevle) {
             window.unmaximize();
         }
     }
@@ -219,10 +215,9 @@ impl Positioner for Floating {
     fn on_pointer_button(&mut self, button: input::MouseButton, state: input::ButtonState) {
         if let input::MouseButton::Left = button {
             if let input::ButtonState::Pressed = state {
-                let mut windows = self.windows.borrow_mut();
-                let under = windows.surface_under(self.pointer_position);
+                let under = self.windows.surface_under(self.pointer_position);
                 if let Some(under) = under {
-                    windows.bring_surface_to_top(&under.0);
+                    self.windows.bring_surface_to_top(&under.0);
                 }
             }
         };
@@ -236,21 +231,20 @@ impl Positioner for Floating {
         self.geometry
     }
 
-    fn windows(&self) -> Ref<WindowList> {
-        self.windows.borrow()
+    fn windows(&self) -> &WindowList {
+        &self.windows
     }
 
-    fn windows_mut(&self) -> RefMut<WindowList> {
-        self.windows.borrow_mut()
+    fn windows_mut(&mut self) -> &mut WindowList {
+        &mut self.windows
     }
 
     fn send_frames(&self, time: u32) {
-        self.windows.borrow().send_frames(time);
+        self.windows.send_frames(time);
     }
 
     fn update(&mut self, delta: f64) {
-        let mut windows = self.windows.borrow_mut();
-        windows.refresh();
-        windows.update_animations(delta);
+        self.windows.refresh();
+        self.windows.update_animations(delta);
     }
 }

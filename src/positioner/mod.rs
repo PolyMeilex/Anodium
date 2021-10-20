@@ -1,8 +1,3 @@
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
-
 use smithay::{
     backend::input::{ButtonState, MouseButton},
     reexports::wayland_protocols::xdg_shell::server::xdg_toplevel::ResizeEdge,
@@ -45,8 +40,8 @@ pub trait Positioner: std::fmt::Debug {
     fn maximize_request(&mut self, toplevel: &Toplevel) {}
     fn unmaximize_request(&mut self, toplevel: &Toplevel) {}
 
-    fn windows<'a>(&'a self) -> Ref<'a, WindowList>;
-    fn windows_mut<'a>(&'a self) -> RefMut<'a, WindowList>;
+    fn windows<'a>(&'a self) -> &'a WindowList;
+    fn windows_mut<'a>(&'a mut self) -> &'a mut WindowList;
 
     fn on_pointer_move(&mut self, pos: Point<f64, Logical>) {}
     fn on_pointer_button(&mut self, button: MouseButton, state: ButtonState) {}
@@ -61,5 +56,4 @@ pub trait Positioner: std::fmt::Debug {
 #[derive(Debug)]
 pub struct MoveResponse {
     pub initial_window_location: Point<i32, Logical>,
-    pub windows: Rc<RefCell<WindowList>>,
 }

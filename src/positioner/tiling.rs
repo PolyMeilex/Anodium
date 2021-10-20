@@ -1,7 +1,4 @@
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
+use std::cell::RefCell;
 
 use smithay::{
     backend::input,
@@ -25,7 +22,7 @@ use super::{MoveResponse, Positioner};
 pub struct Tiling {
     geometry: Rectangle<i32, Logical>,
     pointer_position: Point<f64, Logical>,
-    windows: Rc<RefCell<WindowList>>,
+    windows: WindowList,
 }
 
 impl Tiling {
@@ -39,13 +36,13 @@ impl Tiling {
     }
 
     pub fn arange_windows(&mut self) {
-        if self.windows.borrow().len() > 0 {
-            let len = self.windows.borrow().len();
+        if self.windows.len() > 0 {
+            let len = self.windows.len();
             let w = self.geometry.size.w / len.min(2) as i32;
 
             let mut loc = self.geometry.loc;
 
-            for (id, window) in self.windows.borrow_mut().iter_mut().rev().enumerate() {
+            for (id, window) in self.windows.iter_mut().rev().enumerate() {
                 if window.animation().is_exiting() {
                     continue;
                 }
@@ -87,7 +84,7 @@ impl Positioner for Tiling {
             }
         }
 
-        self.windows.borrow_mut().insert(window);
+        self.windows.insert(window);
 
         if reposition {
             self.arange_windows();
@@ -95,7 +92,7 @@ impl Positioner for Tiling {
     }
 
     fn unmap_toplevel(&mut self, toplevel: &Toplevel) -> Option<Window> {
-        self.windows.borrow_mut().remove(toplevel)
+        self.windows.remove(toplevel)
     }
 
     fn move_request(
@@ -105,7 +102,7 @@ impl Positioner for Tiling {
         _serial: Serial,
         _start_data: &GrabStartData,
     ) -> Option<MoveResponse> {
-        if let Some(window) = self.windows.borrow().find(toplevel) {
+        if let Some(window) = self.windows.find(toplevel) {
             let pointer = seat.get_pointer().unwrap();
 
             let mut initial_window_location = window.location();
@@ -164,7 +161,6 @@ impl Positioner for Tiling {
 
             Some(MoveResponse {
                 initial_window_location,
-                windows: self.windows.clone(),
             })
         } else {
             None
@@ -178,7 +174,7 @@ impl Positioner for Tiling {
     fn on_pointer_button(&mut self, button: input::MouseButton, state: input::ButtonState) {
         if let input::MouseButton::Left = button {
             if let input::ButtonState::Pressed = state {
-                let windows = self.windows.borrow_mut();
+                let windows = &self.windows;
 
                 // TODO: other positioners should deactivate their windows too?
                 for w in windows.iter() {
@@ -204,24 +200,21 @@ impl Positioner for Tiling {
         self.geometry
     }
 
-    fn windows(&self) -> Ref<WindowList> {
-        self.windows.borrow()
+    fn windows(&self) -> &WindowList {
+        &self.windows
     }
 
-    fn windows_mut(&self) -> RefMut<WindowList> {
-        self.windows.borrow_mut()
+    fn windows_mut(&mut self) -> &mut WindowList {
+        &mut self.windows
     }
 
     fn send_frames(&self, time: u32) {
-        self.windows.borrow().send_frames(time);
+        self.windows.send_frames(time);
     }
 
     fn update(&mut self, delta: f64) {
-        {
-            let mut windows = self.windows.borrow_mut();
-            windows.refresh();
-            windows.update_animations(delta);
-        }
+        self.windows.refresh();
+        self.windows.update_animations(delta);
 
         // TODO: Optimize?
         self.arange_windows();
