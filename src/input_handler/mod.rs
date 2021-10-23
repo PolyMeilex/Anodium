@@ -235,8 +235,8 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> KeyAc
         KeyAction::VtSwitch((keysym - xkb::KEY_XF86Switch_VT_1 + 1) as i32)
     } else if modifiers.logo && keysym == xkb::KEY_Return {
         // run terminal
-        KeyAction::Run("yavt".into())
-        // KeyAction::Run("alacritty".into())
+        // KeyAction::Run("yavt".into())
+        KeyAction::Run("alacritty".into())
         // KeyAction::Run("weston-terminal".into())
     } else if modifiers.logo && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
         KeyAction::Workspace((keysym - xkb::KEY_1) as usize + 1)
