@@ -322,9 +322,15 @@ impl Window {
                 // .and_then(|g| if g.size.w == 0 { None } else { Some(g) })
             })
             .unwrap()
-            .unwrap_or(self.bbox)
+            .unwrap_or_else(|| {
+                let mut bbox = self.bbox;
+                bbox.loc = (0, 0).into();
+                bbox
+            })
         } else {
-            self.bbox
+            let mut bbox = self.bbox;
+            bbox.loc = (0, 0).into();
+            bbox
         }
     }
 
