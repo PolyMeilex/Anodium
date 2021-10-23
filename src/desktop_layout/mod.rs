@@ -14,8 +14,8 @@ mod iterators;
 use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};
 
 use crate::config::ConfigVM;
-use crate::positioner::floating::Floating as Universal;
-// use crate::positioner::universal::Universal;
+// use crate::positioner::floating::Floating as Universal;
+use crate::positioner::universal::Universal;
 use crate::positioner::Positioner;
 use crate::utils::AsWlSurface;
 

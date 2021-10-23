@@ -1,6 +1,6 @@
 use std::{process::Command, sync::atomic::Ordering};
 
-use crate::{backend::Backend, Anodium};
+use crate::{backend::Backend, shell::move_surface_grab::MoveSurfaceGrab, Anodium};
 
 use smithay::{
     backend::input::{
@@ -129,6 +129,50 @@ impl Anodium {
             input::ButtonState::Released => wl_pointer::ButtonState::Released,
         };
         self.input_state.pointer.button(button, state, serial, evt.time());
+
+        {
+            if evt.state() == input::ButtonState::Pressed {
+                let under = self
+                    .desktop_layout
+                    .borrow()
+                    .surface_under(self.input_state.pointer_location);
+
+                if self.input_state.modifiers_state.logo {
+                    if let Some((surface, _)) = under {
+                        let pointer = &self.input_state.pointer;
+
+                        // Check that this surface has a click grab.
+                        if pointer.has_grab(serial) {
+                            let start_data = pointer.grab_start_data().unwrap();
+
+                            let mut desktop_layout = self.desktop_layout.borrow_mut();
+
+                            if let Some(space) = desktop_layout.find_workspace_by_surface_mut(&surface) {
+                                if let Some(window) = space.find_window(&surface) {
+                                    let toplevel = window.toplevel().clone();
+
+                                    if let Some(res) =
+                                        space.move_request(&toplevel, &self.seat, serial, &start_data)
+                                    {
+                                        if let Some(window) = space.unmap_toplevel(&toplevel) {
+                                            desktop_layout.grabed_window = Some(window);
+
+                                            let grab = MoveSurfaceGrab {
+                                                start_data,
+                                                toplevel,
+                                                initial_window_location: res.initial_window_location,
+                                                desktop_layout: self.desktop_layout.clone(),
+                                            };
+                                            pointer.set_grab(grab, serial);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         for w in self.desktop_layout.borrow_mut().visible_workspaces_mut() {
             w.on_pointer_button(evt.button(), evt.state());
