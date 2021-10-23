@@ -1,4 +1,7 @@
-use std::{process::Command, sync::atomic::Ordering};
+use std::{
+    process::{self, Command},
+    sync::atomic::Ordering,
+};
 
 use crate::{backend::Backend, shell::move_surface_grab::MoveSurfaceGrab, Anodium};
 
@@ -261,7 +264,7 @@ enum KeyAction {
     /// Trigger a vt-switch
     VtSwitch(i32),
     /// run a command
-    Run(String),
+    Run(process::Command),
     /// Switch the current screen
     Workspace(usize),
     MoveToWorkspace(usize),
@@ -280,8 +283,14 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> KeyAc
     } else if modifiers.logo && keysym == xkb::KEY_Return {
         // run terminal
         // KeyAction::Run("yavt".into())
-        KeyAction::Run("alacritty".into())
+        KeyAction::Run(Command::new("alacritty"))
         // KeyAction::Run("weston-terminal".into())
+    } else if modifiers.logo && keysym == xkb::KEY_d {
+        let mut c = Command::new("rofi");
+        c.arg("-show");
+        c.arg("combi");
+
+        KeyAction::Run(c)
     } else if modifiers.logo && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
         KeyAction::Workspace((keysym - xkb::KEY_1) as usize + 1)
     } else if modifiers.logo && modifiers.shift && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
@@ -303,12 +312,11 @@ impl Anodium {
                 info!(self.log, "Trying to switch to vt {}", vt);
                 backend.change_vt(vt);
             }
-            KeyAction::Run(cmd) => {
-                info!(self.log, "Starting program"; "cmd" => cmd.clone());
-                if let Err(e) = Command::new(&cmd).spawn() {
+            KeyAction::Run(mut cmd) => {
+                info!(self.log, "Starting program");
+                if let Err(e) = cmd.spawn() {
                     error!(self.log,
                         "Failed to start program";
-                        "cmd" => cmd,
                         "err" => format!("{:?}", e)
                     );
                 }
