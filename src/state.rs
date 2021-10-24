@@ -63,7 +63,6 @@ pub struct Anodium {
     pub seat: Seat,
 
     pub start_time: std::time::Instant,
-    pub fps: fps_ticker::Fps,
     last_update: Instant,
 
     pub config: ConfigVM,
@@ -79,7 +78,6 @@ impl Anodium {
         self.desktop_layout.borrow_mut().update(elapsed);
 
         self.last_update = Instant::now();
-        self.fps.tick();
     }
 
     pub fn render(
@@ -346,7 +344,6 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                 seat,
 
                 start_time: Instant::now(),
-                fps: fps_ticker::Fps::default(),
                 last_update: Instant::now(),
 
                 config,

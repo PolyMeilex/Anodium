@@ -258,7 +258,6 @@ pub type RenderSurface = GbmBufferedSurface<SessionFd>;
 
 struct SurfaceData {
     surface: RenderSurface,
-    #[cfg(feature = "debug")]
     fps: fps_ticker::Fps,
 }
 
@@ -338,7 +337,7 @@ fn scan_connectors(
 
                     let mode = modes.get(mode_id).unwrap();
 
-                    println!("{:#?}", mode);
+                    info!(logger, "MODE: {:#?}", mode);
 
                     let mut surface =
                         match device.create_surface(crtc, mode.clone(), &[connector_info.handle()]) {
@@ -390,7 +389,6 @@ fn scan_connectors(
 
                     entry.insert(Rc::new(RefCell::new(SurfaceData {
                         surface: gbm_surface,
-                        #[cfg(feature = "debug")]
                         fps: fps_ticker::Fps::default(),
                     })));
                     break 'outer;

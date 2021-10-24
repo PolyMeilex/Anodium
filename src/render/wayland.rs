@@ -302,67 +302,6 @@ impl Anodium {
     }
 }
 
-// pub fn draw_layers<R, E, F, T>(
-//     renderer: &mut R,
-//     frame: &mut F,
-//     window_map: &WindowMap,
-//     layer: Layer,
-//     output_rect: Rectangle<i32, Logical>,
-//     output_scale: f32,
-//     log: &::slog::Logger,
-// ) -> Result<(), SwapBuffersError>
-// where
-//     R: Renderer<Error = E, TextureId = T, Frame = F> + ImportAll,
-//     F: Frame<Error = E, TextureId = T>,
-//     E: std::error::Error + Into<SwapBuffersError>,
-//     T: Texture + 'static,
-// {
-//     let mut result = Ok(());
-
-//     window_map
-//         .layers
-//         .with_layers_from_bottom_to_top(&layer, |layer_surface| {
-//             // skip layers that do not overlap with a given output
-//             if !output_rect.overlaps(layer_surface.bbox) {
-//                 return;
-//             }
-
-//             let mut initial_place: Point<i32, Logical> = layer_surface.location;
-//             initial_place.x -= output_rect.loc.x;
-
-//             if let Some(wl_surface) = layer_surface.surface.get_surface() {
-//                 // this surface is a root of a subsurface tree that needs to be drawn
-//                 if let Err(err) =
-//                     draw_surface_tree(renderer, frame, wl_surface, initial_place, output_scale, log)
-//                 {
-//                     result = Err(err);
-//                 }
-
-//                 window_map
-//                     .popups()
-//                     .with_child_popups(&wl_surface, initial_place, |popup, initial_place| {
-//                         let location = popup.popup.location();
-//                         let draw_location = *initial_place + location;
-//                         if let Some(wl_surface) = popup.popup.get_surface() {
-//                             if let Err(err) = draw_surface_tree(
-//                                 renderer,
-//                                 frame,
-//                                 &wl_surface,
-//                                 draw_location,
-//                                 output_scale,
-//                                 log,
-//                             ) {
-//                                 result = Err(err);
-//                             }
-//                         }
-//                         *initial_place = draw_location;
-//                     });
-//             }
-//         });
-
-//     result
-// }
-
 pub fn draw_dnd_icon(
     frame: &mut RenderFrame,
     surface: &wl_surface::WlSurface,

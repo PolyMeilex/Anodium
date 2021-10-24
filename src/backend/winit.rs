@@ -26,7 +26,10 @@ pub const OUTPUT_NAME: &str = "winit";
 
 mod input;
 
-pub struct WinitData {}
+#[derive(Default)]
+pub struct WinitData {
+    fps: fps_ticker::Fps,
+}
 
 impl Backend for WinitData {
     fn seat_name(&self) -> String {
@@ -75,7 +78,7 @@ pub fn run_winit(
      * Initialize the globals
      */
 
-    let data = WinitData {};
+    let data = WinitData::default();
     let mut state = BackendState::init(display.clone(), event_loop.handle(), data, log.clone());
 
     let mode = Mode {
@@ -155,16 +158,11 @@ pub fn run_winit(
                                         }
                                     }
 
-                                    let fps = state.anodium.fps.avg().round() as u32;
-
                                     #[cfg(feature = "debug")]
                                     {
+                                        let fps = state.backend_data.fps.avg().round() as u32;
                                         draw_fps(frame, output_scale as f64, fps).unwrap();
                                     }
-                                    #[cfg(not(feature = "debug"))]
-                                    let _ = fps;
-
-                                    //
                                 })
                                 .unwrap();
                         }
@@ -174,6 +172,7 @@ pub fn run_winit(
 
                         state.anodium.display.borrow_mut().flush_clients(&mut ());
                         state.anodium.update();
+                        state.backend_data.fps.tick();
 
                         handle.add_timeout(Duration::from_millis(16), ());
                     }

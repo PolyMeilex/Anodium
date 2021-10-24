@@ -177,9 +177,9 @@ impl Anodium {
             }
         }
 
-        for w in self.desktop_layout.borrow_mut().visible_workspaces_mut() {
-            w.on_pointer_button(evt.button(), evt.state());
-        }
+        self.desktop_layout
+            .borrow_mut()
+            .on_pointer_button(evt.button(), evt.state());
     }
 
     fn on_pointer_axis<I: InputBackend>(&mut self, evt: I::PointerAxisEvent) {

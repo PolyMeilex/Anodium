@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
 
+use smithay::backend::input::{ButtonState, MouseButton};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::output::Mode;
@@ -61,6 +62,12 @@ impl DesktopLayout {
             if w.geometry().contains(pos.to_i32_round()) {
                 self.active_workspace = Some(id.clone());
             }
+        }
+    }
+
+    pub fn on_pointer_button(&mut self, button: MouseButton, state: ButtonState) {
+        for w in self.visible_workspaces_mut() {
+            w.on_pointer_button(button, state);
         }
     }
 
