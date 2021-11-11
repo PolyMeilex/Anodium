@@ -311,8 +311,6 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
             xwayland
         };
 
-        crate::wayland::decoration::init_decoration_manager(&mut display.borrow_mut());
-
         let config = ConfigVM::new().unwrap();
 
         BackendState {

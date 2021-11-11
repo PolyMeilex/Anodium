@@ -21,8 +21,6 @@ mod animations;
 mod desktop_layout;
 mod positioner;
 
-mod wayland;
-
 mod config;
 
 use state::Anodium;
