@@ -66,8 +66,6 @@ use super::Backend;
 use crate::{render::renderer::HasGles2Renderer, render::*, state::BackendState};
 use crate::{render::AnodiumRenderer, state::Anodium};
 
-mod input;
-
 #[derive(Clone)]
 pub struct SessionFd(RawFd);
 impl AsRawFd for SessionFd {
@@ -177,7 +175,7 @@ pub fn run_udev(
     let _libinput_event_source = event_loop
         .handle()
         .insert_source(libinput_backend, move |event, _, state| {
-            state.process_input_event(event)
+            state.anodium.process_input_event(&mut state.backend_data, event);
         })
         .unwrap();
     let _session_event_source = event_loop
