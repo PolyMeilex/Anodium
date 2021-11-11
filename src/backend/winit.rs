@@ -6,7 +6,7 @@ use smithay::{
     wayland::dmabuf::init_dmabuf_global,
 };
 use smithay::{
-    backend::{input::InputBackend, winit},
+    backend::winit,
     reexports::{
         calloop::EventLoop,
         wayland_server::{protocol::wl_output, Display},
@@ -112,7 +112,7 @@ pub fn run_winit(
         event_loop
             .handle()
             .insert_source(timer, move |_: (), handle, state| {
-                match input.dispatch_new_events(|event| state.process_input_event(event)) {
+                match input.dispatch_new_events(|event| state.process_winit_event(event)) {
                     Ok(()) => {
                         let mut renderer = renderer.borrow_mut();
                         let outputs: Vec<_> = state
@@ -176,7 +176,7 @@ pub fn run_winit(
 
                         handle.add_timeout(Duration::from_millis(16), ());
                     }
-                    Err(winit::WinitInputError::WindowClosed) => {
+                    Err(winit::WinitError::WindowClosed) => {
                         state.anodium.running.store(false, Ordering::SeqCst);
                     }
                 }

@@ -1,20 +1,11 @@
 use crate::{backend::winit::WinitData, state::BackendState};
 
-use smithay::{
-    backend::{
-        input::{InputBackend, InputEvent},
-        winit::WinitEvent,
-    },
-    wayland::output::Mode,
-};
+use smithay::{backend::winit::WinitEvent, wayland::output::Mode};
 
 impl BackendState<WinitData> {
-    pub fn process_input_event<B>(&mut self, event: InputEvent<B>)
-    where
-        B: InputBackend<SpecialEvent = WinitEvent>,
-    {
+    pub fn process_winit_event(&mut self, event: WinitEvent) {
         match event {
-            InputEvent::Special(WinitEvent::Resized { size, .. }) => {
+            WinitEvent::Resized { size, .. } => {
                 self.anodium
                     .desktop_layout
                     .borrow_mut()
@@ -26,9 +17,10 @@ impl BackendState<WinitData> {
                         crate::backend::winit::OUTPUT_NAME,
                     );
             }
-            event => {
+            WinitEvent::Input(event) => {
                 self.anodium.process_input_event(&mut self.backend_data, event);
             }
+            _ => {}
         }
     }
 }

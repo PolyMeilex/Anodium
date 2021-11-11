@@ -782,8 +782,9 @@ impl Anodium {
                     #[cfg(feature = "debug")]
                     {
                         draw_fps(frame, output_scale as f64, surface.fps.avg().round() as u32)?;
-                        surface.fps.tick();
                     }
+
+                    surface.fps.tick();
                     Ok(())
                 },
             )

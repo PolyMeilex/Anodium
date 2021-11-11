@@ -108,12 +108,7 @@ impl Anodium {
 
         debug!(self.log, "Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
 
-        let button = match evt.button() {
-            input::MouseButton::Left => 0x110,
-            input::MouseButton::Right => 0x111,
-            input::MouseButton::Middle => 0x112,
-            input::MouseButton::Other(b) => b as u32,
-        };
+        let button = evt.button_code();
         let state = match evt.state() {
             input::ButtonState::Pressed => {
                 // change the keyboard focus unless the pointer is grabbed
@@ -177,9 +172,11 @@ impl Anodium {
             }
         }
 
-        self.desktop_layout
-            .borrow_mut()
-            .on_pointer_button(evt.button(), evt.state());
+        if let Some(btn) = evt.button() {
+            self.desktop_layout
+                .borrow_mut()
+                .on_pointer_button(btn, evt.state());
+        }
     }
 
     fn on_pointer_axis<I: InputBackend>(&mut self, evt: I::PointerAxisEvent) {
