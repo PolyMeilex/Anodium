@@ -1,5 +1,7 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
+    path::PathBuf,
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -10,6 +12,7 @@ use std::{
 
 use smithay::{
     backend::renderer::Frame,
+    nix::libc::dev_t,
     reexports::{
         calloop::{generic::Generic, Interest, LoopHandle, Mode, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
@@ -29,7 +32,7 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
-    backend::Backend,
+    backend::{udev, Backend},
     config::ConfigVM,
     desktop_layout::{DesktopLayout, Output},
     render::{self, renderer::RenderFrame},
@@ -201,6 +204,11 @@ pub struct BackendState<BackendData> {
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
 
+    // Backend
+    pub primary_gpu: Option<PathBuf>,
+    pub backends: HashMap<dev_t, udev::BackendData>,
+    pub pointer_image: crate::cursor::Cursor,
+
     pub log: slog::Logger,
 }
 
@@ -347,9 +355,13 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                 config,
                 log: log.clone(),
             },
-            log,
+            log: log.clone(),
             #[cfg(feature = "xwayland")]
             xwayland,
+
+            primary_gpu: None,
+            backends: Default::default(),
+            pointer_image: crate::cursor::Cursor::load(&log),
         }
     }
 }

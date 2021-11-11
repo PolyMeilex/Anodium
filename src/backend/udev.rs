@@ -81,11 +81,7 @@ struct UdevOutputId {
 }
 
 pub struct UdevData {
-    pub session: AutoSession,
-    primary_gpu: Option<PathBuf>,
-    backends: HashMap<dev_t, BackendData>,
-    signaler: Signaler<SessionSignal>,
-    pointer_image: crate::cursor::Cursor,
+    session: AutoSession,
     render_timer: TimerHandle<(u64, crtc::Handle)>,
     log: Logger,
 }
@@ -124,21 +120,17 @@ pub fn run_udev(
     /*
      * Initialize the compositor
      */
-    let primary_gpu = primary_gpu(&session.seat()).unwrap_or_default();
 
     // setup the timer
     let timer = Timer::new().unwrap();
 
     let data = UdevData {
         session,
-        primary_gpu,
-        backends: HashMap::new(),
-        signaler: session_signal.clone(),
-        pointer_image: crate::cursor::Cursor::load(&log),
         render_timer: timer.handle(),
         log: log.clone(),
     };
     let mut state = BackendState::init(display.clone(), event_loop.handle(), data, log.clone());
+    state.primary_gpu = primary_gpu(&state.anodium.seat_name).unwrap_or_default();
 
     // re-render timer
     event_loop
@@ -154,10 +146,6 @@ pub fn run_udev(
     let udev_backend = UdevBackend::new(state.anodium.seat_name.clone(), log.clone()).map_err(|_| ())?;
 
     /*
-     * Initialize a fake output (we render one screen to every device in this example)
-     */
-
-    /*
      * Initialize libinput backend
      */
     let mut libinput_context = Libinput::new_with_udev::<LibinputSessionInterface<AutoSession>>(
@@ -167,7 +155,7 @@ pub fn run_udev(
         .udev_assign_seat(&state.anodium.seat_name)
         .unwrap();
     let mut libinput_backend = LibinputInputBackend::new(libinput_context, log.clone());
-    libinput_backend.link(session_signal);
+    libinput_backend.link(session_signal.clone());
 
     /*
      * Bind all our objects that get driven by the event loop
@@ -183,7 +171,7 @@ pub fn run_udev(
         .insert_source(notifier, |(), &mut (), _anvil_state| {})
         .unwrap();
     for (dev, path) in udev_backend.device_list() {
-        state.device_added(dev, path.into())
+        state.device_added(dev, path.into(), &session_signal)
     }
 
     // init dmabuf support with format list from all gpus
@@ -191,7 +179,7 @@ pub fn run_udev(
     // TODO2: This does not necessarily depend on egl, but mesa makes no use of it without wl_drm right now
     {
         let mut formats = Vec::new();
-        for backend_data in state.backend_data.backends.values() {
+        for backend_data in state.backends.values() {
             formats.extend(backend_data.renderer.borrow().dmabuf_formats().cloned());
         }
 
@@ -200,7 +188,7 @@ pub fn run_udev(
             formats,
             |buffer, mut ddata| {
                 let anvil_state = ddata.get::<BackendState<UdevData>>().unwrap();
-                for backend_data in anvil_state.backend_data.backends.values() {
+                for backend_data in anvil_state.backends.values() {
                     if backend_data.renderer.borrow_mut().import_dmabuf(buffer).is_ok() {
                         return true;
                     }
@@ -214,8 +202,8 @@ pub fn run_udev(
     let _udev_event_source = event_loop
         .handle()
         .insert_source(udev_backend, move |event, _, state| match event {
-            UdevEvent::Added { device_id, path } => state.device_added(device_id, path),
-            UdevEvent::Changed { device_id } => state.device_changed(device_id),
+            UdevEvent::Added { device_id, path } => state.device_added(device_id, path, &session_signal),
+            UdevEvent::Changed { device_id } => state.device_changed(device_id, &session_signal),
             UdevEvent::Removed { device_id } => state.device_removed(device_id),
         })
         .map_err(|e| -> IoError { e.into() })
@@ -259,7 +247,7 @@ struct SurfaceData {
     fps: fps_ticker::Fps,
 }
 
-struct BackendData {
+pub struct BackendData {
     _restart_token: SignalToken,
     surfaces: Rc<RefCell<HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>>>>,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
@@ -399,7 +387,7 @@ fn scan_connectors(
 }
 
 impl BackendState<UdevData> {
-    fn device_added(&mut self, device_id: dev_t, path: PathBuf) {
+    fn device_added(&mut self, device_id: dev_t, path: PathBuf, session_signal: &Signaler<SessionSignal>) {
         // Try to open the device
         if let Some((mut device, gbm)) = self
             .backend_data
@@ -462,7 +450,7 @@ impl BackendState<UdevData> {
             let renderer = AnodiumRenderer::new(renderer);
             let renderer = Rc::new(RefCell::new(renderer));
 
-            if path.canonicalize().ok() == self.backend_data.primary_gpu {
+            if path.canonicalize().ok() == self.primary_gpu {
                 info!(self.log, "Initializing EGL Hardware Acceleration via {:?}", path);
                 if renderer
                     .borrow_mut()
@@ -478,20 +466,20 @@ impl BackendState<UdevData> {
                 &gbm,
                 &mut *renderer.borrow_mut(),
                 &mut self.anodium,
-                &self.backend_data.signaler,
+                &session_signal,
                 &self.log,
             )));
 
             let dev_id = device.device_id();
             let handle = self.handle.clone();
-            let restart_token = self.backend_data.signaler.register(move |signal| match signal {
+            let restart_token = session_signal.register(move |signal| match signal {
                 SessionSignal::ActivateSession | SessionSignal::ActivateDevice { .. } => {
                     handle.insert_idle(move |anvil_state| anvil_state.udev_render(dev_id, None));
                 }
                 _ => {}
             });
 
-            device.link(self.backend_data.signaler.clone());
+            device.link(session_signal.clone());
             let event_dispatcher = Dispatcher::new(
                 device,
                 move |event, _, anvil_state: &mut BackendState<_>| match event {
@@ -510,7 +498,7 @@ impl BackendState<UdevData> {
                 schedule_initial_render(backend.clone(), renderer.clone(), &self.handle, self.log.clone());
             }
 
-            self.backend_data.backends.insert(
+            self.backends.insert(
                 dev_id,
                 BackendData {
                     _restart_token: restart_token,
@@ -527,12 +515,12 @@ impl BackendState<UdevData> {
     }
 
     #[allow(dead_code)]
-    fn device_changed(&mut self, device: dev_t) {
+    fn device_changed(&mut self, device: dev_t, session_signal: &Signaler<SessionSignal>) {
         //quick and dirty, just re-init all backends
-        if let Some(ref mut backend_data) = self.backend_data.backends.get_mut(&device) {
+        if let Some(ref mut backend_data) = self.backends.get_mut(&device) {
             let logger = self.log.clone();
             let loop_handle = self.handle.clone();
-            let signaler = self.backend_data.signaler.clone();
+            let signaler = session_signal.clone();
 
             self.anodium.retain_outputs(|output| {
                 output
@@ -568,7 +556,7 @@ impl BackendState<UdevData> {
 
     fn device_removed(&mut self, device: dev_t) {
         // drop the backends on this side
-        if let Some(backend_data) = self.backend_data.backends.remove(&device) {
+        if let Some(backend_data) = self.backends.remove(&device) {
             // drop surfaces
             backend_data.surfaces.borrow_mut().clear();
             debug!(self.log, "Surfaces dropped");
@@ -585,7 +573,7 @@ impl BackendState<UdevData> {
             let _device = backend_data.event_dispatcher.into_source_inner();
 
             // don't use hardware acceleration anymore, if this was the primary gpu
-            if _device.dev_path().and_then(|path| path.canonicalize().ok()) == self.backend_data.primary_gpu {
+            if _device.dev_path().and_then(|path| path.canonicalize().ok()) == self.primary_gpu {
                 backend_data.renderer.borrow_mut().unbind_wl_display();
             }
             debug!(self.log, "Dropping device");
@@ -594,7 +582,7 @@ impl BackendState<UdevData> {
 
     // If crtc is `Some()`, render it, else render all crtcs
     fn udev_render(&mut self, dev_id: u64, crtc: Option<crtc::Handle>) {
-        let device_backend = match self.backend_data.backends.get_mut(&dev_id) {
+        let device_backend = match self.backends.get_mut(&dev_id) {
             Some(backend) => backend,
             None => {
                 error!(self.log, "Trying to render on non-existent backend {}", dev_id);
@@ -619,7 +607,7 @@ impl BackendState<UdevData> {
 
         for (&crtc, surface) in to_render_iter {
             // TODO get scale from the rendersurface when supporting HiDPI
-            let frame = self.backend_data.pointer_image.get_image(
+            let frame = self.pointer_image.get_image(
                 1, /*scale*/
                 self.anodium.start_time.elapsed().as_millis() as u32,
             );
