@@ -82,7 +82,7 @@ struct UdevOutputId {
 
 pub struct UdevData {
     session: AutoSession,
-    render_timer: TimerHandle<(u64, crtc::Handle)>,
+    _render_timer: TimerHandle<(u64, crtc::Handle)>,
     log: Logger,
 }
 
@@ -126,7 +126,7 @@ pub fn run_udev(
 
     let data = UdevData {
         session,
-        render_timer: timer.handle(),
+        _render_timer: timer.handle(),
         log: log.clone(),
     };
     let mut state = BackendState::init(display.clone(), event_loop.handle(), data, log.clone());
@@ -650,11 +650,10 @@ impl BackendState<UdevData> {
                 };
 
                 if reschedule {
-                    debug!(self.log, "Rescheduling");
-                    self.backend_data.render_timer.add_timeout(
-                        Duration::from_millis(1000 /*a seconds*/ / 60 /*refresh rate*/),
-                        (device_backend.dev_id, crtc),
-                    );
+                    // debug!(self.log, "Rescheduling");
+                    // self.backend_data
+                    //     .render_timer
+                    //     .add_timeout(Duration::from_secs(5), (device_backend.dev_id, crtc));
                 }
             } else {
                 // Send frame events so that client start drawing their next frame
