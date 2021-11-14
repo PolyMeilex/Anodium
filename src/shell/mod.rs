@@ -189,12 +189,11 @@ impl Anodium {
                         }
 
                         // If the compositor requested MoveAfterReszie
-                        match data.move_after_resize_state {
-                            MoveAfterResizeState::WaitingForCommit(mdata) => {
-                                new_location = Some(mdata.target_window_location);
-                                data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
-                            }
-                            _ => {}
+                        if let MoveAfterResizeState::WaitingForCommit(mdata) =
+                            data.move_after_resize_state
+                        {
+                            new_location = Some(mdata.target_window_location);
+                            data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
                         }
 
                         new_location

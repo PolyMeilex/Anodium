@@ -109,7 +109,7 @@ impl Anodium {
                     return;
                 }
 
-                let toplevel = Toplevel::Xdg(surface.clone());
+                let toplevel = Toplevel::Xdg(surface);
                 if let Some(space) = self
                     .desktop_layout
                     .borrow_mut()
@@ -119,7 +119,7 @@ impl Anodium {
                 }
             }
             XdgRequest::Maximize { surface } => {
-                let toplevel = Toplevel::Xdg(surface.clone());
+                let toplevel = Toplevel::Xdg(surface);
                 if let Some(space) = self
                     .desktop_layout
                     .borrow_mut()
@@ -129,7 +129,7 @@ impl Anodium {
                 }
             }
             XdgRequest::UnMaximize { surface } => {
-                let toplevel = Toplevel::Xdg(surface.clone());
+                let toplevel = Toplevel::Xdg(surface);
                 if let Some(space) = self
                     .desktop_layout
                     .borrow_mut()

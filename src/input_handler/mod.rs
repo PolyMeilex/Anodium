@@ -24,9 +24,10 @@ use smithay::{
 impl Anodium {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
         match event {
-            InputEvent::Keyboard { event, .. } => match self.keyboard_key_to_action::<I>(event) {
-                action => self.shortcut_handler(action),
-            },
+            InputEvent::Keyboard { event, .. } => {
+                let action = self.keyboard_key_to_action::<I>(event);
+                self.shortcut_handler(action)
+            }
             InputEvent::PointerMotion { event, .. } => {
                 self.input_state.pointer_location =
                     self.clamp_coords(self.input_state.pointer_location + event.delta());

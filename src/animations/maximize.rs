@@ -41,12 +41,9 @@ impl MaximizeAnimation {
     }
 
     pub fn stop(&mut self) {
-        match self.state {
-            MaximizeAnimationState::Enter => {
-                self.state = MaximizeAnimationState::Exit;
-            }
-            _ => {}
-        };
+        if let MaximizeAnimationState::Enter = self.state {
+            self.state = MaximizeAnimationState::Exit;
+        }
     }
 
     pub fn update(&mut self, elapsed: f64) {

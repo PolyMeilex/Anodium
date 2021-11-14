@@ -43,14 +43,14 @@ impl PointerGrab for MoveSurfaceGrab {
                         .get::<RefCell<SurfaceData>>()
                         .unwrap()
                         .borrow();
-                    match &data.move_after_resize_state {
+
+                    matches!(
+                        &data.move_after_resize_state,
                         // If done
-                        MoveAfterResizeState::Current(_) => true,
-                        // If non-existent
-                        MoveAfterResizeState::None => true,
-                        // If in proggres
-                        _ => false,
-                    }
+                        MoveAfterResizeState::Current(_) |
+                        // Or if non-existent
+                        MoveAfterResizeState::None,
+                    )
                 })
                 .unwrap();
 

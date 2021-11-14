@@ -64,14 +64,10 @@ impl ConfigVM {
             })
             .collect();
 
-        let outputs: Array = outputs.into();
-
-        let result: Array = inner.engine.call_fn(
-            &mut inner.scope,
-            &mut inner.ast,
-            "arrange_outputs",
-            (outputs,),
-        )?;
+        let result: Array =
+            inner
+                .engine
+                .call_fn(&mut inner.scope, &inner.ast, "arrange_outputs", (outputs,))?;
 
         Ok(result
             .into_iter()
@@ -89,20 +85,14 @@ impl ConfigVM {
         let modes: Array = modes
             .iter()
             .enumerate()
-            .map(|(id, m)| {
-                Dynamic::from(Mode {
-                    id,
-                    mode: m.clone(),
-                })
-            })
+            .map(|(id, m)| Dynamic::from(Mode { id, mode: *m }))
             .collect();
 
-        let modes: Array = modes.into();
         let output_name: ImmutableString = output_name.into();
 
         let result: Dynamic = inner.engine.call_fn(
             &mut inner.scope,
-            &mut inner.ast,
+            &inner.ast,
             "configure_output",
             (output_name, modes),
         )?;

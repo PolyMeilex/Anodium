@@ -298,7 +298,7 @@ impl OutputMap {
             }
 
             if let Some(scale) = scale {
-                if output.scale.round() != scale.round() {
+                if output.scale.round() as u32 != scale.round() as u32 {
                     output.scale = scale;
 
                     output.output.change_current_state(

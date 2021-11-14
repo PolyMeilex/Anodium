@@ -229,7 +229,7 @@ impl DesktopLayout {
         let mut positioner = Universal::new(Default::default(), Default::default());
         positioner.set_geometry(output.usable_geometry());
 
-        self.workspaces.insert(id.into(), Box::new(positioner));
+        self.workspaces.insert(id, Box::new(positioner));
     }
 
     pub fn update_output_mode_by_name<N: AsRef<str>>(&mut self, mode: Mode, name: N) {

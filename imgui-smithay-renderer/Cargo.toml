@@ -5,7 +5,7 @@ authors = ["Poly <marynczak.bartlomiej@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-imgui = "0.7.0"
+imgui = "0.8.0"
 memoffset = "0.6.4"
 cgmath = "0.18.0"
 

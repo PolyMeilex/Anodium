@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::{
     cell::RefCell,
     collections::hash_map::{Entry, HashMap},
@@ -294,7 +295,7 @@ fn scan_connectors(
                     info!("MODE: {:#?}", mode);
 
                     let mut surface =
-                        match drm.create_surface(crtc, mode.clone(), &[connector_info.handle()]) {
+                        match drm.create_surface(crtc, *mode, &[connector_info.handle()]) {
                             Ok(surface) => surface,
                             Err(err) => {
                                 warn!("Failed to create drm surface: {}", err);
@@ -349,7 +350,7 @@ fn scan_connectors(
                     {
                         imgui.set_ini_filename(None);
                         let io = imgui.io_mut();
-                        io.display_framebuffer_scale = [1.0 as f32, 1.0 as f32];
+                        io.display_framebuffer_scale = [1.0f32, 1.0f32];
                         io.display_size = [size.0 as f32, size.1 as f32];
                     }
 
@@ -387,12 +388,12 @@ impl BackendState {
     fn open_device(
         &mut self,
         device_id: dev_t,
-        path: &PathBuf,
+        path: &Path,
     ) -> Option<(DrmDevice<SessionFd>, GbmDevice<SessionFd>)> {
         self.anodium
             .session
             .open(
-                &path,
+                path,
                 OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
             )
             .ok()
@@ -474,7 +475,7 @@ impl BackendState {
                 &gbm,
                 &mut *renderer.borrow_mut(),
                 &mut self.anodium,
-                &session_signal,
+                session_signal,
                 &self.log,
             )));
 
@@ -612,7 +613,7 @@ impl BackendState {
         let mut surfaces_iter = surfaces.iter();
         let mut option_iter = crtc
             .iter()
-            .flat_map(|crtc| surfaces.get(&crtc).map(|surface| (crtc, surface)));
+            .flat_map(|crtc| surfaces.get(crtc).map(|surface| (crtc, surface)));
 
         let to_render_iter: &mut dyn Iterator<Item = (&crtc::Handle, &Rc<RefCell<SurfaceData>>)> =
             if crtc.is_some() {
@@ -764,7 +765,7 @@ impl Anodium {
                     frame
                         .renderer
                         .with_context(|_renderer, gles| {
-                            imgui_pipeline.render(Transform::Flipped180, gles, &draw_data);
+                            imgui_pipeline.render(Transform::Flipped180, gles, draw_data);
                         })
                         .unwrap();
 

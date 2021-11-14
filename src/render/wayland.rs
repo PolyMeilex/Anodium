@@ -145,7 +145,7 @@ fn draw_surface_tree(
         },
         |_surface, states, location| {
             let mut location = *location;
-            if let Some(ref data) = states.data_map.get::<RefCell<SurfaceData>>() {
+            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
                 let mut data = data.borrow_mut();
                 let buffer_scale = data.buffer_scale;
                 if let Some(texture) = data
@@ -199,7 +199,7 @@ impl Anodium {
 
             if let Some(wl_surface) = window.surface().as_ref() {
                 // this surface is a root of a subsurface tree that needs to be drawn
-                if let Err(err) = draw_surface_tree(frame, &wl_surface, initial_place, output_scale)
+                if let Err(err) = draw_surface_tree(frame, wl_surface, initial_place, output_scale)
                 {
                     error!("{:?}", err);
                 }
@@ -317,11 +317,11 @@ pub fn draw_dnd_icon(
 
 // TODO: Move this to diferent module, this is not wayland specyfic
 pub fn draw_fps(ui: &imgui::Ui, _output_scale: f64, value: f64) {
-    imgui::Window::new(imgui::im_str!("FPS"))
+    imgui::Window::new("FPS")
         .size([50.0, 20.0], imgui::Condition::Always)
         .position([0.0, 0.0], imgui::Condition::Always)
         .title_bar(false)
-        .build(&ui, || {
+        .build(ui, || {
             ui.text(&format!("{}FPS", value as u32));
         });
 }

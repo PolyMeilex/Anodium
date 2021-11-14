@@ -44,10 +44,8 @@ impl Positioner for Universal {
     fn unmap_toplevel(&mut self, toplevel: &Toplevel) -> Option<Window> {
         if let Some(win) = self.floating.unmap_toplevel(toplevel) {
             Some(win)
-        } else if let Some(win) = self.tiling.unmap_toplevel(toplevel) {
-            Some(win)
         } else {
-            None
+            self.tiling.unmap_toplevel(toplevel)
         }
     }
 
@@ -63,10 +61,8 @@ impl Positioner for Universal {
             .move_request(toplevel, seat, serial, start_data)
         {
             Some(req)
-        } else if let Some(req) = self.tiling.move_request(toplevel, seat, serial, start_data) {
-            Some(req)
         } else {
-            None
+            self.tiling.move_request(toplevel, seat, serial, start_data)
         }
     }
 

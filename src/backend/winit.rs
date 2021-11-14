@@ -76,7 +76,7 @@ pub fn run_winit(
      */
 
     let mut state = BackendState::init(
-        display.clone(),
+        display,
         event_loop.handle(),
         AnodiumSession::new_winit(),
         log.clone(),
@@ -108,7 +108,7 @@ pub fn run_winit(
     {
         imgui.set_ini_filename(None);
         let io = imgui.io_mut();
-        io.display_framebuffer_scale = [1.0 as f32, 1.0 as f32];
+        io.display_framebuffer_scale = [1.0f32, 1.0f32];
         io.display_size = [size.w as f32, size.h as f32];
     }
 
@@ -172,7 +172,7 @@ pub fn run_winit(
                                             imgui_pipeline.render(
                                                 Transform::Normal,
                                                 gles,
-                                                &draw_data,
+                                                draw_data,
                                             );
                                         })
                                         .unwrap();

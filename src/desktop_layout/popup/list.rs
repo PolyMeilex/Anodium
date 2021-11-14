@@ -44,7 +44,7 @@ impl PopupList {
                 .filter(move |w| w.popup.parent().as_ref() == Some(base))
             {
                 let mut initial_place = initial_place;
-                f(&p, &mut initial_place);
+                f(p, &mut initial_place);
                 find(popups, p.popup.get_surface().unwrap(), initial_place, f)
             }
         }
@@ -81,13 +81,13 @@ impl PopupList {
                 parent,
                 parent_location + parent_geometry.loc,
                 |p, initial_place| {
-                    if let None = res {
+                    if res.is_none() {
                         if let Some(out) = p.matching(*initial_place, point) {
                             res = Some(out);
                         }
 
                         let location = p.popup.location();
-                        *initial_place = *initial_place + location;
+                        *initial_place += location;
                     }
                 },
             );

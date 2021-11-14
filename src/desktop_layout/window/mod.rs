@@ -66,11 +66,11 @@ impl Toplevel {
 
     pub fn maximize(&self, size: Size<i32, Logical>) {
         if let Toplevel::Xdg(ref t) = self {
-            let ret = t.with_pending_state(|state| {
+            let res = t.with_pending_state(|state| {
                 state.states.set(xdg_toplevel::State::Maximized);
                 state.size = Some(size);
             });
-            if let Ok(_) = ret {
+            if res.is_ok() {
                 t.send_configure();
             }
         }
@@ -95,7 +95,7 @@ impl Toplevel {
                 let res = t.with_pending_state(|state| {
                     state.size = Some(size);
                 });
-                if let Ok(_) = res {
+                if res.is_ok() {
                     t.send_configure();
                 }
             }
@@ -169,7 +169,7 @@ impl Window {
         let initial_size = self.geometry().size;
 
         if let Some(wl_surface) = self.toplevel().get_surface() {
-            with_states(&wl_surface, |states| {
+            with_states(wl_surface, |states| {
                 let surface_data = states.data_map.get::<RefCell<SurfaceData>>();
 
                 if let Some(data) = surface_data {
@@ -194,7 +194,7 @@ impl Window {
         let initial_size = self.geometry().size;
 
         let size = if let Some(surface) = self.toplevel().get_surface() {
-            let fullscreen_state = with_states(&surface, |states| {
+            let fullscreen_state = with_states(surface, |states| {
                 let mut data = states
                     .data_map
                     .get::<RefCell<SurfaceData>>()
@@ -362,7 +362,7 @@ impl Window {
     }
 
     pub fn render_location(&self) -> Point<i32, Logical> {
-        let mut location = self.location.clone();
+        let mut location = self.location;
 
         location.y -= 1000;
         location.y += (self.animation.value() * 1000.0) as i32;

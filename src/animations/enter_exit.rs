@@ -26,7 +26,7 @@ impl EnterExitAnimation {
         fn curve(v: f64) -> f64 {
             if v < 0.0 {
                 0.0
-            } else if v >= 0.0 && v < 1.0 {
+            } else if (0.0..1.0).contains(&v) {
                 -(v * v) + 2.0 * v
             } else {
                 1.0
@@ -37,19 +37,11 @@ impl EnterExitAnimation {
     }
 
     pub fn is_exiting(&self) -> bool {
-        if let Self::Exit(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::Exit(_))
     }
 
     pub fn exited(&self) -> bool {
-        if let Self::ExitDone = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, Self::ExitDone)
     }
 
     pub fn update(&mut self, delta: f64, toplevel_alive: bool) {

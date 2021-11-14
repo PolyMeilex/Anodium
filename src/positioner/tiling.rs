@@ -118,7 +118,7 @@ impl Positioner for Tiling {
                         .contains(xdg_toplevel::State::Maximized)
                     {
                         let new_size = surface.get_surface().and_then(|surface| {
-                            let fullscreen_state = compositor::with_states(&surface, |states| {
+                            let fullscreen_state = compositor::with_states(surface, |states| {
                                 let mut data = states
                                     .data_map
                                     .get::<RefCell<SurfaceData>>()

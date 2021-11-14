@@ -91,7 +91,7 @@ impl Positioner for Floating {
                         .contains(xdg_toplevel::State::Maximized)
                     {
                         let new_size = surface.get_surface().and_then(|surface| {
-                            compositor::with_states(&surface, |states| {
+                            compositor::with_states(surface, |states| {
                                 let mut data = states
                                     .data_map
                                     .get::<RefCell<SurfaceData>>()
@@ -132,7 +132,7 @@ impl Positioner for Floating {
                                 target_window_location.x = (pointer_pos.x - w * p) as i32;
 
                                 if let Some(surface) = surface.get_surface() {
-                                    compositor::with_states(&surface, |states| {
+                                    compositor::with_states(surface, |states| {
                                         let mut data = states
                                             .data_map
                                             .get::<RefCell<SurfaceData>>()

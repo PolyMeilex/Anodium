@@ -343,8 +343,8 @@ impl BackendState {
 
                 input_state: InputState {
                     pointer_location: (0.0, 0.0).into(),
-                    pointer: pointer,
-                    keyboard: keyboard,
+                    pointer,
+                    keyboard,
                     modifiers_state: Default::default(),
                     suppressed_keys: Vec::new(),
                 },
