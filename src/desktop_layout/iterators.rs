@@ -9,7 +9,10 @@ pub(super) struct VisibleWorkspaceIter<'a> {
 }
 
 impl<'a> VisibleWorkspaceIter<'a> {
-    pub fn new(outputs: &'a OutputMap, workspaces: &'a HashMap<String, Box<dyn Positioner>>) -> Self {
+    pub fn new(
+        outputs: &'a OutputMap,
+        workspaces: &'a HashMap<String, Box<dyn Positioner>>,
+    ) -> Self {
         Self {
             outputs: outputs.iter(),
             workspaces,
@@ -21,9 +24,12 @@ impl<'a> Iterator for VisibleWorkspaceIter<'a> {
     type Item = &'a dyn Positioner;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.outputs
-            .next()
-            .map(|output| self.workspaces.get(output.active_workspace()).unwrap().as_ref())
+        self.outputs.next().map(|output| {
+            self.workspaces
+                .get(output.active_workspace())
+                .unwrap()
+                .as_ref()
+        })
     }
 }
 
@@ -33,7 +39,10 @@ pub(super) struct VisibleWorkspaceIterMut<'a> {
 }
 
 impl<'a> VisibleWorkspaceIterMut<'a> {
-    pub fn new(outputs: &OutputMap, workspaces: &'a mut HashMap<String, Box<dyn Positioner>>) -> Self {
+    pub fn new(
+        outputs: &OutputMap,
+        workspaces: &'a mut HashMap<String, Box<dyn Positioner>>,
+    ) -> Self {
         let mut keys = std::collections::HashSet::new();
         let all_unique = outputs
             .iter()

@@ -4,8 +4,8 @@ use smithay::{
     reexports::wayland_server::{protocol::wl_surface, Display},
     wayland::{
         compositor::{
-            compositor_init, is_sync_subsurface, with_states, with_surface_tree_upward, SurfaceAttributes,
-            TraversalAction,
+            compositor_init, is_sync_subsurface, with_states, with_surface_tree_upward,
+            SurfaceAttributes, TraversalAction,
         },
         shell::{
             wlr_layer::{wlr_layer_shell_init, LayerShellRequest, LayerSurfaceAttributes},

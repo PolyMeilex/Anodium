@@ -22,12 +22,20 @@ impl PopupList {
         self.popups.push(popup);
     }
 
-    pub fn with_child_popups<Func>(&self, base: &WlSurface, initial_place: Point<i32, Logical>, mut f: Func)
-    where
+    pub fn with_child_popups<Func>(
+        &self,
+        base: &WlSurface,
+        initial_place: Point<i32, Logical>,
+        mut f: Func,
+    ) where
         Func: FnMut(&Popup, &mut Point<i32, Logical>),
     {
-        fn find<Func>(popups: &[Popup], base: &WlSurface, initial_place: Point<i32, Logical>, f: &mut Func)
-        where
+        fn find<Func>(
+            popups: &[Popup],
+            base: &WlSurface,
+            initial_place: Point<i32, Logical>,
+            f: &mut Func,
+        ) where
             Func: FnMut(&Popup, &mut Point<i32, Logical>),
         {
             for p in popups

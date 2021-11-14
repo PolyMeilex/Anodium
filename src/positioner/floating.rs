@@ -86,7 +86,10 @@ impl Positioner for Floating {
             // If surface is maximized then unmaximize it
             if let Toplevel::Xdg(ref surface) = toplevel {
                 if let Some(current_state) = surface.current_state() {
-                    if current_state.states.contains(xdg_toplevel::State::Maximized) {
+                    if current_state
+                        .states
+                        .contains(xdg_toplevel::State::Maximized)
+                    {
                         let new_size = surface.get_surface().and_then(|surface| {
                             compositor::with_states(&surface, |states| {
                                 let mut data = states
@@ -116,9 +119,12 @@ impl Positioner for Floating {
 
                             let pointer_pos = pointer.current_location();
 
-                            if let (Some(initial_size), Some(target_size)) = (current_state.size, new_size) {
+                            if let (Some(initial_size), Some(target_size)) =
+                                (current_state.size, new_size)
+                            {
                                 let initial_window_location = target_window_location;
-                                let pointer_win_pos = pointer_pos - initial_window_location.to_f64();
+                                let pointer_win_pos =
+                                    pointer_pos - initial_window_location.to_f64();
 
                                 let p = pointer_win_pos.x / initial_size.w as f64;
                                 let w = target_size.w as f64;
@@ -134,13 +140,15 @@ impl Positioner for Floating {
                                             .borrow_mut();
 
                                         data.move_after_resize_state =
-                                            MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
-                                                initial_window_location,
-                                                initial_size,
+                                            MoveAfterResizeState::WaitingForAck(
+                                                MoveAfterResizeData {
+                                                    initial_window_location,
+                                                    initial_size,
 
-                                                target_window_location,
-                                                target_size,
-                                            });
+                                                    target_window_location,
+                                                    target_size,
+                                                },
+                                            );
                                     })
                                     .unwrap();
                                 } else {
@@ -240,7 +248,10 @@ impl Positioner for Floating {
         }
     }
 
-    fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+    fn surface_under(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
         self.windows.surface_under(point)
     }
 

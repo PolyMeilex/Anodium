@@ -145,7 +145,9 @@ impl Anodium {
             } => {
                 let waiting_for_serial = with_states(&surface, |states| {
                     if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
-                        if let ResizeState::WaitingForFinalAck(_, serial) = data.borrow().resize_state {
+                        if let ResizeState::WaitingForFinalAck(_, serial) =
+                            data.borrow().resize_state
+                        {
                             return Some(serial);
                         }
                     }
@@ -185,7 +187,9 @@ impl Anodium {
                                 .get::<RefCell<SurfaceData>>()
                                 .unwrap()
                                 .borrow_mut();
-                            if let ResizeState::WaitingForFinalAck(resize_data, _) = data.resize_state {
+                            if let ResizeState::WaitingForFinalAck(resize_data, _) =
+                                data.resize_state
+                            {
                                 data.resize_state = ResizeState::WaitingForCommit(resize_data);
                             } else {
                                 unreachable!()
@@ -199,8 +203,11 @@ impl Anodium {
                 with_states(&surface, |states| {
                     if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
                         let mut data = data.borrow_mut();
-                        if let MoveAfterResizeState::WaitingForAck(mdata) = data.move_after_resize_state {
-                            data.move_after_resize_state = MoveAfterResizeState::WaitingForCommit(mdata);
+                        if let MoveAfterResizeState::WaitingForAck(mdata) =
+                            data.move_after_resize_state
+                        {
+                            data.move_after_resize_state =
+                                MoveAfterResizeState::WaitingForCommit(mdata);
                         }
                     }
                 })

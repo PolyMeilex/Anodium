@@ -5,7 +5,8 @@ use std::{
 };
 
 use x11rb::{
-    connection::Connection as _, errors::ReplyOrIdError, protocol::Event, rust_connection::RustConnection,
+    connection::Connection as _, errors::ReplyOrIdError, protocol::Event,
+    rust_connection::RustConnection,
 };
 
 use smithay::reexports::calloop::{
@@ -22,7 +23,10 @@ impl X11Source {
     pub fn new(connection: Rc<RustConnection>) -> Self {
         let fd = Fd(connection.stream().as_raw_fd());
         let generic = Generic::new(fd, Interest::READ, Mode::Level);
-        Self { connection, generic }
+        Self {
+            connection,
+            generic,
+        }
     }
 }
 

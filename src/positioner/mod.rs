@@ -45,7 +45,10 @@ pub trait Positioner: std::fmt::Debug {
 
     fn with_windows_rev(&self, cb: &mut dyn FnMut(&Window));
 
-    fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+    fn surface_under(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
         None
     }
 

@@ -4,7 +4,9 @@ use smithay::{
     reexports::wayland_server::protocol::wl_surface,
     utils::{Logical, Point, Rectangle},
     wayland::{
-        compositor::{with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction},
+        compositor::{
+            with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction,
+        },
         shell::wlr_layer::{self, Anchor, ExclusiveZone, LayerSurfaceCachedState},
     },
 };
@@ -30,7 +32,10 @@ pub struct LayerSurface {
 impl LayerSurface {
     /// Finds the topmost surface under this point if any and returns it together with the location of this
     /// surface.
-    fn matching(&self, point: Point<f64, Logical>) -> Option<(wl_surface::WlSurface, Point<i32, Logical>)> {
+    fn matching(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(wl_surface::WlSurface, Point<i32, Logical>)> {
         if !self.bbox.to_f64().contains(point) {
             return None;
         }
@@ -51,8 +56,10 @@ impl LayerSurface {
 
                     let contains_the_point = data
                         .map(|data| {
-                            data.borrow()
-                                .contains_point(&*states.cached_state.current(), point - location.to_f64())
+                            data.borrow().contains_point(
+                                &*states.cached_state.current(),
+                                point - location.to_f64(),
+                            )
                         })
                         .unwrap_or(false);
                     if contains_the_point {

@@ -78,7 +78,10 @@ impl DesktopLayout {
         self.output_map.send_frames(time);
     }
 
-    pub fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+    pub fn surface_under(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
         // Layers above windows
         for o in self.output_map.iter() {
             let overlay = o.layer_map().get_surface_under(&Layer::Overlay, point);
@@ -147,7 +150,10 @@ impl DesktopLayout {
     }
 
     #[allow(dead_code)]
-    pub fn find_workspace_by_surface<S: AsWlSurface>(&self, surface: &S) -> Option<&dyn Positioner> {
+    pub fn find_workspace_by_surface<S: AsWlSurface>(
+        &self,
+        surface: &S,
+    ) -> Option<&dyn Positioner> {
         for w in self.visible_workspaces() {
             if let Some(surface) = surface.as_surface() {
                 if w.find_window(surface).is_some() {

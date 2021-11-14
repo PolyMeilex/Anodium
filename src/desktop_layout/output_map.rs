@@ -217,7 +217,9 @@ impl OutputMap {
     pub fn width(&self) -> i32 {
         // This is a simplification, we only arrange the outputs on the y axis side-by-side
         // so that the total width is simply the sum of all output widths.
-        self.outputs.iter().fold(0, |acc, output| acc + output.size().w)
+        self.outputs
+            .iter()
+            .fold(0, |acc, output| acc + output.size().w)
     }
 
     pub fn height(&self, x: i32) -> Option<i32> {
@@ -285,9 +287,12 @@ impl OutputMap {
         if let Some(output) = output {
             if let Some(mode) = mode {
                 output.output.delete_mode(output.current_mode);
-                output
-                    .output
-                    .change_current_state(Some(mode), None, Some(output.scale.round() as i32), None);
+                output.output.change_current_state(
+                    Some(mode),
+                    None,
+                    Some(output.scale.round() as i32),
+                    None,
+                );
                 output.output.set_preferred(mode);
                 output.current_mode = mode;
             }
@@ -315,7 +320,12 @@ impl OutputMap {
         }
     }
 
-    pub fn update_by_name<N: AsRef<str>>(&mut self, mode: Option<Mode>, scale: Option<f64>, name: N) {
+    pub fn update_by_name<N: AsRef<str>>(
+        &mut self,
+        mode: Option<Mode>,
+        scale: Option<f64>,
+        name: N,
+    ) {
         self.update(mode, scale, |o| o.name() == name.as_ref())
     }
 }
@@ -333,7 +343,8 @@ impl OutputMap {
         surface: wlr_layer::LayerSurface,
         layer: wlr_layer::Layer,
     ) {
-        let output = output.and_then(|output| self.outputs.iter_mut().find(|o| o.output.owns(&output)));
+        let output =
+            output.and_then(|output| self.outputs.iter_mut().find(|o| o.output.owns(&output)));
 
         if let Some(output) = output {
             output.layer_map.insert(surface, layer);

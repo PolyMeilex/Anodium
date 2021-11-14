@@ -34,7 +34,9 @@ pub struct AnodiumRenderer<B> {
 impl<B: HasGles2Renderer> AnodiumRenderer<B> {
     pub fn new(mut inner: B) -> Self {
         let glow = unsafe {
-            glow::Context::from_loader_function(|symbol| smithay::backend::egl::get_proc_address(symbol))
+            glow::Context::from_loader_function(|symbol| {
+                smithay::backend::egl::get_proc_address(symbol)
+            })
         };
 
         let quad_pipeline = inner
@@ -84,9 +86,13 @@ impl<B: HasGles2Renderer> AnodiumRenderer<B> {
         F: FnOnce(&mut RenderContext) -> R,
     {
         let glow = &self.glow;
-        self.inner
-            .gles_renderer()
-            .with_context(|renderer, gles| func(&mut RenderContext { renderer, gles, glow }))
+        self.inner.gles_renderer().with_context(|renderer, gles| {
+            func(&mut RenderContext {
+                renderer,
+                gles,
+                glow,
+            })
+        })
     }
 
     pub fn render<F, R>(
@@ -118,7 +124,11 @@ impl<B: HasGles2Renderer> AnodiumRenderer<B> {
                         let ret = func(&mut RenderFrame {
                             transform,
                             frame,
-                            context: RenderContext { renderer, gles, glow },
+                            context: RenderContext {
+                                renderer,
+                                gles,
+                                glow,
+                            },
 
                             quad_pipeline,
 
@@ -185,7 +195,8 @@ impl<'a> Frame for RenderFrame<'a> {
         tex_coords: [Vector2<f32>; 4],
         alpha: f32,
     ) -> Result<(), Self::Error> {
-        self.frame.render_texture(texture, matrix, tex_coords, alpha)
+        self.frame
+            .render_texture(texture, matrix, tex_coords, alpha)
     }
 }
 
@@ -223,7 +234,11 @@ impl AnodiumRenderer<WinitGraphicsBackend> {
                     let ret = func(&mut RenderFrame {
                         transform: Transform::Normal,
                         frame,
-                        context: RenderContext { renderer, gles, glow },
+                        context: RenderContext {
+                            renderer,
+                            gles,
+                            glow,
+                        },
 
                         quad_pipeline,
                         #[cfg(feature = "debug")]

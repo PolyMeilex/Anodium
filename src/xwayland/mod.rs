@@ -1,4 +1,6 @@
-use std::{cell::RefCell, collections::HashMap, convert::TryFrom, os::unix::net::UnixStream, rc::Rc};
+use std::{
+    cell::RefCell, collections::HashMap, convert::TryFrom, os::unix::net::UnixStream, rc::Rc,
+};
 
 use smithay::{
     reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
@@ -12,8 +14,8 @@ use x11rb::{
     protocol::{
         composite::{ConnectionExt as _, Redirect},
         xproto::{
-            ChangeWindowAttributesAux, ConfigWindow, ConfigureWindowAux, ConnectionExt as _, EventMask,
-            Window, WindowClass,
+            ChangeWindowAttributesAux, ConfigWindow, ConfigureWindowAux, ConnectionExt as _,
+            EventMask, Window, WindowClass,
         },
         Event,
     },
@@ -34,7 +36,8 @@ impl BackendState {
     }
 
     pub fn xwayland_ready(&mut self, connection: UnixStream, client: Client) {
-        let (wm, source) = X11State::start_wm(connection, self.anodium.not_mapped_list.clone()).unwrap();
+        let (wm, source) =
+            X11State::start_wm(connection, self.anodium.not_mapped_list.clone()).unwrap();
         let wm = Rc::new(RefCell::new(wm));
         client.data_map().insert_if_missing(|| Rc::clone(&wm));
         self.handle
@@ -223,7 +226,8 @@ pub fn commit_hook(surface: &WlSurface) {
             let mut inner = x11.borrow_mut();
             // Is the surface among the unpaired surfaces (see comment next to WL_SURFACE_ID
             // handling above)
-            if let Some((window, location)) = inner.unpaired_surfaces.remove(&surface.as_ref().id()) {
+            if let Some((window, location)) = inner.unpaired_surfaces.remove(&surface.as_ref().id())
+            {
                 inner.new_window(window, surface.clone(), location);
             }
         }

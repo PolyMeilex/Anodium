@@ -57,7 +57,13 @@ pub fn run_winit(
         init_dmabuf_global(
             &mut *display.borrow_mut(),
             dmabuf_formats,
-            move |buffer, _| renderer.borrow_mut().renderer().import_dmabuf(buffer).is_ok(),
+            move |buffer, _| {
+                renderer
+                    .borrow_mut()
+                    .renderer()
+                    .import_dmabuf(buffer)
+                    .is_ok()
+            },
             log.clone(),
         );
     };

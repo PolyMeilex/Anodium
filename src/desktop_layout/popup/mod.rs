@@ -6,7 +6,9 @@ use smithay::{
     reexports::wayland_server::protocol::wl_surface,
     utils::{Logical, Point, Rectangle},
     wayland::{
-        compositor::{with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction},
+        compositor::{
+            with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction,
+        },
         shell::xdg::{PopupSurface, SurfaceCachedState, XdgPopupSurfaceRoleAttributes},
     },
 };
@@ -135,8 +137,10 @@ impl Popup {
 
                     let contains_the_point = data
                         .map(|data| {
-                            data.borrow()
-                                .contains_point(&*states.cached_state.current(), point - location.to_f64())
+                            data.borrow().contains_point(
+                                &*states.cached_state.current(),
+                                point - location.to_f64(),
+                            )
                         })
                         .unwrap_or(false);
                     if contains_the_point {

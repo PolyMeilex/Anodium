@@ -132,7 +132,9 @@ fn create_program(
         let mut shaders = Vec::with_capacity(shader_sources.len());
 
         for (shader_type, shader_source) in shader_sources.iter() {
-            let shader = gl.create_shader(*shader_type).expect("Cannot create shader");
+            let shader = gl
+                .create_shader(*shader_type)
+                .expect("Cannot create shader");
             gl.shader_source(shader, shader_source);
             gl.compile_shader(shader);
             if !gl.get_shader_compile_status(shader) {

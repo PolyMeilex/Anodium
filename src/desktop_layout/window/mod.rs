@@ -7,7 +7,9 @@ use smithay::{
     },
     utils::{Logical, Point, Rectangle, Size},
     wayland::{
-        compositor::{with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction},
+        compositor::{
+            with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction,
+        },
         shell::xdg::{SurfaceCachedState, ToplevelSurface},
     },
 };
@@ -201,13 +203,14 @@ impl Window {
                 let fullscreen_state = data.move_after_resize_state;
 
                 if let MoveAfterResizeState::Current(mdata) = fullscreen_state {
-                    data.move_after_resize_state = MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
-                        initial_window_location,
-                        initial_size,
+                    data.move_after_resize_state =
+                        MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
+                            initial_window_location,
+                            initial_size,
 
-                        target_window_location: mdata.initial_window_location,
-                        target_size: mdata.initial_size,
-                    });
+                            target_window_location: mdata.initial_window_location,
+                            target_size: mdata.initial_size,
+                        });
                 }
 
                 fullscreen_state
@@ -256,8 +259,10 @@ impl Window {
 
                     let contains_the_point = data
                         .map(|data| {
-                            data.borrow()
-                                .contains_point(&*states.cached_state.current(), point - location.to_f64())
+                            data.borrow().contains_point(
+                                &*states.cached_state.current(),
+                                point - location.to_f64(),
+                            )
                         })
                         .unwrap_or(false);
                     if contains_the_point {

@@ -57,16 +57,13 @@ impl NotMappedList {
     }
 
     pub fn remove(&mut self, kind: &Toplevel) -> Option<Window> {
-        let id =
-            self.windows.iter().enumerate().find_map(
-                |(id, win)| {
-                    if win.toplevel() == kind {
-                        Some(id)
-                    } else {
-                        None
-                    }
-                },
-            );
+        let id = self.windows.iter().enumerate().find_map(|(id, win)| {
+            if win.toplevel() == kind {
+                Some(id)
+            } else {
+                None
+            }
+        });
 
         id.map(|id| self.windows.remove(id))
     }

@@ -1,5 +1,6 @@
 use smithay::{
-    reexports::wayland_server::protocol::wl_surface::WlSurface, wayland::shell::xdg::ToplevelSurface,
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    wayland::shell::xdg::ToplevelSurface,
 };
 
 use crate::desktop_layout::Toplevel;

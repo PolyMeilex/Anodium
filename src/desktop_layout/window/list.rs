@@ -28,7 +28,10 @@ impl WindowList {
         }
     }
 
-    pub fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+    pub fn surface_under(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
         self.windows.iter().find_map(|w| w.matching(point))
     }
 

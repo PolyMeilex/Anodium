@@ -23,7 +23,9 @@ use smithay::{
     },
 };
 
-use crate::{desktop_layout::Window, render::renderer::RenderFrame, shell::SurfaceData, state::Anodium};
+use crate::{
+    desktop_layout::Window, render::renderer::RenderFrame, shell::SurfaceData, state::Anodium,
+};
 
 struct BufferTextures<T> {
     buffer: Option<wl_buffer::WlBuffer>,
@@ -59,7 +61,9 @@ pub fn draw_cursor(
     let delta = match ret {
         Some(h) => h,
         None => {
-            warn!("Trying to display as a cursor a surface that does not have the CursorImage role.");
+            warn!(
+                "Trying to display as a cursor a surface that does not have the CursorImage role."
+            );
             (0, 0).into()
         }
     };
@@ -99,12 +103,13 @@ fn draw_surface_tree(
 
                         match renderer.import_buffer(&buffer, Some(states), &damage) {
                             Some(Ok(m)) => {
-                                let texture_buffer = if let Some(BufferType::Shm) = buffer_type(&buffer) {
-                                    buffer.release();
-                                    None
-                                } else {
-                                    Some(buffer)
-                                };
+                                let texture_buffer =
+                                    if let Some(BufferType::Shm) = buffer_type(&buffer) {
+                                        buffer.release();
+                                        None
+                                    } else {
+                                        Some(buffer)
+                                    };
                                 data.texture = Some(Box::new(BufferTextures {
                                     buffer: texture_buffer,
                                     texture: m,
@@ -156,7 +161,10 @@ fn draw_surface_tree(
                     }
                     if let Err(err) = frame.render_texture_at(
                         &texture.texture,
-                        location.to_f64().to_physical(output_scale as f64).to_i32_round(),
+                        location
+                            .to_f64()
+                            .to_physical(output_scale as f64)
+                            .to_i32_round(),
                         buffer_scale,
                         output_scale as f64,
                         Transform::Normal, /* TODO */
@@ -191,7 +199,8 @@ impl Anodium {
 
             if let Some(wl_surface) = window.surface().as_ref() {
                 // this surface is a root of a subsurface tree that needs to be drawn
-                if let Err(err) = draw_surface_tree(frame, &wl_surface, initial_place, output_scale) {
+                if let Err(err) = draw_surface_tree(frame, &wl_surface, initial_place, output_scale)
+                {
                     error!("{:?}", err);
                 }
                 // furthermore, draw its popups
@@ -257,7 +266,9 @@ impl Anodium {
 
                     if let Some(wl_surface) = layer_surface.surface.get_surface() {
                         // this surface is a root of a subsurface tree that needs to be drawn
-                        if let Err(err) = draw_surface_tree(frame, wl_surface, initial_place, output_scale) {
+                        if let Err(err) =
+                            draw_surface_tree(frame, wl_surface, initial_place, output_scale)
+                        {
                             result = Err(err);
                         }
 
@@ -332,8 +343,16 @@ pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
         let mut tex = 0;
         gl.GenTextures(1, &mut tex);
         gl.BindTexture(ffi::TEXTURE_2D, tex);
-        gl.TexParameteri(ffi::TEXTURE_2D, ffi::TEXTURE_WRAP_S, ffi::CLAMP_TO_EDGE as i32);
-        gl.TexParameteri(ffi::TEXTURE_2D, ffi::TEXTURE_WRAP_T, ffi::CLAMP_TO_EDGE as i32);
+        gl.TexParameteri(
+            ffi::TEXTURE_2D,
+            ffi::TEXTURE_WRAP_S,
+            ffi::CLAMP_TO_EDGE as i32,
+        );
+        gl.TexParameteri(
+            ffi::TEXTURE_2D,
+            ffi::TEXTURE_WRAP_T,
+            ffi::CLAMP_TO_EDGE as i32,
+        );
         gl.TexImage2D(
             ffi::TEXTURE_2D,
             0,

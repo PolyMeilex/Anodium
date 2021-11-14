@@ -19,7 +19,9 @@ use smithay::{
     },
     utils::{Logical, Point, Rectangle, Size},
     wayland::{
-        data_device::{default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent},
+        data_device::{
+            default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent,
+        },
         output::{xdg::init_xdg_output_manager, PhysicalProperties},
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
         shell::wlr_layer::Layer,
@@ -153,7 +155,12 @@ impl Anodium {
                 let guard = self.dnd_icon.lock().unwrap();
                 if let Some(ref wl_surface) = *guard {
                     if wl_surface.as_ref().is_alive() {
-                        render::draw_dnd_icon(frame, wl_surface, relative_ptr_location, output_scale)?;
+                        render::draw_dnd_icon(
+                            frame,
+                            wl_surface,
+                            relative_ptr_location,
+                            output_scale,
+                        )?;
                     }
                 }
             }
@@ -286,10 +293,11 @@ impl BackendState {
         init_tablet_manager_global(&mut display.borrow_mut());
 
         let cursor_status3 = cursor_status.clone();
-        seat.tablet_seat().on_cursor_surface(move |_tool, new_status| {
-            // TODO: tablet tools should have their own cursors
-            *cursor_status3.lock().unwrap() = new_status;
-        });
+        seat.tablet_seat()
+            .on_cursor_surface(move |_tool, new_status| {
+                // TODO: tablet tools should have their own cursors
+                *cursor_status3.lock().unwrap() = new_status;
+            });
 
         let keyboard = seat
             .add_keyboard(XkbConfig::default(), 200, 25, |seat, focus| {
@@ -301,11 +309,16 @@ impl BackendState {
         let xwayland = {
             let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), log.clone());
             let ret = handle.insert_source(channel, |event, _, state| match event {
-                XWaylandEvent::Ready { connection, client } => state.xwayland_ready(connection, client),
+                XWaylandEvent::Ready { connection, client } => {
+                    state.xwayland_ready(connection, client)
+                }
                 XWaylandEvent::Exited => state.xwayland_exited(),
             });
             if let Err(e) = ret {
-                error!("Failed to insert the XWaylandSource into the event loop: {}", e);
+                error!(
+                    "Failed to insert the XWaylandSource into the event loop: {}",
+                    e
+                );
             }
             xwayland
         };

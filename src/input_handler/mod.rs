@@ -124,7 +124,9 @@ impl Anodium {
             }
             input::ButtonState::Released => wl_pointer::ButtonState::Released,
         };
-        self.input_state.pointer.button(button, state, serial, evt.time());
+        self.input_state
+            .pointer
+            .button(button, state, serial, evt.time());
 
         {
             if evt.state() == input::ButtonState::Pressed {
@@ -143,20 +145,26 @@ impl Anodium {
 
                             let mut desktop_layout = self.desktop_layout.borrow_mut();
 
-                            if let Some(space) = desktop_layout.find_workspace_by_surface_mut(&surface) {
+                            if let Some(space) =
+                                desktop_layout.find_workspace_by_surface_mut(&surface)
+                            {
                                 if let Some(window) = space.find_window(&surface) {
                                     let toplevel = window.toplevel().clone();
 
-                                    if let Some(res) =
-                                        space.move_request(&toplevel, &self.seat, serial, &start_data)
-                                    {
+                                    if let Some(res) = space.move_request(
+                                        &toplevel,
+                                        &self.seat,
+                                        serial,
+                                        &start_data,
+                                    ) {
                                         if let Some(window) = space.unmap_toplevel(&toplevel) {
                                             desktop_layout.grabed_window = Some(window);
 
                                             let grab = MoveSurfaceGrab {
                                                 start_data,
                                                 toplevel,
-                                                initial_window_location: res.initial_window_location,
+                                                initial_window_location: res
+                                                    .initial_window_location,
                                                 desktop_layout: self.desktop_layout.clone(),
                                             };
                                             pointer.set_grab(grab, serial);
@@ -181,7 +189,9 @@ impl Anodium {
         let source = match evt.source() {
             input::AxisSource::Continuous => wl_pointer::AxisSource::Continuous,
             input::AxisSource::Finger => wl_pointer::AxisSource::Finger,
-            input::AxisSource::Wheel | input::AxisSource::WheelTilt => wl_pointer::AxisSource::Wheel,
+            input::AxisSource::Wheel | input::AxisSource::WheelTilt => {
+                wl_pointer::AxisSource::Wheel
+            }
         };
         let horizontal_amount = evt
             .amount(input::Axis::Horizontal)

@@ -27,11 +27,17 @@ impl ConfigVM {
         let ast = engine.compile(include_str!("../config.rhai"))?;
         let scope = Scope::new();
 
-        engine.register_fn("rev", |array: Array| array.into_iter().rev().collect::<Array>());
+        engine.register_fn("rev", |array: Array| {
+            array.into_iter().rev().collect::<Array>()
+        });
 
         output::register(&mut engine);
 
-        Ok(ConfigVM(Rc::new(RefCell::new(Inner { engine, ast, scope }))))
+        Ok(ConfigVM(Rc::new(RefCell::new(Inner {
+            engine,
+            ast,
+            scope,
+        }))))
     }
 
     pub fn arrange_outputs(
@@ -60,12 +66,17 @@ impl ConfigVM {
 
         let outputs: Array = outputs.into();
 
-        let result: Array =
-            inner
-                .engine
-                .call_fn(&mut inner.scope, &mut inner.ast, "arrange_outputs", (outputs,))?;
+        let result: Array = inner.engine.call_fn(
+            &mut inner.scope,
+            &mut inner.ast,
+            "arrange_outputs",
+            (outputs,),
+        )?;
 
-        Ok(result.into_iter().map(|item| item.try_cast().unwrap()).collect())
+        Ok(result
+            .into_iter()
+            .map(|item| item.try_cast().unwrap())
+            .collect())
     }
 
     pub fn configure_output(
@@ -78,7 +89,12 @@ impl ConfigVM {
         let modes: Array = modes
             .iter()
             .enumerate()
-            .map(|(id, m)| Dynamic::from(Mode { id, mode: m.clone() }))
+            .map(|(id, m)| {
+                Dynamic::from(Mode {
+                    id,
+                    mode: m.clone(),
+                })
+            })
             .collect();
 
         let modes: Array = modes.into();

@@ -38,7 +38,11 @@ impl PointerGrab for MoveSurfaceGrab {
             if let Some(surface) = window.toplevel().get_surface() {
                 // Check if there is MoveAfterResize in progress
                 let started = compositor::with_states(surface, |states| {
-                    let data = states.data_map.get::<RefCell<SurfaceData>>().unwrap().borrow();
+                    let data = states
+                        .data_map
+                        .get::<RefCell<SurfaceData>>()
+                        .unwrap()
+                        .borrow();
                     match &data.move_after_resize_state {
                         // If done
                         MoveAfterResizeState::Current(_) => true,
@@ -119,7 +123,9 @@ impl PointerGrab for MoveSurfaceGrab {
                         .unwrap()
                         .map_toplevel(window, false);
                 } else {
-                    desktop_layout.active_workspace().map_toplevel(window, false);
+                    desktop_layout
+                        .active_workspace()
+                        .map_toplevel(window, false);
                 }
             }
 

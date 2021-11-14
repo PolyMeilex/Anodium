@@ -58,7 +58,10 @@ impl Positioner for Universal {
         serial: smithay::wayland::Serial,
         start_data: &smithay::wayland::seat::GrabStartData,
     ) -> Option<MoveResponse> {
-        if let Some(req) = self.floating.move_request(toplevel, seat, serial, start_data) {
+        if let Some(req) = self
+            .floating
+            .move_request(toplevel, seat, serial, start_data)
+        {
             Some(req)
         } else if let Some(req) = self.tiling.move_request(toplevel, seat, serial, start_data) {
             Some(req)
@@ -96,7 +99,10 @@ impl Positioner for Universal {
         self.floating.with_windows_rev(cb);
     }
 
-    fn surface_under(&self, point: Point<f64, Logical>) -> Option<(WlSurface, Point<i32, Logical>)> {
+    fn surface_under(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
         let fr = self.floating.surface_under(point);
 
         if fr.is_some() {
