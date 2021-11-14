@@ -5,7 +5,6 @@ use std::{
     os::unix::io::{AsRawFd, RawFd},
     path::PathBuf,
     rc::Rc,
-    time::Duration,
 };
 
 use image::ImageBuffer;
@@ -26,7 +25,7 @@ use smithay::{
         SwapBuffersError,
     },
     reexports::{
-        calloop::{timer::Timer, Dispatcher, EventLoop, LoopHandle, RegistrationToken},
+        calloop::{Dispatcher, EventLoop, LoopHandle, RegistrationToken},
         drm::{
             self,
             control::{
@@ -187,22 +186,6 @@ pub fn run_udev(
      */
     #[cfg(feature = "xwayland")]
     state.start_xwayland();
-
-    let timer = Timer::new().unwrap();
-    let timer_handle = timer.handle();
-
-    {
-        event_loop
-            .handle()
-            .insert_source(timer, move |_: (), handle, state| {
-                state.anodium.display.borrow_mut().flush_clients(&mut ());
-                state.anodium.update();
-
-                handle.add_timeout(Duration::from_millis(16), ());
-            })
-            .unwrap();
-        timer_handle.add_timeout(Duration::ZERO, ());
-    }
 
     // Cleanup stuff
 

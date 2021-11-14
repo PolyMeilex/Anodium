@@ -36,17 +36,17 @@ pub fn udev(log: slog::Logger, event_loop: &mut EventLoop<'static, BackendState>
 }
 
 pub fn auto(log: slog::Logger) {
+    let mut event_loop = EventLoop::try_new().unwrap();
+
     if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
         #[cfg(feature = "winit")]
         {
-            let mut event_loop = EventLoop::try_new().unwrap();
             let state = winit(log, &mut event_loop);
             run_loop(state, event_loop)
         }
     } else {
         #[cfg(feature = "udev")]
         {
-            let mut event_loop = EventLoop::try_new().unwrap();
             let state = udev(log, &mut event_loop);
             run_loop(state, event_loop)
         }
@@ -62,6 +62,9 @@ fn run_loop(mut state: BackendState, mut event_loop: EventLoop<'static, BackendS
             {
                 signal.stop();
             }
+
+            state.anodium.display.borrow_mut().flush_clients(&mut ());
+            state.anodium.update();
         })
         .unwrap();
 }

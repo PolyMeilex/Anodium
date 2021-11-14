@@ -164,8 +164,6 @@ pub fn run_winit(
                     let time = start_time.elapsed().as_millis() as u32;
                     state.anodium.send_frames(time);
 
-                    state.anodium.display.borrow_mut().flush_clients(&mut ());
-                    state.anodium.update();
                     fps.tick();
 
                     handle.add_timeout(Duration::from_millis(16), ());
