@@ -92,15 +92,15 @@ impl Anodium {
 
         // Layers bellow windows
         for layer in [Layer::Background, Layer::Bottom] {
-            self.draw_layers(frame, layer, output_geometry, output_scale, &self.log)?;
+            self.draw_layers(frame, layer, output_geometry, output_scale)?;
         }
 
         // draw the windows
-        self.draw_windows(frame, output_geometry, output_scale, &self.log)?;
+        self.draw_windows(frame, output_geometry, output_scale)?;
 
         // Layers above windows
         for layer in [Layer::Top, Layer::Overlay] {
-            self.draw_layers(frame, layer, output_geometry, output_scale, &self.log)?;
+            self.draw_layers(frame, layer, output_geometry, output_scale)?;
         }
 
         // Grab Debug:
@@ -152,13 +152,7 @@ impl Anodium {
                 let guard = self.dnd_icon.lock().unwrap();
                 if let Some(ref wl_surface) = *guard {
                     if wl_surface.as_ref().is_alive() {
-                        render::draw_dnd_icon(
-                            frame,
-                            wl_surface,
-                            relative_ptr_location,
-                            output_scale,
-                            &self.log,
-                        )?;
+                        render::draw_dnd_icon(frame, wl_surface, relative_ptr_location, output_scale)?;
                     }
                 }
             }
@@ -229,7 +223,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                     match display.dispatch(std::time::Duration::from_millis(0), state) {
                         Ok(_) => Ok(PostAction::Continue),
                         Err(e) => {
-                            error!(state.anodium.log, "I/O error on the Wayland display: {}", e);
+                            error!("I/O error on the Wayland display: {}", e);
                             state.anodium.running.store(false, Ordering::SeqCst);
                             Err(e)
                         }
@@ -253,7 +247,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
             .into_string()
             .unwrap();
 
-        info!(log, "Listening on wayland socket"; "name" => socket_name.clone());
+        info!( "Listening on wayland socket"; "name" => socket_name.clone());
         ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
 
         // init data device
@@ -311,10 +305,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
                 XWaylandEvent::Exited => state.xwayland_exited(),
             });
             if let Err(e) = ret {
-                error!(
-                    log,
-                    "Failed to insert the XWaylandSource into the event loop: {}", e
-                );
+                error!("Failed to insert the XWaylandSource into the event loop: {}", e);
             }
             xwayland
         };

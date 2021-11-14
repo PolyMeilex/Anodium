@@ -55,9 +55,8 @@ impl Anodium {
     fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: I::KeyboardKeyEvent) -> KeyAction {
         let keycode = evt.key_code();
         let state = evt.state();
-        debug!(self.log, "key"; "keycode" => keycode, "state" => format!("{:?}", state));
+        debug!("key"; "keycode" => keycode, "state" => format!("{:?}", state));
         let serial = SCOUNTER.next_serial();
-        let log = &self.log;
         let time = Event::time(&evt);
 
         let modifiers_state = &mut self.input_state.modifiers_state;
@@ -67,7 +66,7 @@ impl Anodium {
             .input(keycode, state, serial, time, |modifiers, handle| {
                 let keysym = handle.modified_sym();
 
-                debug!(log, "keysym";
+                debug!( "keysym";
                     "state" => format!("{:?}", state),
                     "mods" => format!("{:?}", modifiers),
                     "keysym" => ::xkbcommon::xkb::keysym_get_name(keysym)
@@ -106,7 +105,7 @@ impl Anodium {
     fn on_pointer_button<I: InputBackend>(&mut self, evt: I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
 
-        debug!(self.log, "Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
+        debug!("Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
 
         let button = evt.button_code();
         let state = match evt.state() {
@@ -302,17 +301,17 @@ impl Anodium {
         match action {
             KeyAction::None => {}
             KeyAction::Quit => {
-                info!(self.log, "Quitting.");
+                info!("Quitting.");
                 self.running.store(false, Ordering::SeqCst);
             }
             KeyAction::VtSwitch(vt) => {
-                info!(self.log, "Trying to switch to vt {}", vt);
+                info!("Trying to switch to vt {}", vt);
                 backend.change_vt(vt);
             }
             KeyAction::Run(mut cmd) => {
-                info!(self.log, "Starting program");
+                info!("Starting program");
                 if let Err(e) = cmd.spawn() {
-                    error!(self.log,
+                    error!(
                         "Failed to start program";
                         "err" => format!("{:?}", e)
                     );
@@ -328,7 +327,7 @@ impl Anodium {
                     .switch_workspace(&format!("{}", num));
             }
             action => {
-                warn!(self.log, "Key action {:?} unsupported on winit backend.", action);
+                warn!("Key action {:?} unsupported on winit backend.", action);
             }
         }
     }

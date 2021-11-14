@@ -14,7 +14,7 @@ pub fn winit(
     log: slog::Logger,
     event_loop: &mut EventLoop<'static, BackendState<winit::WinitData>>,
 ) -> BackendState<winit::WinitData> {
-    info!(log, "Starting anvil with winit backend");
+    info!("Starting anvil with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
     if let Ok(state) = winit::run_winit(display, event_loop, log.clone()) {
@@ -29,7 +29,7 @@ pub fn udev(
     log: slog::Logger,
     event_loop: &mut EventLoop<'static, BackendState<udev::UdevData>>,
 ) -> BackendState<udev::UdevData> {
-    info!(log, "Starting anvil on a tty using udev");
+    info!("Starting anvil on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
     if let Ok(state) = udev::run_udev(display, event_loop, log.clone()) {

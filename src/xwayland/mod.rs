@@ -29,13 +29,12 @@ mod x11rb_event_source;
 impl<BackendData: 'static> BackendState<BackendData> {
     pub fn start_xwayland(&mut self) {
         if let Err(e) = self.xwayland.start() {
-            error!(self.log, "Failed to start XWayland: {}", e);
+            error!("Failed to start XWayland: {}", e);
         }
     }
 
     pub fn xwayland_ready(&mut self, connection: UnixStream, client: Client) {
-        let (wm, source) =
-            X11State::start_wm(connection, self.anodium.not_mapped_list.clone(), self.log.clone()).unwrap();
+        let (wm, source) = X11State::start_wm(connection, self.anodium.not_mapped_list.clone()).unwrap();
         let wm = Rc::new(RefCell::new(wm));
         client.data_map().insert_if_missing(|| Rc::clone(&wm));
         self.handle
@@ -50,7 +49,7 @@ impl<BackendData: 'static> BackendState<BackendData> {
     }
 
     pub fn xwayland_exited(&mut self) {
-        error!(self.log, "Xwayland crashed");
+        error!("Xwayland crashed");
     }
 }
 
@@ -65,7 +64,6 @@ x11rb::atom_manager! {
 struct X11State {
     conn: Rc<RustConnection>,
     atoms: Atoms,
-    log: slog::Logger,
     unpaired_surfaces: HashMap<u32, (Window, Point<i32, Logical>)>,
     window_map: Rc<RefCell<NotMappedList>>,
 }
@@ -74,7 +72,6 @@ impl X11State {
     fn start_wm(
         connection: UnixStream,
         window_map: Rc<RefCell<NotMappedList>>,
-        log: slog::Logger,
     ) -> Result<(Self, X11Source), Box<dyn std::error::Error>> {
         // Create an X11 connection. XWayland only uses screen 0.
         let screen = 0;
@@ -119,14 +116,13 @@ impl X11State {
             atoms,
             unpaired_surfaces: Default::default(),
             window_map,
-            log,
         };
 
         Ok((wm, X11Source::new(conn)))
     }
 
     fn handle_event(&mut self, event: Event, client: &Client) -> Result<(), ReplyOrIdError> {
-        debug!(self.log, "X11: Got event {:?}", event);
+        debug!("X11: Got event {:?}", event);
         match event {
             Event::ConfigureRequest(r) => {
                 // Just grant the wish
@@ -171,7 +167,6 @@ impl X11State {
                             Ok(geo) => (geo.x as i32, geo.y as i32).into(),
                             Err(err) => {
                                 error!(
-                                    self.log,
                                     "Failed to get geometry for {:x}, perhaps the window was already destroyed?",
                                     msg.window;
                                     "err" => format!("{:?}", err),
@@ -184,8 +179,8 @@ impl X11State {
                     let id = msg.data.as_data32()[0];
                     let surface = client.get_resource::<WlSurface>(id);
                     info!(
-                        self.log,
-                        "X11 surface {:x?} corresponds to WlSurface {:x} = {:?}", msg.window, id, surface,
+                        "X11 surface {:x?} corresponds to WlSurface {:x} = {:?}",
+                        msg.window, id, surface,
                     );
                     match surface {
                         None => {
@@ -201,11 +196,11 @@ impl X11State {
     }
 
     fn new_window(&mut self, window: Window, surface: WlSurface, location: Point<i32, Logical>) {
-        debug!(self.log, "Matched X11 surface {:x?} to {:x?}", window, surface);
+        debug!("Matched X11 surface {:x?} to {:x?}", window, surface);
 
         if give_role(&surface, "x11_surface").is_err() {
             // It makes no sense to post a protocol error here since that would only kill Xwayland
-            error!(self.log, "Surface {:x?} already has a role?!", surface);
+            error!("Surface {:x?} already has a role?!", surface);
             return;
         }
 

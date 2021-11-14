@@ -83,7 +83,6 @@ struct UdevOutputId {
 pub struct UdevData {
     session: AutoSession,
     _render_timer: TimerHandle<(u64, crtc::Handle)>,
-    log: Logger,
 }
 
 impl Backend for UdevData {
@@ -93,7 +92,7 @@ impl Backend for UdevData {
 
     fn change_vt(&mut self, vt: i32) {
         if let Err(err) = self.session.change_vt(vt) {
-            error!(self.log, "Error switching to vt {}: {}", vt, err);
+            error!("Error switching to vt {}: {}", vt, err);
         }
     }
 }
@@ -103,14 +102,6 @@ pub fn run_udev(
     event_loop: &mut EventLoop<'static, BackendState<UdevData>>,
     log: Logger,
 ) -> Result<BackendState<UdevData>, ()> {
-    let name = display
-        .borrow_mut()
-        .add_socket_auto()
-        .unwrap()
-        .into_string()
-        .unwrap();
-    info!(log, "Listening on wayland socket"; "name" => name.clone());
-    ::std::env::set_var("WAYLAND_DISPLAY", name);
     /*
      * Initialize session
      */
@@ -127,10 +118,10 @@ pub fn run_udev(
     let data = UdevData {
         session,
         _render_timer: timer.handle(),
-        log: log.clone(),
     };
     let mut state = BackendState::init(display.clone(), event_loop.handle(), data, log.clone());
     state.primary_gpu = primary_gpu(&state.anodium.seat_name).unwrap_or_default();
+    info!("Primary GPU: {:?}", state.primary_gpu);
 
     // re-render timer
     event_loop
@@ -259,7 +250,7 @@ pub struct BackendData {
 }
 
 fn scan_connectors(
-    device: &mut DrmDevice<SessionFd>,
+    drm: &mut DrmDevice<SessionFd>,
     gbm: &GbmDevice<SessionFd>,
     renderer: &mut AnodiumRenderer<Gles2Renderer>,
     main_state: &mut Anodium,
@@ -267,15 +258,15 @@ fn scan_connectors(
     logger: &::slog::Logger,
 ) -> HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>> {
     // Get a set of all modesetting resource handles (excluding planes):
-    let res_handles = device.resource_handles().unwrap();
+    let res_handles = drm.resource_handles().unwrap();
 
     // Use first connected connector
     let connector_infos: Vec<ConnectorInfo> = res_handles
         .connectors()
         .iter()
-        .map(|conn| device.get_connector(*conn).unwrap())
+        .map(|conn| drm.get_connector(*conn).unwrap())
         .filter(|conn| conn.state() == ConnectorState::Connected)
-        .inspect(|conn| info!(logger, "Connected: {:?}", conn.interface()))
+        .inspect(|conn| info!("Connected: {:?}", conn.interface()))
         .collect();
 
     let mut backends = HashMap::new();
@@ -286,13 +277,12 @@ fn scan_connectors(
             .encoders()
             .iter()
             .filter_map(|e| *e)
-            .flat_map(|encoder_handle| device.get_encoder(encoder_handle))
+            .flat_map(|encoder_handle| drm.get_encoder(encoder_handle))
             .collect::<Vec<EncoderInfo>>();
         'outer: for encoder_info in encoder_infos {
             for crtc in res_handles.filter_crtcs(encoder_info.possible_crtcs()) {
                 if let Entry::Vacant(entry) = backends.entry(crtc) {
                     info!(
-                        logger,
                         "Trying to setup connector {:?}-{} with crtc {:?}",
                         connector_info.interface(),
                         connector_info.interface_id(),
@@ -323,16 +313,16 @@ fn scan_connectors(
 
                     let mode = modes.get(mode_id).unwrap();
 
-                    info!(logger, "MODE: {:#?}", mode);
+                    info!("MODE: {:#?}", mode);
 
-                    let mut surface =
-                        match device.create_surface(crtc, mode.clone(), &[connector_info.handle()]) {
-                            Ok(surface) => surface,
-                            Err(err) => {
-                                warn!(logger, "Failed to create drm surface: {}", err);
-                                continue;
-                            }
-                        };
+                    let mut surface = match drm.create_surface(crtc, mode.clone(), &[connector_info.handle()])
+                    {
+                        Ok(surface) => surface,
+                        Err(err) => {
+                            warn!("Failed to create drm surface: {}", err);
+                            continue;
+                        }
+                    };
                     surface.link(signaler.clone());
 
                     let renderer_formats = Bind::<Dmabuf>::supported_formats(renderer.gles_renderer())
@@ -343,7 +333,7 @@ fn scan_connectors(
                         {
                             Ok(renderer) => renderer,
                             Err(err) => {
-                                warn!(logger, "Failed to create rendering surface: {}", err);
+                                warn!("Failed to create rendering surface: {}", err);
                                 continue;
                             }
                         };
@@ -368,7 +358,7 @@ fn scan_connectors(
                         |output| {
                             output.userdata().insert_if_missing(|| UdevOutputId {
                                 crtc,
-                                device_id: device.device_id(),
+                                device_id: drm.device_id(),
                             });
                         },
                     );
@@ -387,10 +377,13 @@ fn scan_connectors(
 }
 
 impl BackendState<UdevData> {
-    fn device_added(&mut self, device_id: dev_t, path: PathBuf, session_signal: &Signaler<SessionSignal>) {
-        // Try to open the device
-        if let Some((mut device, gbm)) = self
-            .backend_data
+    /// Try to open the device
+    fn open_device(
+        &mut self,
+        device_id: dev_t,
+        path: &PathBuf,
+    ) -> Option<(DrmDevice<SessionFd>, GbmDevice<SessionFd>)> {
+        self.backend_data
             .session
             .open(
                 &path,
@@ -398,38 +391,36 @@ impl BackendState<UdevData> {
             )
             .ok()
             .and_then(|fd| {
-                match {
-                    let fd = SessionFd(fd);
-                    (
-                        DrmDevice::new(fd.clone(), true, self.log.clone()),
-                        GbmDevice::new(fd),
-                    )
-                } {
+                let fd = SessionFd(fd);
+                match (
+                    DrmDevice::new(fd.clone(), true, self.log.clone()),
+                    GbmDevice::new(fd),
+                ) {
                     (Ok(drm), Ok(gbm)) => Some((drm, gbm)),
                     (Err(err), _) => {
-                        warn!(
-                            self.log,
-                            "Skipping device {:?}, because of drm error: {}", device_id, err
-                        );
+                        warn!("Skipping device {:?}, because of drm error: {}", device_id, err);
                         None
                     }
                     (_, Err(err)) => {
                         // TODO try DumbBuffer allocator in this case
-                        warn!(
-                            self.log,
-                            "Skipping device {:?}, because of gbm error: {}", device_id, err
-                        );
+                        warn!("Skipping device {:?}, because of gbm error: {}", device_id, err);
                         None
                     }
                 }
             })
-        {
+    }
+
+    fn device_added(&mut self, device_id: dev_t, path: PathBuf, session_signal: &Signaler<SessionSignal>) {
+        info!("Device Added {:?} : {:?}", device_id, path);
+
+        // Try to open the device
+        if let Some((mut drm, gbm)) = self.open_device(device_id, &path) {
             let egl = match EGLDisplay::new(&gbm, self.log.clone()) {
                 Ok(display) => display,
                 Err(err) => {
                     warn!(
-                        self.log,
-                        "Skipping device {:?}, because of egl display error: {}", device_id, err
+                        "Skipping device {:?}, because of egl display error: {}",
+                        device_id, err
                     );
                     return;
                 }
@@ -439,8 +430,8 @@ impl BackendState<UdevData> {
                 Ok(context) => context,
                 Err(err) => {
                     warn!(
-                        self.log,
-                        "Skipping device {:?}, because of egl context error: {}", device_id, err
+                        "Skipping device {:?}, because of egl context error: {}",
+                        device_id, err
                     );
                     return;
                 }
@@ -451,18 +442,18 @@ impl BackendState<UdevData> {
             let renderer = Rc::new(RefCell::new(renderer));
 
             if path.canonicalize().ok() == self.primary_gpu {
-                info!(self.log, "Initializing EGL Hardware Acceleration via {:?}", path);
+                info!("Initializing EGL Hardware Acceleration via {:?}", path);
                 if renderer
                     .borrow_mut()
                     .bind_wl_display(&*self.anodium.display.borrow())
                     .is_ok()
                 {
-                    info!(self.log, "EGL hardware-acceleration enabled");
+                    info!("EGL hardware-acceleration enabled");
                 }
             }
 
             let backends = Rc::new(RefCell::new(scan_connectors(
-                &mut device,
+                &mut drm,
                 &gbm,
                 &mut *renderer.borrow_mut(),
                 &mut self.anodium,
@@ -470,7 +461,7 @@ impl BackendState<UdevData> {
                 &self.log,
             )));
 
-            let dev_id = device.device_id();
+            let dev_id = drm.device_id();
             let handle = self.handle.clone();
             let restart_token = session_signal.register(move |signal| match signal {
                 SessionSignal::ActivateSession | SessionSignal::ActivateDevice { .. } => {
@@ -479,22 +470,22 @@ impl BackendState<UdevData> {
                 _ => {}
             });
 
-            device.link(session_signal.clone());
+            drm.link(session_signal.clone());
             let event_dispatcher = Dispatcher::new(
-                device,
+                drm,
                 move |event, _, anvil_state: &mut BackendState<_>| match event {
                     DrmEvent::VBlank(crtc) => anvil_state.udev_render(dev_id, Some(crtc)),
                     DrmEvent::Error(error) => {
-                        error!(anvil_state.log, "{:?}", error);
+                        error!("{:?}", error);
                     }
                 },
             );
             let registration_token = self.handle.register_dispatcher(event_dispatcher.clone()).unwrap();
 
-            trace!(self.log, "Backends: {:?}", backends.borrow().keys());
+            trace!("Backends: {:?}", backends.borrow().keys());
             for backend in backends.borrow_mut().values() {
                 // render first frame
-                trace!(self.log, "Scheduling frame");
+                trace!("Scheduling frame");
                 schedule_initial_render(backend.clone(), renderer.clone(), &self.handle, self.log.clone());
             }
 
@@ -559,7 +550,7 @@ impl BackendState<UdevData> {
         if let Some(backend_data) = self.backends.remove(&device) {
             // drop surfaces
             backend_data.surfaces.borrow_mut().clear();
-            debug!(self.log, "Surfaces dropped");
+            debug!("Surfaces dropped");
 
             self.anodium.retain_outputs(|output| {
                 output
@@ -576,7 +567,7 @@ impl BackendState<UdevData> {
             if _device.dev_path().and_then(|path| path.canonicalize().ok()) == self.primary_gpu {
                 backend_data.renderer.borrow_mut().unbind_wl_display();
             }
-            debug!(self.log, "Dropping device");
+            debug!("Dropping device");
         }
     }
 
@@ -585,7 +576,7 @@ impl BackendState<UdevData> {
         let device_backend = match self.backends.get_mut(&dev_id) {
             Some(backend) => backend,
             None => {
-                error!(self.log, "Trying to render on non-existent backend {}", dev_id);
+                error!("Trying to render on non-existent backend {}", dev_id);
                 return;
             }
         };
@@ -632,10 +623,9 @@ impl BackendState<UdevData> {
                 crtc,
                 &pointer_image,
                 &mut self.cursor_status.lock().unwrap(),
-                &self.log,
             );
             if let Err(err) = result {
-                warn!(self.log, "Error during rendering: {:?}", err);
+                warn!("Error during rendering: {:?}", err);
                 let reschedule = match err {
                     SwapBuffersError::AlreadySwapped => false,
                     SwapBuffersError::TemporaryFailure(err) => !matches!(
@@ -680,7 +670,6 @@ fn schedule_initial_render<Data: 'static>(
             SwapBuffersError::AlreadySwapped => {}
             SwapBuffersError::TemporaryFailure(err) => {
                 // TODO dont reschedule after 3(?) retries
-                warn!(logger, "Failed to submit page_flip: {}", err);
                 let handle = evt_handle.clone();
                 evt_handle.insert_idle(move |_| schedule_initial_render(surface, renderer, &handle, logger));
             }
@@ -699,7 +688,6 @@ impl Anodium {
         crtc: crtc::Handle,
         pointer_image: &Gles2Texture,
         cursor_status: &mut CursorImageStatus,
-        logger: &slog::Logger,
     ) -> Result<(), SwapBuffersError> {
         surface.surface.frame_submitted()?;
 
@@ -747,7 +735,7 @@ impl Anodium {
                             }
 
                             if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
-                                draw_cursor(frame, wl_surface, relative_ptr_location, output_scale, logger)?;
+                                draw_cursor(frame, wl_surface, relative_ptr_location, output_scale)?;
                             } else {
                                 frame.render_texture_at(
                                     pointer_image,

@@ -4,7 +4,6 @@ use std::{cell::RefCell, sync::Mutex};
 
 #[cfg(feature = "image")]
 use image::{ImageBuffer, Rgba};
-use slog::Logger;
 #[cfg(feature = "image")]
 use smithay::backend::renderer::gles2::{Gles2Error, Gles2Renderer, Gles2Texture};
 use smithay::{
@@ -44,7 +43,6 @@ pub fn draw_cursor(
     surface: &wl_surface::WlSurface,
     location: Point<i32, Logical>,
     output_scale: f64,
-    log: &Logger,
 ) -> Result<(), SwapBuffersError> {
     let ret = with_states(surface, |states| {
         Some(
@@ -61,14 +59,11 @@ pub fn draw_cursor(
     let delta = match ret {
         Some(h) => h,
         None => {
-            warn!(
-                log,
-                "Trying to display as a cursor a surface that does not have the CursorImage role."
-            );
+            warn!("Trying to display as a cursor a surface that does not have the CursorImage role.");
             (0, 0).into()
         }
     };
-    draw_surface_tree(frame, surface, location - delta, output_scale, log)
+    draw_surface_tree(frame, surface, location - delta, output_scale)
 }
 
 fn draw_surface_tree(
@@ -76,7 +71,6 @@ fn draw_surface_tree(
     root: &wl_surface::WlSurface,
     location: Point<i32, Logical>,
     output_scale: f64,
-    log: &Logger,
 ) -> Result<(), SwapBuffersError> {
     let mut result = Ok(());
 
@@ -117,11 +111,11 @@ fn draw_surface_tree(
                                 }))
                             }
                             Some(Err(err)) => {
-                                warn!(log, "Error loading buffer: {:?}", err);
+                                warn!("Error loading buffer: {:?}", err);
                                 buffer.release();
                             }
                             None => {
-                                error!(log, "Unknown buffer format for: {:?}", buffer);
+                                error!("Unknown buffer format for: {:?}", buffer);
                                 buffer.release();
                             }
                         }
@@ -185,7 +179,6 @@ impl Anodium {
         frame: &mut RenderFrame,
         output_rect: Rectangle<i32, Logical>,
         output_scale: f64,
-        log: &::slog::Logger,
     ) -> Result<(), SwapBuffersError> {
         let mut render = move |window: &Window| {
             let mut initial_place = window.render_location();
@@ -198,8 +191,8 @@ impl Anodium {
 
             if let Some(wl_surface) = window.surface().as_ref() {
                 // this surface is a root of a subsurface tree that needs to be drawn
-                if let Err(err) = draw_surface_tree(frame, &wl_surface, initial_place, output_scale, log) {
-                    error!(log, "{:?}", err);
+                if let Err(err) = draw_surface_tree(frame, &wl_surface, initial_place, output_scale) {
+                    error!("{:?}", err);
                 }
                 // furthermore, draw its popups
                 // let toplevel_geometry_offset = window.geometry().loc;
@@ -247,7 +240,6 @@ impl Anodium {
         layer: Layer,
         output_rect: Rectangle<i32, Logical>,
         output_scale: f64,
-        log: &::slog::Logger,
     ) -> Result<(), SwapBuffersError> {
         let mut result = Ok(());
 
@@ -265,9 +257,7 @@ impl Anodium {
 
                     if let Some(wl_surface) = layer_surface.surface.get_surface() {
                         // this surface is a root of a subsurface tree that needs to be drawn
-                        if let Err(err) =
-                            draw_surface_tree(frame, wl_surface, initial_place, output_scale, log)
-                        {
+                        if let Err(err) = draw_surface_tree(frame, wl_surface, initial_place, output_scale) {
                             result = Err(err);
                         }
 
@@ -307,15 +297,11 @@ pub fn draw_dnd_icon(
     surface: &wl_surface::WlSurface,
     location: Point<i32, Logical>,
     output_scale: f64,
-    log: &::slog::Logger,
 ) -> Result<(), SwapBuffersError> {
     if get_role(surface) != Some("dnd_icon") {
-        warn!(
-            log,
-            "Trying to display as a dnd icon a surface that does not have the DndIcon role."
-        );
+        warn!("Trying to display as a dnd icon a surface that does not have the DndIcon role.");
     }
-    draw_surface_tree(frame, surface, location, output_scale, log)
+    draw_surface_tree(frame, surface, location, output_scale)
 }
 
 // TODO: Move this to diferent module, this is not wayland specyfic

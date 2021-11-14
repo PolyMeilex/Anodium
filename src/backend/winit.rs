@@ -56,7 +56,7 @@ pub fn run_winit(
         .bind_wl_display(&display.borrow())
         .is_ok()
     {
-        info!(log, "EGL hardware-acceleration enabled");
+        info!("EGL hardware-acceleration enabled");
         let dmabuf_formats = renderer
             .borrow_mut()
             .renderer()
@@ -103,7 +103,7 @@ pub fn run_winit(
     #[cfg(feature = "xwayland")]
     state.start_xwayland();
 
-    info!(log, "Initialization completed, starting the main loop.");
+    info!("Initialization completed, starting the main loop.");
 
     let timer = Timer::new().unwrap();
     let timer_handle = timer.handle();
@@ -152,7 +152,6 @@ pub fn run_winit(
                                                 surface,
                                                 (x as i32, y as i32).into(),
                                                 output_scale,
-                                                &log,
                                             )
                                             .unwrap();
                                         }
