@@ -670,6 +670,7 @@ fn schedule_initial_render<Data: 'static>(
             SwapBuffersError::AlreadySwapped => {}
             SwapBuffersError::TemporaryFailure(err) => {
                 // TODO dont reschedule after 3(?) retries
+                warn!("Failed to submit page_flip: {}", err);
                 let handle = evt_handle.clone();
                 evt_handle.insert_idle(move |_| schedule_initial_render(surface, renderer, &handle, logger));
             }
