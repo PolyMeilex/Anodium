@@ -1,8 +1,8 @@
-use crate::{backend::winit::WinitData, state::BackendState};
+use crate::state::BackendState;
 
 use smithay::{backend::winit::WinitEvent, wayland::output::Mode};
 
-impl BackendState<WinitData> {
+impl BackendState {
     pub fn process_winit_event(&mut self, event: WinitEvent) {
         match event {
             WinitEvent::Resized { size, .. } => {
@@ -18,7 +18,7 @@ impl BackendState<WinitData> {
                     );
             }
             WinitEvent::Input(event) => {
-                self.anodium.process_input_event(&mut self.backend_data, event);
+                self.anodium.process_input_event(event);
             }
             _ => {}
         }

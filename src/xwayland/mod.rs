@@ -26,7 +26,7 @@ use x11rb_event_source::X11Source;
 
 mod x11rb_event_source;
 
-impl<BackendData: 'static> BackendState<BackendData> {
+impl BackendState {
     pub fn start_xwayland(&mut self) {
         if let Err(e) = self.xwayland.start() {
             error!("Failed to start XWayland: {}", e);

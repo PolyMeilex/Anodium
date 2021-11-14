@@ -11,7 +11,7 @@ use std::{
 };
 
 use smithay::{
-    backend::renderer::Frame,
+    backend::{renderer::Frame, session::Session},
     nix::libc::dev_t,
     reexports::{
         calloop::{generic::Generic, Interest, LoopHandle, Mode, PostAction},
@@ -32,7 +32,7 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
-    backend::{udev, Backend},
+    backend::{session::AnodiumSession, udev},
     config::ConfigVM,
     desktop_layout::{DesktopLayout, Output},
     render::{self, renderer::RenderFrame},
@@ -64,6 +64,7 @@ pub struct Anodium {
 
     pub seat_name: String,
     pub seat: Seat,
+    pub session: AnodiumSession,
 
     pub start_time: std::time::Instant,
     last_update: Instant,
@@ -188,9 +189,8 @@ impl Anodium {
     }
 }
 
-pub struct BackendState<BackendData> {
+pub struct BackendState {
     pub handle: LoopHandle<'static, Self>,
-    pub backend_data: BackendData,
     pub cursor_status: Arc<Mutex<CursorImageStatus>>,
 
     pub anodium: Anodium,
@@ -206,11 +206,11 @@ pub struct BackendState<BackendData> {
     pub log: slog::Logger,
 }
 
-impl<BackendData: Backend + 'static> BackendState<BackendData> {
+impl BackendState {
     pub fn init(
         display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
-        backend_data: BackendData,
+        session: AnodiumSession,
         log: slog::Logger,
     ) -> Self {
         // init the wayland connection
@@ -236,7 +236,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
 
         init_shm_global(&mut display.borrow_mut(), vec![], log.clone());
 
-        init_shell::<BackendData>(display.clone(), log.clone());
+        init_shell(display.clone(), log.clone());
 
         init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
 
@@ -271,7 +271,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
         );
 
         // init input
-        let seat_name = backend_data.seat_name();
+        let seat_name = session.seat();
 
         let (mut seat, _) = Seat::new(&mut display.borrow_mut(), seat_name.clone(), log.clone());
 
@@ -314,7 +314,6 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
 
         BackendState {
             handle,
-            backend_data,
             cursor_status,
             anodium: Anodium {
                 running: Arc::new(AtomicBool::new(true)),
@@ -339,6 +338,7 @@ impl<BackendData: Backend + 'static> BackendState<BackendData> {
 
                 seat_name,
                 seat,
+                session,
 
                 start_time: Instant::now(),
                 last_update: Instant::now(),

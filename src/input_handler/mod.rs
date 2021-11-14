@@ -3,12 +3,15 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::{backend::Backend, shell::move_surface_grab::MoveSurfaceGrab, Anodium};
+use crate::{shell::move_surface_grab::MoveSurfaceGrab, Anodium};
 
 use smithay::{
-    backend::input::{
-        self, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent,
-        PointerButtonEvent, PointerMotionAbsoluteEvent, PointerMotionEvent,
+    backend::{
+        input::{
+            self, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent,
+            PointerButtonEvent, PointerMotionAbsoluteEvent, PointerMotionEvent,
+        },
+        session::Session,
     },
     reexports::wayland_server::protocol::wl_pointer,
     utils::{Logical, Point},
@@ -19,14 +22,10 @@ use smithay::{
 };
 
 impl Anodium {
-    pub fn process_input_event<B: Backend, I: InputBackend>(
-        &mut self,
-        backend: &mut B,
-        event: InputEvent<I>,
-    ) {
+    pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
         match event {
             InputEvent::Keyboard { event, .. } => match self.keyboard_key_to_action::<I>(event) {
-                action => self.shortcut_handler(backend, action),
+                action => self.shortcut_handler(action),
             },
             InputEvent::PointerMotion { event, .. } => {
                 self.input_state.pointer_location =
@@ -297,7 +296,7 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
 }
 
 impl Anodium {
-    fn shortcut_handler<B: Backend>(&mut self, backend: &mut B, action: KeyAction) {
+    fn shortcut_handler(&mut self, action: KeyAction) {
         match action {
             KeyAction::None => {}
             KeyAction::Quit => {
@@ -306,7 +305,7 @@ impl Anodium {
             }
             KeyAction::VtSwitch(vt) => {
                 info!("Trying to switch to vt {}", vt);
-                backend.change_vt(vt);
+                self.session.change_vt(vt).ok();
             }
             KeyAction::Run(mut cmd) => {
                 info!("Starting program");

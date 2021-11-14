@@ -278,12 +278,12 @@ impl Anodium {
     }
 }
 
-pub fn init_shell<BackendData: 'static>(display: Rc<RefCell<Display>>, log: ::slog::Logger) {
+pub fn init_shell(display: Rc<RefCell<Display>>, log: ::slog::Logger) {
     // Create the compositor
     compositor_init(
         &mut *display.borrow_mut(),
         move |surface, mut ddata| {
-            let state = ddata.get::<BackendState<BackendData>>().unwrap();
+            let state = ddata.get::<BackendState>().unwrap();
             state.anodium.surface_commit(&surface);
         },
         log.clone(),
@@ -293,7 +293,7 @@ pub fn init_shell<BackendData: 'static>(display: Rc<RefCell<Display>>, log: ::sl
     xdg_shell_init(
         &mut *display.borrow_mut(),
         move |request, mut dispatch_data| {
-            let state = dispatch_data.get::<BackendState<BackendData>>().unwrap();
+            let state = dispatch_data.get::<BackendState>().unwrap();
             state.anodium.xdg_shell_request(request);
         },
         log.clone(),
@@ -302,7 +302,7 @@ pub fn init_shell<BackendData: 'static>(display: Rc<RefCell<Display>>, log: ::sl
     wlr_layer_shell_init(
         &mut *display.borrow_mut(),
         move |request, mut ddata| {
-            let state = ddata.get::<BackendState<BackendData>>().unwrap();
+            let state = ddata.get::<BackendState>().unwrap();
             state.anodium.wlr_layer_shell_request(request);
         },
         log.clone(),

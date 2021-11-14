@@ -26,10 +26,7 @@ use smithay::{
         SwapBuffersError,
     },
     reexports::{
-        calloop::{
-            timer::{Timer, TimerHandle},
-            Dispatcher, EventLoop, LoopHandle, RegistrationToken,
-        },
+        calloop::{timer::Timer, Dispatcher, EventLoop, LoopHandle, RegistrationToken},
         drm::{
             self,
             control::{
@@ -62,7 +59,7 @@ use smithay::{
     wayland::dmabuf::init_dmabuf_global,
 };
 
-use super::Backend;
+use super::session::AnodiumSession;
 use crate::{render::renderer::HasGles2Renderer, render::*, state::BackendState};
 use crate::{render::AnodiumRenderer, state::Anodium};
 
@@ -80,56 +77,41 @@ struct UdevOutputId {
     crtc: crtc::Handle,
 }
 
-pub struct UdevData {
-    session: AutoSession,
-    _render_timer: TimerHandle<(u64, crtc::Handle)>,
-}
-
-impl Backend for UdevData {
-    fn seat_name(&self) -> String {
-        self.session.seat()
-    }
-
-    fn change_vt(&mut self, vt: i32) {
-        if let Err(err) = self.session.change_vt(vt) {
-            error!("Error switching to vt {}: {}", vt, err);
-        }
-    }
-}
+// pub struct UdevData {
+// _render_timer: TimerHandle<(u64, crtc::Handle)>,
+// }
 
 pub fn run_udev(
     display: Rc<RefCell<Display>>,
-    event_loop: &mut EventLoop<'static, BackendState<UdevData>>,
+    event_loop: &mut EventLoop<'static, BackendState>,
     log: Logger,
-) -> Result<BackendState<UdevData>, ()> {
+) -> Result<BackendState, ()> {
     /*
      * Initialize session
      */
     let (session, notifier) = AutoSession::new(log.clone()).ok_or(())?;
+
     let session_signal = notifier.signaler();
+    let session = AnodiumSession::new_udev(session);
 
     /*
      * Initialize the compositor
      */
 
     // setup the timer
-    let timer = Timer::new().unwrap();
+    // let render_timer = Timer::new().unwrap();
 
-    let data = UdevData {
-        session,
-        _render_timer: timer.handle(),
-    };
-    let mut state = BackendState::init(display.clone(), event_loop.handle(), data, log.clone());
+    let mut state = BackendState::init(display.clone(), event_loop.handle(), session, log.clone());
     state.primary_gpu = primary_gpu(&state.anodium.seat_name).unwrap_or_default();
     info!("Primary GPU: {:?}", state.primary_gpu);
 
     // re-render timer
-    event_loop
-        .handle()
-        .insert_source(timer, |(dev_id, crtc), _, anvil_state| {
-            anvil_state.udev_render(dev_id, Some(crtc))
-        })
-        .unwrap();
+    // event_loop
+    //     .handle()
+    //     .insert_source(render_timer, |(dev_id, crtc), _, anvil_state| {
+    //         anvil_state.udev_render(dev_id, Some(crtc))
+    //     })
+    //     .unwrap();
 
     /*
      * Initialize the udev backend
@@ -139,8 +121,8 @@ pub fn run_udev(
     /*
      * Initialize libinput backend
      */
-    let mut libinput_context = Libinput::new_with_udev::<LibinputSessionInterface<AutoSession>>(
-        state.backend_data.session.clone().into(),
+    let mut libinput_context = Libinput::new_with_udev::<LibinputSessionInterface<AnodiumSession>>(
+        state.anodium.session.clone().into(),
     );
     libinput_context
         .udev_assign_seat(&state.anodium.seat_name)
@@ -154,7 +136,7 @@ pub fn run_udev(
     let _libinput_event_source = event_loop
         .handle()
         .insert_source(libinput_backend, move |event, _, state| {
-            state.anodium.process_input_event(&mut state.backend_data, event);
+            state.anodium.process_input_event(event);
         })
         .unwrap();
     let _session_event_source = event_loop
@@ -178,7 +160,7 @@ pub fn run_udev(
             &mut *display.borrow_mut(),
             formats,
             |buffer, mut ddata| {
-                let anvil_state = ddata.get::<BackendState<UdevData>>().unwrap();
+                let anvil_state = ddata.get::<BackendState>().unwrap();
                 for backend_data in anvil_state.backends.values() {
                     if backend_data.renderer.borrow_mut().import_dmabuf(buffer).is_ok() {
                         return true;
@@ -245,7 +227,7 @@ pub struct BackendData {
     renderer: Rc<RefCell<AnodiumRenderer<Gles2Renderer>>>,
     gbm: GbmDevice<SessionFd>,
     registration_token: RegistrationToken,
-    event_dispatcher: Dispatcher<'static, DrmDevice<SessionFd>, BackendState<UdevData>>,
+    event_dispatcher: Dispatcher<'static, DrmDevice<SessionFd>, BackendState>,
     dev_id: u64,
 }
 
@@ -376,14 +358,14 @@ fn scan_connectors(
     backends
 }
 
-impl BackendState<UdevData> {
+impl BackendState {
     /// Try to open the device
     fn open_device(
         &mut self,
         device_id: dev_t,
         path: &PathBuf,
     ) -> Option<(DrmDevice<SessionFd>, GbmDevice<SessionFd>)> {
-        self.backend_data
+        self.anodium
             .session
             .open(
                 &path,
@@ -452,7 +434,7 @@ impl BackendState<UdevData> {
                 }
             }
 
-            let backends = Rc::new(RefCell::new(scan_connectors(
+            let outputs = Rc::new(RefCell::new(scan_connectors(
                 &mut drm,
                 &gbm,
                 &mut *renderer.borrow_mut(),
@@ -471,22 +453,20 @@ impl BackendState<UdevData> {
             });
 
             drm.link(session_signal.clone());
-            let event_dispatcher = Dispatcher::new(
-                drm,
-                move |event, _, anvil_state: &mut BackendState<_>| match event {
+            let event_dispatcher =
+                Dispatcher::new(drm, move |event, _, anvil_state: &mut BackendState| match event {
                     DrmEvent::VBlank(crtc) => anvil_state.udev_render(dev_id, Some(crtc)),
                     DrmEvent::Error(error) => {
                         error!("{:?}", error);
                     }
-                },
-            );
+                });
             let registration_token = self.handle.register_dispatcher(event_dispatcher.clone()).unwrap();
 
-            trace!("Backends: {:?}", backends.borrow().keys());
-            for backend in backends.borrow_mut().values() {
+            trace!("Backends: {:?}", outputs.borrow().keys());
+            for output in outputs.borrow_mut().values() {
                 // render first frame
                 trace!("Scheduling frame");
-                schedule_initial_render(backend.clone(), renderer.clone(), &self.handle, self.log.clone());
+                schedule_initial_render(output.clone(), renderer.clone(), &self.handle, self.log.clone());
             }
 
             self.backends.insert(
@@ -495,7 +475,7 @@ impl BackendState<UdevData> {
                     _restart_token: restart_token,
                     registration_token,
                     event_dispatcher,
-                    surfaces: backends,
+                    surfaces: outputs,
                     renderer,
                     gbm,
                     pointer_images: Vec::new(),
@@ -505,7 +485,6 @@ impl BackendState<UdevData> {
         }
     }
 
-    #[allow(dead_code)]
     fn device_changed(&mut self, device: dev_t, session_signal: &Signaler<SessionSignal>) {
         //quick and dirty, just re-init all backends
         if let Some(ref mut backend_data) = self.backends.get_mut(&device) {

@@ -3,6 +3,8 @@ pub mod udev;
 #[cfg(feature = "winit")]
 pub mod winit;
 
+pub mod session;
+
 use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
 use std::sync::atomic::Ordering;
 use std::{cell::RefCell, rc::Rc};
@@ -10,10 +12,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::state::BackendState;
 
 #[cfg(feature = "winit")]
-pub fn winit(
-    log: slog::Logger,
-    event_loop: &mut EventLoop<'static, BackendState<winit::WinitData>>,
-) -> BackendState<winit::WinitData> {
+pub fn winit(log: slog::Logger, event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
     info!("Starting anvil with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -25,10 +24,7 @@ pub fn winit(
 }
 
 #[cfg(feature = "udev")]
-pub fn udev(
-    log: slog::Logger,
-    event_loop: &mut EventLoop<'static, BackendState<udev::UdevData>>,
-) -> BackendState<udev::UdevData> {
+pub fn udev(log: slog::Logger, event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
     info!("Starting anvil on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -57,7 +53,7 @@ pub fn auto(log: slog::Logger) {
     }
 }
 
-fn run_loop<D>(mut state: BackendState<D>, mut event_loop: EventLoop<'static, BackendState<D>>) {
+fn run_loop(mut state: BackendState, mut event_loop: EventLoop<'static, BackendState>) {
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
