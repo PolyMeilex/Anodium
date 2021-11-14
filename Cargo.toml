@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 bitflags = "1.2.1"
-input = { version = "0.6.0", features = ["udev"], optional = true }
+input = { version = "0.7.0", features = ["udev"], optional = true }
 thiserror = "1"
 xcursor = { version = "0.3.3", optional = true }
 image = { version = "0.23.14", default-features = false, optional = true }
@@ -26,7 +26,7 @@ imgui-smithay-renderer = {path="./imgui-smithay-renderer", optional = true}
 rhai = "1.0.2"
 
 [dependencies.smithay]
-path = ".."
+git = "https://github.com/Smithay/smithay.git"
 default-features = false
 features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog"]
 
@@ -37,7 +37,7 @@ default-features = false
 features = [ "composite" ]
 
 [features]
-default = ["udev","winit","xwayland"]
+default = ["udev","winit"]
 # default = ["udev","winit"]
 winit = [ "smithay/backend_winit" ]
 udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_libseat", "input", "image", "xcursor" ]
