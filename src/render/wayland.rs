@@ -78,7 +78,7 @@ fn draw_surface_tree(
 ) -> Result<(), SwapBuffersError> {
     let mut result = Ok(());
 
-    let renderer = &mut frame.context.renderer;
+    let renderer = &mut frame.renderer;
     let frame = &mut frame.frame;
     with_surface_tree_upward(
         root,
@@ -316,19 +316,14 @@ pub fn draw_dnd_icon(
 }
 
 // TODO: Move this to diferent module, this is not wayland specyfic
-#[cfg(feature = "debug")]
-pub fn draw_fps(frame: &mut RenderFrame, _output_scale: f64, value: u32) -> Result<(), Gles2Error> {
-    let ui = &frame.imgui_frame;
-
+pub fn draw_fps(ui: &imgui::Ui, _output_scale: f64, value: f64) {
     imgui::Window::new(imgui::im_str!("FPS"))
         .size([50.0, 20.0], imgui::Condition::Always)
         .position([0.0, 0.0], imgui::Condition::Always)
         .title_bar(false)
         .build(&ui, || {
-            ui.text(&format!("{}FPS", value));
+            ui.text(&format!("{}FPS", value as u32));
         });
-
-    Ok(())
 }
 
 // TODO: Move this to diferent module, this is not wayland specyfic

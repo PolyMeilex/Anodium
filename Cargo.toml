@@ -22,7 +22,7 @@ glow = "0.10.0"
 cgmath = "0.18.0"
 
 imgui = "0.7.0"
-imgui-smithay-renderer = {path="./imgui-smithay-renderer", optional = true}
+imgui-smithay-renderer = {path="./imgui-smithay-renderer"}
 rhai = "1.0.2"
 
 [dependencies.smithay]
@@ -41,6 +41,6 @@ default = ["udev","winit"]
 # default = ["udev","winit"]
 winit = [ "smithay/backend_winit" ]
 udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_libseat", "input", "image", "xcursor" ]
-debug = [ "image/png", "imgui-smithay-renderer"]
+debug = [ "image/png"]
 
 xwayland = [ "smithay/xwayland", "x11rb" ]

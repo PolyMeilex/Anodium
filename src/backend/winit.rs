@@ -1,7 +1,8 @@
 use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering, time::Duration};
 
+use smithay::backend::winit::WinitEvent;
 use smithay::{
-    backend::renderer::{ImportDma, ImportEgl},
+    backend::renderer::{ImportDma, ImportEgl, Transform},
     reexports::calloop::timer::Timer,
     wayland::dmabuf::init_dmabuf_global,
 };
@@ -20,7 +21,8 @@ use smithay::{
 use slog::Logger;
 
 use super::session::AnodiumSession;
-use crate::{render::AnodiumRenderer, render::*, state::BackendState};
+
+use crate::{render::renderer::RenderFrame, render::*, state::BackendState};
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -37,7 +39,6 @@ pub fn run_winit(
     let (renderer, mut input) = winit::init(log.clone()).map_err(|err| {
         slog::crit!(log, "Failed to initialize Winit backend: {}", err);
     })?;
-    let renderer = AnodiumRenderer::new(renderer);
     let renderer = Rc::new(RefCell::new(renderer));
 
     if renderer
@@ -103,6 +104,20 @@ pub fn run_winit(
     #[cfg(feature = "xwayland")]
     state.start_xwayland();
 
+    let mut imgui = imgui::Context::create();
+    {
+        imgui.set_ini_filename(None);
+        let io = imgui.io_mut();
+        io.display_framebuffer_scale = [1.0 as f32, 1.0 as f32];
+        io.display_size = [size.w as f32, size.h as f32];
+    }
+
+    let imgui_pipeline = renderer
+        .borrow_mut()
+        .renderer()
+        .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
+        .unwrap();
+
     info!("Initialization completed, starting the main loop.");
 
     let timer = Timer::new().unwrap();
@@ -113,7 +128,15 @@ pub fn run_winit(
     event_loop
         .handle()
         .insert_source(timer, move |_: (), handle, state| {
-            match input.dispatch_new_events(|event| state.process_winit_event(event)) {
+            match input.dispatch_new_events(|event| {
+                if let WinitEvent::Resized { size, scale_factor } = &event {
+                    let io = imgui.io_mut();
+                    io.display_framebuffer_scale = [*scale_factor as f32, *scale_factor as f32];
+                    io.display_size = [size.w as f32, size.h as f32];
+                }
+
+                state.process_winit_event(event)
+            }) {
                 Ok(()) => {
                     let mut renderer = renderer.borrow_mut();
                     let outputs: Vec<_> = state
@@ -127,11 +150,33 @@ pub fn run_winit(
 
                     for (output_geometry, output_scale) in outputs {
                         renderer
-                            .render_winit(|frame| {
+                            .render(|renderer, frame| {
+                                let mut frame = RenderFrame {
+                                    transform: Transform::Normal,
+                                    renderer,
+                                    frame,
+                                };
+
                                 state
                                     .anodium
-                                    .render(frame, (output_geometry, output_scale))
+                                    .render(&mut frame, (output_geometry, output_scale))
                                     .unwrap();
+
+                                {
+                                    let ui = imgui.frame();
+                                    draw_fps(&ui, 1.0, fps.avg());
+                                    let draw_data = ui.render();
+                                    frame
+                                        .renderer
+                                        .with_context(|_renderer, gles| {
+                                            imgui_pipeline.render(
+                                                Transform::Normal,
+                                                gles,
+                                                &draw_data,
+                                            );
+                                        })
+                                        .unwrap();
+                                }
 
                                 // draw the cursor as relevant
                                 {
@@ -149,19 +194,13 @@ pub fn run_winit(
                                     // draw as relevant
                                     if let CursorImageStatus::Image(ref surface) = *guard {
                                         draw_cursor(
-                                            frame,
+                                            &mut frame,
                                             surface,
                                             (x as i32, y as i32).into(),
                                             output_scale,
                                         )
                                         .unwrap();
                                     }
-                                }
-
-                                #[cfg(feature = "debug")]
-                                {
-                                    let fps = fps.avg().round() as u32;
-                                    draw_fps(frame, output_scale as f64, fps).unwrap();
                                 }
                             })
                             .unwrap();

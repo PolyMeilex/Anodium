@@ -18,7 +18,7 @@ use smithay::{
         libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{
             gles2::{Gles2Renderer, Gles2Texture},
-            Bind, Frame, Transform,
+            Bind, Frame, Renderer, Transform,
         },
         session::{auto::AutoSession, Session, Signal as SessionSignal},
         udev::{UdevBackend, UdevEvent},
@@ -62,8 +62,8 @@ use smithay::{
 };
 
 use super::session::AnodiumSession;
-use crate::{render::renderer::HasGles2Renderer, render::*, state::BackendState};
-use crate::{render::AnodiumRenderer, state::Anodium};
+use crate::state::Anodium;
+use crate::{render::renderer::RenderFrame, render::*, state::BackendState};
 
 #[derive(Clone)]
 pub struct SessionFd(RawFd);
@@ -208,13 +208,15 @@ struct SurfaceData {
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
     fps: fps_ticker::Fps,
+    imgui: Option<imgui::SuspendedContext>,
+    imgui_pipeline: imgui_smithay_renderer::Renderer,
 }
 
 pub struct BackendData {
     _restart_token: SignalToken,
     surfaces: Rc<RefCell<HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>>>>,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
-    renderer: Rc<RefCell<AnodiumRenderer<Gles2Renderer>>>,
+    renderer: Rc<RefCell<Gles2Renderer>>,
     gbm: GbmDevice<SessionFd>,
     registration_token: RegistrationToken,
     event_dispatcher: Dispatcher<'static, DrmDevice<SessionFd>, BackendState>,
@@ -225,8 +227,8 @@ fn scan_connectors(
     handle: LoopHandle<'static, BackendState>,
     drm: &mut DrmDevice<SessionFd>,
     gbm: &GbmDevice<SessionFd>,
-    renderer: &mut AnodiumRenderer<Gles2Renderer>,
-    main_state: &mut Anodium,
+    renderer: &mut Gles2Renderer,
+    anodium: &mut Anodium,
     signaler: &Signaler<SessionSignal>,
     logger: &::slog::Logger,
 ) -> HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>> {
@@ -282,7 +284,7 @@ fn scan_connectors(
                     };
 
                     let modes = connector_info.modes();
-                    let mode_id = main_state
+                    let mode_id = anodium
                         .config
                         .configure_output(&output_name, modes)
                         .unwrap();
@@ -301,9 +303,8 @@ fn scan_connectors(
                         };
                     surface.link(signaler.clone());
 
-                    let renderer_formats =
-                        Bind::<Dmabuf>::supported_formats(renderer.gles_renderer())
-                            .expect("Dmabuf renderer without formats");
+                    let renderer_formats = Bind::<Dmabuf>::supported_formats(renderer)
+                        .expect("Dmabuf renderer without formats");
 
                     let gbm_surface = match GbmBufferedSurface::new(
                         surface,
@@ -325,7 +326,7 @@ fn scan_connectors(
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 
-                    main_state.add_output(
+                    anodium.add_output(
                         &output_name,
                         PhysicalProperties {
                             size: (phys_w as i32, phys_h as i32).into(),
@@ -344,10 +345,26 @@ fn scan_connectors(
 
                     let timer = Timer::new().unwrap();
 
+                    let mut imgui = imgui::Context::create();
+                    {
+                        imgui.set_ini_filename(None);
+                        let io = imgui.io_mut();
+                        io.display_framebuffer_scale = [1.0 as f32, 1.0 as f32];
+                        io.display_size = [size.0 as f32, size.1 as f32];
+                    }
+
+                    let imgui_pipeline = renderer
+                        .with_context(|_, gles| {
+                            imgui_smithay_renderer::Renderer::new(gles, &mut imgui)
+                        })
+                        .unwrap();
+
                     entry.insert(Rc::new(RefCell::new(SurfaceData {
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
                         fps: fps_ticker::Fps::default(),
+                        imgui: Some(imgui.suspend()),
+                        imgui_pipeline,
                     })));
 
                     handle
@@ -438,7 +455,6 @@ impl BackendState {
             };
 
             let renderer = unsafe { Gles2Renderer::new(context, self.log.clone()).unwrap() };
-            let renderer = AnodiumRenderer::new(renderer);
             let renderer = Rc::new(RefCell::new(renderer));
 
             if path.canonicalize().ok() == self.primary_gpu {
@@ -669,7 +685,7 @@ impl BackendState {
 
 fn schedule_initial_render<Data: 'static>(
     surface: Rc<RefCell<SurfaceData>>,
-    renderer: Rc<RefCell<AnodiumRenderer<Gles2Renderer>>>,
+    renderer: Rc<RefCell<Gles2Renderer>>,
     evt_handle: &LoopHandle<'static, Data>,
     logger: ::slog::Logger,
 ) {
@@ -699,7 +715,7 @@ impl Anodium {
     fn render_surface(
         &mut self,
         surface: &mut SurfaceData,
-        renderer: &mut AnodiumRenderer<Gles2Renderer>,
+        renderer: &mut Gles2Renderer,
         device_id: dev_t,
         crtc: crtc::Handle,
         pointer_image: &Gles2Texture,
@@ -728,8 +744,31 @@ impl Anodium {
             .render(
                 mode.size,
                 Transform::Flipped180, // Scanout is rotated
-                |frame| {
-                    self.render(frame, (output_geometry, output_scale))?;
+                |renderer, frame| {
+                    let mut frame = RenderFrame {
+                        transform: Transform::Flipped180,
+                        renderer,
+                        frame,
+                    };
+
+                    self.render(&mut frame, (output_geometry, output_scale))?;
+
+                    let imgui_pipeline = &surface.imgui_pipeline;
+                    let imgui = surface.imgui.take().unwrap();
+
+                    let mut imgui = imgui.activate().unwrap();
+                    let ui = imgui.frame();
+                    draw_fps(&ui, 1.0, surface.fps.avg());
+                    let draw_data = ui.render();
+
+                    frame
+                        .renderer
+                        .with_context(|_renderer, gles| {
+                            imgui_pipeline.render(Transform::Flipped180, gles, &draw_data);
+                        })
+                        .unwrap();
+
+                    surface.imgui = Some(imgui.suspend());
 
                     // set cursor
                     if output_geometry
@@ -753,7 +792,7 @@ impl Anodium {
 
                             if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
                                 draw_cursor(
-                                    frame,
+                                    &mut frame,
                                     wl_surface,
                                     relative_ptr_location,
                                     output_scale,
@@ -772,11 +811,6 @@ impl Anodium {
                                 )?;
                             }
                         }
-                    }
-
-                    #[cfg(feature = "debug")]
-                    {
-                        draw_fps(frame, output_scale as f64, surface.fps.avg().round() as u32)?;
                     }
 
                     surface.fps.tick();
@@ -798,13 +832,13 @@ impl Anodium {
 
 fn initial_render(
     surface: &mut RenderSurface,
-    renderer: &mut AnodiumRenderer<Gles2Renderer>,
+    renderer: &mut Gles2Renderer,
 ) -> Result<(), SwapBuffersError> {
     let dmabuf = surface.next_buffer()?;
     renderer.bind(dmabuf)?;
     // Does not matter if we render an empty frame
     renderer
-        .render((1, 1).into(), Transform::Normal, |frame| {
+        .render((1, 1).into(), Transform::Normal, |_renderer, frame| {
             frame
                 .clear([0.8, 0.8, 0.9, 1.0])
                 .map_err(Into::<SwapBuffersError>::into)

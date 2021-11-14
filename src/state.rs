@@ -17,7 +17,7 @@ use smithay::{
         calloop::{generic::Generic, Interest, LoopHandle, Mode, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point, Rectangle, Size},
+    utils::{Logical, Point, Rectangle},
     wayland::{
         data_device::{
             default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent,
@@ -107,40 +107,40 @@ impl Anodium {
         }
 
         // Grab Debug:
-        if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
-            let loc: Point<i32, Logical> = window.location() + window.geometry().loc;
-            let size: Size<i32, Logical> = window.geometry().size;
-            let quad: Rectangle<i32, Logical> = Rectangle::from_loc_and_size(loc, size);
+        // if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
+        //     let loc: Point<i32, Logical> = window.location() + window.geometry().loc;
+        //     let size: Size<i32, Logical> = window.geometry().size;
+        //     let quad: Rectangle<i32, Logical> = Rectangle::from_loc_and_size(loc, size);
 
-            if output_geometry.overlaps(quad) {
-                frame.quad_pipeline.render(
-                    output_geometry.to_f64().to_physical(output_scale),
-                    quad.to_f64().to_physical(output_scale),
-                    frame.transform,
-                    &frame.context,
-                    0.1,
-                );
-            }
-        }
+        //     if output_geometry.overlaps(quad) {
+        //         frame.quad_pipeline.render(
+        //             output_geometry.to_f64().to_physical(output_scale),
+        //             quad.to_f64().to_physical(output_scale),
+        //             frame.transform,
+        //             &frame.context,
+        //             0.1,
+        //         );
+        //     }
+        // }
 
-        #[cfg(feature = "debug")]
-        if let Some(o) = self
-            .desktop_layout
-            .borrow()
-            .output_map
-            .find_by_position(output_geometry.loc)
-        {
-            let space = o.active_workspace();
-            let ui = &frame.imgui_frame;
+        // #[cfg(feature = "debug")]
+        // if let Some(o) = self
+        //     .desktop_layout
+        //     .borrow()
+        //     .output_map
+        //     .find_by_position(output_geometry.loc)
+        // {
+        //     let space = o.active_workspace();
+        //     let ui = &frame.imgui_frame;
 
-            imgui::Window::new(imgui::im_str!("Workspace"))
-                .size([100.0, 20.0], imgui::Condition::Always)
-                .position([0.0, 30.0], imgui::Condition::Always)
-                .title_bar(false)
-                .build(&ui, || {
-                    ui.text(&format!("Workspace: {}", space));
-                });
-        }
+        //     imgui::Window::new(imgui::im_str!("Workspace"))
+        //         .size([100.0, 20.0], imgui::Condition::Always)
+        //         .position([0.0, 30.0], imgui::Condition::Always)
+        //         .title_bar(false)
+        //         .build(&ui, || {
+        //             ui.text(&format!("Workspace: {}", space));
+        //         });
+        // }
 
         // Pointer Related:
         if output_geometry

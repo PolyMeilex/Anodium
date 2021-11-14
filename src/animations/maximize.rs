@@ -72,22 +72,23 @@ impl MaximizeAnimation {
 
     pub fn render(
         &mut self,
-        frame: &mut RenderFrame,
+        _frame: &mut RenderFrame,
 
-        (output_geometry, output_scale): (Rectangle<i32, Physical>, f64),
+        (_output_geometry, _output_scale): (Rectangle<i32, Physical>, f64),
     ) {
         match &self.state {
             MaximizeAnimationState::Enter | MaximizeAnimationState::Exit => {
-                let quad = self.geometry.to_physical(output_scale);
-                let alpha = self.progress;
+                // let quad = self.geometry.to_physical(output_scale);
+                // let alpha = self.progress;
 
-                frame.quad_pipeline.render(
-                    output_geometry.to_f64(),
-                    quad,
-                    frame.transform,
-                    &frame.context,
-                    alpha as f32 / 2.0,
-                );
+                // TODO:
+                // frame.quad_pipeline.render(
+                //     output_geometry.to_f64(),
+                //     quad,
+                //     frame.transform,
+                //     &frame.context,
+                //     alpha as f32 / 2.0,
+                // );
             }
             _ => {}
         }
