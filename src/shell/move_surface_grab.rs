@@ -10,14 +10,14 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{DesktopLayout, Toplevel};
+use crate::desktop_layout::{DesktopLayout, WindowSurface};
 
 use super::{MoveAfterResizeState, SurfaceData};
 
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,
 
-    pub toplevel: Toplevel,
+    pub toplevel: WindowSurface,
     pub initial_window_location: Point<i32, Logical>,
 
     pub desktop_layout: Rc<RefCell<DesktopLayout>>,

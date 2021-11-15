@@ -2,7 +2,7 @@ use smithay::utils::{Logical, Point};
 
 use crate::utils::AsWlSurface;
 
-use crate::desktop_layout::window::{Toplevel, Window};
+use crate::desktop_layout::window::{WindowSurface, Window};
 
 #[derive(Default)]
 pub struct NotMappedList {
@@ -10,7 +10,7 @@ pub struct NotMappedList {
 }
 
 impl NotMappedList {
-    pub fn insert(&mut self, toplevel: Toplevel, location: Point<i32, Logical>) {
+    pub fn insert(&mut self, toplevel: WindowSurface, location: Point<i32, Logical>) {
         self.windows.push(Window::new(toplevel.clone(), location));
         if let Some(w) = self.find_mut(&toplevel) {
             w.self_update()
@@ -56,7 +56,7 @@ impl NotMappedList {
         }
     }
 
-    pub fn remove(&mut self, kind: &Toplevel) -> Option<Window> {
+    pub fn remove(&mut self, kind: &WindowSurface) -> Option<Window> {
         let id = self.windows.iter().enumerate().find_map(|(id, win)| {
             if win.toplevel() == kind {
                 Some(id)

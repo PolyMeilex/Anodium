@@ -9,7 +9,7 @@ use smithay::{
     },
 };
 
-use crate::{desktop_layout::Toplevel, state::Anodium};
+use crate::{desktop_layout::WindowSurface, state::Anodium};
 
 use super::{
     move_surface_grab::MoveSurfaceGrab,
@@ -23,7 +23,7 @@ impl Anodium {
             XdgRequest::NewToplevel { surface } => {
                 self.not_mapped_list
                     .borrow_mut()
-                    .insert(Toplevel::Xdg(surface), Default::default());
+                    .insert(WindowSurface::Xdg(surface), Default::default());
             }
             // TODO:
             // XdgRequest::NewPopup { surface } => {
@@ -60,7 +60,7 @@ impl Anodium {
                     return;
                 }
 
-                let toplevel = Toplevel::Xdg(surface);
+                let toplevel = WindowSurface::Xdg(surface);
 
                 let mut desktop_layout = self.desktop_layout.borrow_mut();
 
@@ -109,7 +109,7 @@ impl Anodium {
                     return;
                 }
 
-                let toplevel = Toplevel::Xdg(surface);
+                let toplevel = WindowSurface::Xdg(surface);
                 if let Some(space) = self
                     .desktop_layout
                     .borrow_mut()
@@ -119,7 +119,7 @@ impl Anodium {
                 }
             }
             XdgRequest::Maximize { surface } => {
-                let toplevel = Toplevel::Xdg(surface);
+                let toplevel = WindowSurface::Xdg(surface);
                 if let Some(space) = self
                     .desktop_layout
                     .borrow_mut()
@@ -129,7 +129,7 @@ impl Anodium {
                 }
             }
             XdgRequest::UnMaximize { surface } => {
-                let toplevel = Toplevel::Xdg(surface);
+                let toplevel = WindowSurface::Xdg(surface);
                 if let Some(space) = self
                     .desktop_layout
                     .borrow_mut()

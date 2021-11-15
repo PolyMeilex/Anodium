@@ -25,32 +25,32 @@ mod list;
 pub use list::WindowList;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Toplevel {
+pub enum WindowSurface {
     Xdg(ToplevelSurface),
     #[cfg(feature = "xwayland")]
     X11(X11Surface),
 }
 
-impl Toplevel {
+impl WindowSurface {
     pub fn alive(&self) -> bool {
         match *self {
-            Toplevel::Xdg(ref t) => t.alive(),
+            WindowSurface::Xdg(ref t) => t.alive(),
             #[cfg(feature = "xwayland")]
-            Toplevel::X11(ref t) => t.alive(),
+            WindowSurface::X11(ref t) => t.alive(),
         }
     }
 
     pub fn get_surface(&self) -> Option<&wl_surface::WlSurface> {
         match *self {
-            Toplevel::Xdg(ref t) => t.get_surface(),
+            WindowSurface::Xdg(ref t) => t.get_surface(),
             #[cfg(feature = "xwayland")]
-            Toplevel::X11(ref t) => t.get_surface(),
+            WindowSurface::X11(ref t) => t.get_surface(),
         }
     }
 
     /// Activate/Deactivate this window
     pub fn set_activated(&self, active: bool) {
-        if let Toplevel::Xdg(ref t) = self {
+        if let WindowSurface::Xdg(ref t) = self {
             let changed = t.with_pending_state(|state| {
                 if active {
                     state.states.set(xdg_toplevel::State::Activated)
@@ -65,7 +65,7 @@ impl Toplevel {
     }
 
     pub fn maximize(&self, size: Size<i32, Logical>) {
-        if let Toplevel::Xdg(ref t) = self {
+        if let WindowSurface::Xdg(ref t) = self {
             let res = t.with_pending_state(|state| {
                 state.states.set(xdg_toplevel::State::Maximized);
                 state.size = Some(size);
@@ -77,7 +77,7 @@ impl Toplevel {
     }
 
     pub fn unmaximize(&self, size: Option<Size<i32, Logical>>) {
-        if let Toplevel::Xdg(ref t) = self {
+        if let WindowSurface::Xdg(ref t) = self {
             let ret = t.with_pending_state(|state| {
                 state.states.unset(xdg_toplevel::State::Maximized);
                 state.size = size;
@@ -91,7 +91,7 @@ impl Toplevel {
     #[allow(dead_code)]
     pub fn resize(&self, size: Size<i32, Logical>) {
         match self {
-            Toplevel::Xdg(t) => {
+            WindowSurface::Xdg(t) => {
                 let res = t.with_pending_state(|state| {
                     state.size = Some(size);
                 });
@@ -100,7 +100,7 @@ impl Toplevel {
                 }
             }
             #[cfg(feature = "xwayland")]
-            Toplevel::X11(t) => t.resize(size.w as u32, size.h as u32),
+            WindowSurface::X11(t) => t.resize(size.w as u32, size.h as u32),
         };
     }
 }
@@ -113,7 +113,7 @@ pub struct Window {
     /// Used for the fast path of the check in `matching`, and as the fall-back for the window
     /// geometry if that's not set explicitly.
     bbox: Rectangle<i32, Logical>,
-    toplevel: Toplevel,
+    toplevel: WindowSurface,
 
     surface: Option<wl_surface::WlSurface>,
 
@@ -134,7 +134,7 @@ impl Window {
         self.bbox
     }
 
-    pub fn toplevel(&self) -> &Toplevel {
+    pub fn toplevel(&self) -> &WindowSurface {
         &self.toplevel
     }
 
@@ -149,7 +149,7 @@ impl Window {
 }
 
 impl Window {
-    pub fn new(toplevel: Toplevel, location: Point<i32, Logical>) -> Self {
+    pub fn new(toplevel: WindowSurface, location: Point<i32, Logical>) -> Self {
         let surface = toplevel.get_surface().cloned();
         let mut window = Window {
             location,

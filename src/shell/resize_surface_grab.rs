@@ -14,13 +14,13 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::Toplevel;
+use crate::desktop_layout::WindowSurface;
 
 use super::{ResizeEdge, ResizeState, SurfaceData};
 
 pub struct ResizeSurfaceGrab {
     pub start_data: GrabStartData,
-    pub toplevel: Toplevel,
+    pub toplevel: WindowSurface,
     pub edges: ResizeEdge,
     pub initial_window_size: Size<i32, Logical>,
     pub last_window_size: Size<i32, Logical>,
@@ -90,7 +90,7 @@ impl PointerGrab for ResizeSurfaceGrab {
         self.last_window_size = (new_window_width, new_window_height).into();
 
         match &self.toplevel {
-            Toplevel::Xdg(xdg) => {
+            WindowSurface::Xdg(xdg) => {
                 let ret = xdg.with_pending_state(|state| {
                     state.states.set(xdg_toplevel::State::Resizing);
                     state.size = Some(self.last_window_size);
@@ -100,7 +100,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                 }
             }
             #[cfg(feature = "xwayland")]
-            Toplevel::X11(_) => {
+            WindowSurface::X11(_) => {
                 // TODO: What to do here? Send the update via X11?
             }
         }
@@ -124,7 +124,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                 return;
             }
 
-            if let Toplevel::Xdg(xdg) = &self.toplevel {
+            if let WindowSurface::Xdg(xdg) = &self.toplevel {
                 let ret = xdg.with_pending_state(|state| {
                     state.states.unset(xdg_toplevel::State::Resizing);
                     state.size = Some(self.last_window_size);

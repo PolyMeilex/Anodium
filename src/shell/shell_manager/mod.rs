@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Mutex;
 
-use crate::desktop_layout::{Toplevel, Window};
+use crate::desktop_layout::{WindowSurface, Window};
 
 use super::not_mapped_list::NotMappedList;
 use super::SurfaceData;
@@ -24,14 +24,14 @@ pub enum ShellEvent {
     },
 
     ViewMove {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
         start_data: GrabStartData,
         seat: Seat,
         serial: Serial,
     },
 
     ViewResize {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
         start_data: GrabStartData,
         seat: Seat,
         edges: ResizeEdge,
@@ -39,29 +39,29 @@ pub enum ShellEvent {
     },
 
     ViewMaximize {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
     },
     ViewUnMaximize {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
     },
 
     ViewFullscreen {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
         output: Option<WlOutput>,
     },
     ViewUnFullscreen {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
     },
 
     ViewMinimize {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
     },
 
     //
     // Misc
     //
     ShowWindowMenu {
-        toplevel: Toplevel,
+        toplevel: WindowSurface,
         seat: Seat,
         serial: Serial,
         location: Point<i32, Logical>,
@@ -80,7 +80,7 @@ impl Inner {
 
             let toplevel = win.toplevel().clone();
             // send the initial configure if relevant
-            if let Toplevel::Xdg(ref toplevel) = toplevel {
+            if let WindowSurface::Xdg(ref toplevel) = toplevel {
                 let initial_configure_sent = compositor::with_states(surface, |states| {
                     states
                         .data_map
@@ -99,7 +99,7 @@ impl Inner {
             let size = win.geometry().size;
             if size.w != 0 && size.h != 0 {
                 match toplevel {
-                    Toplevel::Xdg(_) => {
+                    WindowSurface::Xdg(_) => {
                         let configured = compositor::with_states(surface, |states| {
                             states
                                 .data_map
@@ -120,7 +120,7 @@ impl Inner {
                         }
                     }
                     #[cfg(feature = "xwayland")]
-                    Toplevel::X11(_) => {
+                    WindowSurface::X11(_) => {
                         let pending = self.not_mapped_list.remove(&toplevel);
 
                         if let Some(window) = pending {

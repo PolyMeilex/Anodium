@@ -11,7 +11,7 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::Toplevel,
+    desktop_layout::WindowSurface,
     shell::{surface_data::ResizeState, MoveAfterResizeState, SurfaceData},
 };
 
@@ -25,7 +25,7 @@ impl Inner {
             //
             XdgRequest::NewToplevel { surface } => {
                 self.not_mapped_list
-                    .insert(Toplevel::Xdg(surface), Default::default());
+                    .insert(WindowSurface::Xdg(surface), Default::default());
             }
 
             XdgRequest::Move {
@@ -38,7 +38,7 @@ impl Inner {
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
                     (self.cb)(
                         ShellEvent::ViewMove {
-                            toplevel: Toplevel::Xdg(surface),
+                            toplevel: WindowSurface::Xdg(surface),
                             start_data,
                             seat,
                             serial,
@@ -58,7 +58,7 @@ impl Inner {
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
                     (self.cb)(
                         ShellEvent::ViewResize {
-                            toplevel: Toplevel::Xdg(surface),
+                            toplevel: WindowSurface::Xdg(surface),
                             start_data,
                             seat,
                             edges,
@@ -72,7 +72,7 @@ impl Inner {
             XdgRequest::Maximize { surface } => {
                 (self.cb)(
                     ShellEvent::ViewMaximize {
-                        toplevel: Toplevel::Xdg(surface),
+                        toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,
                 );
@@ -80,7 +80,7 @@ impl Inner {
             XdgRequest::UnMaximize { surface } => {
                 (self.cb)(
                     ShellEvent::ViewUnMaximize {
-                        toplevel: Toplevel::Xdg(surface),
+                        toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,
                 );
@@ -89,7 +89,7 @@ impl Inner {
             XdgRequest::Fullscreen { surface, output } => {
                 (self.cb)(
                     ShellEvent::ViewFullscreen {
-                        toplevel: Toplevel::Xdg(surface),
+                        toplevel: WindowSurface::Xdg(surface),
                         output,
                     },
                     ddata,
@@ -98,7 +98,7 @@ impl Inner {
             XdgRequest::UnFullscreen { surface } => {
                 (self.cb)(
                     ShellEvent::ViewUnFullscreen {
-                        toplevel: Toplevel::Xdg(surface),
+                        toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,
                 );
@@ -107,7 +107,7 @@ impl Inner {
             XdgRequest::Minimize { surface } => {
                 (self.cb)(
                     ShellEvent::ViewMinimize {
-                        toplevel: Toplevel::Xdg(surface),
+                        toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,
                 );
@@ -131,7 +131,7 @@ impl Inner {
             } => {
                 (self.cb)(
                     ShellEvent::ShowWindowMenu {
-                        toplevel: Toplevel::Xdg(surface),
+                        toplevel: WindowSurface::Xdg(surface),
                         seat: Seat::from_resource(&seat).unwrap(),
                         serial,
                         location,

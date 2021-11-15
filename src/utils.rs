@@ -5,7 +5,7 @@ use smithay::{
     wayland::shell::xdg::ToplevelSurface,
 };
 
-use crate::desktop_layout::Toplevel;
+use crate::desktop_layout::WindowSurface;
 
 pub trait AsWlSurface {
     fn as_surface(&self) -> Option<&WlSurface>;
@@ -17,7 +17,7 @@ impl AsWlSurface for WlSurface {
     }
 }
 
-impl AsWlSurface for Toplevel {
+impl AsWlSurface for WindowSurface {
     fn as_surface(&self) -> Option<&WlSurface> {
         self.get_surface()
     }

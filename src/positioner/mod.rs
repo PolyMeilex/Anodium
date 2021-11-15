@@ -11,7 +11,7 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{Toplevel, Window};
+use crate::desktop_layout::{WindowSurface, Window};
 
 pub mod floating;
 pub mod tiling;
@@ -20,11 +20,11 @@ pub mod universal;
 #[allow(unused)]
 pub trait Positioner: std::fmt::Debug {
     fn map_toplevel(&mut self, window: Window, reposition: bool);
-    fn unmap_toplevel(&mut self, toplevel: &Toplevel) -> Option<Window>;
+    fn unmap_toplevel(&mut self, toplevel: &WindowSurface) -> Option<Window>;
 
     fn move_request(
         &mut self,
-        toplevel: &Toplevel,
+        toplevel: &WindowSurface,
         seat: &Seat,
         serial: Serial,
         start_data: &GrabStartData,
@@ -32,7 +32,7 @@ pub trait Positioner: std::fmt::Debug {
 
     fn resize_request(
         &mut self,
-        toplevel: &Toplevel,
+        toplevel: &WindowSurface,
         seat: &Seat,
         serial: Serial,
         start_data: GrabStartData,
@@ -40,8 +40,8 @@ pub trait Positioner: std::fmt::Debug {
     ) {
     }
 
-    fn maximize_request(&mut self, toplevel: &Toplevel) {}
-    fn unmaximize_request(&mut self, toplevel: &Toplevel) {}
+    fn maximize_request(&mut self, toplevel: &WindowSurface) {}
+    fn unmaximize_request(&mut self, toplevel: &WindowSurface) {}
 
     fn with_windows_rev(&self, cb: &mut dyn FnMut(&Window));
 

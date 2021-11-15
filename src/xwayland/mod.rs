@@ -23,7 +23,7 @@ use x11rb::{
     rust_connection::{DefaultStream, RustConnection},
 };
 
-use crate::{desktop_layout::Toplevel, shell::not_mapped_list::NotMappedList, state::BackendState};
+use crate::{desktop_layout::WindowSurface, shell::not_mapped_list::NotMappedList, state::BackendState};
 
 impl BackendState {
     pub fn start_xwayland(&mut self) {
@@ -220,7 +220,7 @@ impl X11State {
         };
         self.window_map
             .borrow_mut()
-            .insert(Toplevel::X11(x11surface), location);
+            .insert(WindowSurface::X11(x11surface), location);
     }
 }
 

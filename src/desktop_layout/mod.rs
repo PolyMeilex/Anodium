@@ -24,7 +24,7 @@ pub mod popup;
 pub use popup::{Popup, PopupKind, PopupList};
 
 pub mod window;
-pub use window::{Toplevel, Window, WindowList};
+pub use window::{WindowSurface, Window, WindowList};
 
 mod layer_map;
 

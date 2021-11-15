@@ -7,7 +7,7 @@ use smithay::{
 
 use crate::utils::AsWlSurface;
 
-pub use super::{Toplevel, Window};
+pub use super::{WindowSurface, Window};
 
 #[derive(Default, Debug)]
 pub struct WindowList {

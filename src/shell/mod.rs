@@ -15,7 +15,7 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::Toplevel,
+    desktop_layout::WindowSurface,
     state::{Anodium, BackendState},
 };
 
@@ -84,7 +84,7 @@ impl Anodium {
 
                 let toplevel = win.toplevel().clone();
                 // send the initial configure if relevant
-                if let Toplevel::Xdg(ref toplevel) = toplevel {
+                if let WindowSurface::Xdg(ref toplevel) = toplevel {
                     let initial_configure_sent = with_states(surface, |states| {
                         states
                             .data_map
@@ -103,7 +103,7 @@ impl Anodium {
                 let size = win.geometry().size;
                 if size.w != 0 && size.h != 0 {
                     match toplevel {
-                        Toplevel::Xdg(_) => {
+                        WindowSurface::Xdg(_) => {
                             let configured = with_states(surface, |states| {
                                 states
                                     .data_map
@@ -125,7 +125,7 @@ impl Anodium {
                             }
                         }
                         #[cfg(feature = "xwayland")]
-                        Toplevel::X11(_) => {
+                        WindowSurface::X11(_) => {
                             let pending = not_mapped_list.remove(&toplevel);
 
                             if let Some(win) = pending {
