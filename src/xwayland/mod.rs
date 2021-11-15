@@ -1,10 +1,11 @@
 use std::{
     cell::RefCell, collections::HashMap, convert::TryFrom, os::unix::net::UnixStream, rc::Rc,
+    sync::Arc,
 };
 
 use smithay::{
     reexports::wayland_server::{protocol::wl_surface::WlSurface, Client},
-    utils::{Logical, Point},
+    utils::{x11rb::X11Source, Logical, Point},
     wayland::compositor::give_role,
 };
 
@@ -24,10 +25,6 @@ use x11rb::{
 
 use crate::{desktop_layout::Toplevel, shell::not_mapped_list::NotMappedList, state::BackendState};
 
-use x11rb_event_source::X11Source;
-
-mod x11rb_event_source;
-
 impl BackendState {
     pub fn start_xwayland(&mut self) {
         if let Err(e) = self.xwayland.start() {
@@ -41,12 +38,11 @@ impl BackendState {
         let wm = Rc::new(RefCell::new(wm));
         client.data_map().insert_if_missing(|| Rc::clone(&wm));
         self.handle
-            .insert_source(source, move |events, _, _| {
-                let mut wm = wm.borrow_mut();
-                for event in events.into_iter() {
-                    wm.handle_event(event, &client)?;
+            .insert_source(source, move |event, _, _| {
+                match wm.borrow_mut().handle_event(event, &client) {
+                    Ok(()) => {}
+                    Err(err) => error!("Error while handling X11 event: {}", err),
                 }
-                Ok(())
             })
             .unwrap();
     }
@@ -60,12 +56,13 @@ x11rb::atom_manager! {
     Atoms: AtomsCookie {
         WM_S0,
         WL_SURFACE_ID,
+        _ANVIL_CLOSE_CONNECTION,
     }
 }
 
 /// The actual runtime state of the XWayland integration.
 struct X11State {
-    conn: Rc<RustConnection>,
+    conn: Arc<RustConnection>,
     atoms: Atoms,
     unpaired_surfaces: HashMap<u32, (Window, Point<i32, Logical>)>,
     window_map: Rc<RefCell<NotMappedList>>,
@@ -113,15 +110,23 @@ impl X11State {
 
         conn.flush()?;
 
-        let conn = Rc::new(conn);
+        let conn = Arc::new(conn);
         let wm = Self {
-            conn: Rc::clone(&conn),
+            conn: Arc::clone(&conn),
             atoms,
             unpaired_surfaces: Default::default(),
             window_map,
         };
 
-        Ok((wm, X11Source::new(conn)))
+        Ok((
+            wm,
+            X11Source::new(
+                conn,
+                win,
+                atoms._ANVIL_CLOSE_CONNECTION,
+                slog_scope::logger(),
+            ),
+        ))
     }
 
     fn handle_event(&mut self, event: Event, client: &Client) -> Result<(), ReplyOrIdError> {
@@ -195,6 +200,7 @@ impl X11State {
             }
             _ => {}
         }
+        self.conn.flush()?;
         Ok(())
     }
 
@@ -236,7 +242,7 @@ pub fn commit_hook(surface: &WlSurface) {
 
 #[derive(Clone, Debug)]
 pub struct X11Surface {
-    conn: Rc<RustConnection>,
+    conn: Arc<RustConnection>,
     window: Window,
     surface: WlSurface,
 }

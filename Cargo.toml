@@ -27,7 +27,7 @@ rhai = "1.0.2"
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
 default-features = false
-features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog"]
+features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog", "x11rb_event_source"]
 
 [dependencies.x11rb]
 optional = true
