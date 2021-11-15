@@ -39,7 +39,7 @@ use crate::{
     desktop_layout::{DesktopLayout, Output},
     render::{self, renderer::RenderFrame},
     shell::init_shell,
-    shell::not_mapped_list::NotMappedList,
+    shell::{self, move_surface_grab::MoveSurfaceGrab, not_mapped_list::NotMappedList},
 };
 
 pub struct InputState {
@@ -243,7 +243,84 @@ impl BackendState {
 
         init_shm_global(&mut display.borrow_mut(), vec![], log.clone());
 
-        init_shell(display.clone(), log.clone());
+        use shell::shell_manager::{ShellEvent, ShellManager};
+
+        ShellManager::init_shell(&mut display.borrow_mut(), |event, mut ddata| {
+            let state = ddata.get::<BackendState>().unwrap();
+            match event {
+                ShellEvent::ViewCreated { window } => {
+                    let mut space = state.anodium.desktop_layout.borrow_mut();
+                    space.active_workspace().map_toplevel(window, true);
+                }
+
+                ShellEvent::ViewMove {
+                    toplevel,
+                    start_data,
+                    seat,
+                    serial,
+                } => {
+                    let mut desktop_layout = state.anodium.desktop_layout.borrow_mut();
+                    let pointer = seat.get_pointer().unwrap();
+
+                    if let Some(space) = desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                        if let Some(res) = space.move_request(&toplevel, &seat, serial, &start_data)
+                        {
+                            if let Some(window) = space.unmap_toplevel(&toplevel) {
+                                desktop_layout.grabed_window = Some(window);
+
+                                let grab = MoveSurfaceGrab {
+                                    start_data,
+                                    toplevel,
+                                    initial_window_location: res.initial_window_location,
+                                    desktop_layout: state.anodium.desktop_layout.clone(),
+                                };
+                                pointer.set_grab(grab, serial);
+                            }
+                        }
+                    }
+                }
+                ShellEvent::ViewResize {
+                    toplevel,
+                    start_data,
+                    seat,
+                    edges,
+                    serial,
+                } => {
+                    if let Some(space) = state
+                        .anodium
+                        .desktop_layout
+                        .borrow_mut()
+                        .find_workspace_by_surface_mut(&toplevel)
+                    {
+                        space.resize_request(&toplevel, &seat, serial, start_data, edges);
+                    }
+                }
+
+                ShellEvent::ViewMaximize { toplevel } => {
+                    if let Some(space) = state
+                        .anodium
+                        .desktop_layout
+                        .borrow_mut()
+                        .find_workspace_by_surface_mut(&toplevel)
+                    {
+                        space.maximize_request(&toplevel);
+                    }
+                }
+                ShellEvent::ViewUnMaximize { toplevel } => {
+                    if let Some(space) = state
+                        .anodium
+                        .desktop_layout
+                        .borrow_mut()
+                        .find_workspace_by_surface_mut(&toplevel)
+                    {
+                        space.unmaximize_request(&toplevel);
+                    }
+                }
+                _ => {}
+            }
+        });
+
+        // init_shell(display.clone(), log.clone());
 
         init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
 

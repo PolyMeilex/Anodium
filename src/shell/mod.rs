@@ -28,6 +28,8 @@ pub use surface_data::SurfaceData;
 pub use surface_data::{MoveAfterResizeData, MoveAfterResizeState};
 use surface_data::{ResizeData, ResizeEdge, ResizeState};
 
+pub mod shell_manager;
+
 mod xdg_shell;
 
 impl Anodium {
