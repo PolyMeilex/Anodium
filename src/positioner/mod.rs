@@ -1,9 +1,6 @@
 use smithay::{
     backend::input::{ButtonState, MouseButton},
-    reexports::{
-        wayland_protocols::xdg_shell::server::xdg_toplevel::ResizeEdge,
-        wayland_server::protocol::wl_surface::WlSurface,
-    },
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point, Rectangle},
     wayland::{
         seat::{GrabStartData, Seat},
@@ -11,7 +8,8 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{WindowSurface, Window};
+use crate::desktop_layout::{Window, WindowSurface};
+use crate::shell::surface_data::ResizeEdge;
 
 pub mod floating;
 pub mod tiling;

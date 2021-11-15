@@ -5,7 +5,8 @@ use smithay::{
 
 use super::{floating::Floating, tiling::Tiling, MoveResponse, Positioner};
 
-use crate::desktop_layout::{WindowSurface, Window};
+use crate::desktop_layout::{Window, WindowSurface};
+use crate::shell::surface_data::ResizeEdge;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -72,7 +73,7 @@ impl Positioner for Universal {
         seat: &smithay::wayland::seat::Seat,
         serial: smithay::wayland::Serial,
         start_data: smithay::wayland::seat::GrabStartData,
-        edges: smithay::reexports::wayland_protocols::xdg_shell::server::xdg_toplevel::ResizeEdge,
+        edges: ResizeEdge,
     ) {
         self.floating
             .resize_request(toplevel, seat, serial, start_data.clone(), edges);

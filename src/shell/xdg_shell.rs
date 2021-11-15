@@ -115,7 +115,7 @@ impl Anodium {
                     .borrow_mut()
                     .find_workspace_by_surface_mut(&toplevel)
                 {
-                    space.resize_request(&toplevel, &seat, serial, start_data, edges);
+                    space.resize_request(&toplevel, &seat, serial, start_data, edges.into());
                 }
             }
             XdgRequest::Maximize { surface } => {

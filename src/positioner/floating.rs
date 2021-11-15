@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use smithay::{
     backend::input,
     reexports::{
-        wayland_protocols::xdg_shell::server::xdg_toplevel::{self, ResizeEdge},
+        wayland_protocols::xdg_shell::server::xdg_toplevel,
         wayland_server::protocol::wl_surface::WlSurface,
     },
     utils::{Logical, Point, Rectangle},
@@ -15,10 +15,10 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::{WindowSurface, Window, WindowList},
+    desktop_layout::{Window, WindowList, WindowSurface},
     shell::{
         resize_surface_grab::ResizeSurfaceGrab,
-        surface_data::{ResizeData, ResizeState},
+        surface_data::{ResizeData, ResizeEdge, ResizeState},
         MoveAfterResizeData, MoveAfterResizeState, SurfaceData,
     },
 };

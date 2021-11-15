@@ -23,9 +23,10 @@ impl WindowList {
     pub fn refresh(&mut self) {
         self.windows.retain(|w| !w.animation().exited());
 
-        for w in self.windows.iter_mut() {
-            w.self_update();
-        }
+        // Note: Already updated in ShellManager::refresh
+        // for w in self.windows.iter_mut() {
+        //     w.self_update();
+        // }
     }
 
     pub fn surface_under(

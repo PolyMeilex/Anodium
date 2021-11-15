@@ -1,11 +1,10 @@
-use smithay::reexports::wayland_protocols::xdg_shell::server::xdg_toplevel::ResizeEdge;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
-use smithay::reexports::wayland_server::protocol::wl_surface::{self, WlSurface};
+use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{DispatchData, Display};
 use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor::{self, SurfaceAttributes, TraversalAction};
 use smithay::wayland::seat::{GrabStartData, Seat};
-use smithay::wayland::shell::xdg::{xdg_shell_init, XdgRequest, XdgToplevelSurfaceRoleAttributes};
+use smithay::wayland::shell::xdg::{xdg_shell_init, XdgToplevelSurfaceRoleAttributes};
 use smithay::wayland::Serial;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -14,7 +13,11 @@ use std::sync::Mutex;
 use crate::desktop_layout::{Window, WindowSurface};
 
 use super::not_mapped_list::NotMappedList;
-use super::SurfaceData;
+use super::surface_data::{ResizeData, ResizeEdge, ResizeState};
+use super::{MoveAfterResizeState, SurfaceData};
+
+mod window_list;
+use window_list::ShellWindowList;
 
 mod xdg;
 
@@ -71,6 +74,7 @@ pub enum ShellEvent {
 struct Inner {
     cb: Box<dyn FnMut(ShellEvent, DispatchData)>,
     not_mapped_list: NotMappedList,
+    windows: ShellWindowList,
 }
 
 impl Inner {
@@ -115,6 +119,7 @@ impl Inner {
                             let pending = self.not_mapped_list.remove(&toplevel);
 
                             if let Some(window) = pending {
+                                self.windows.push(window.clone());
                                 (self.cb)(ShellEvent::WindowCreated { window }, ddata);
                             }
                         }
@@ -124,6 +129,7 @@ impl Inner {
                         let pending = self.not_mapped_list.remove(&toplevel);
 
                         if let Some(window) = pending {
+                            self.windows.push(window.clone());
                             (self.cb)(ShellEvent::WindowCreated { window }, ddata);
                         }
                     }
@@ -161,98 +167,63 @@ impl Inner {
         self.try_map_unmaped(&surface, ddata);
 
         // Update maped windows
-        // {
-        // In visible workspaces
-        // for workspace in self.desktop_layout.borrow_mut().visible_workspaces_mut() {
-        //     if let Some(window) = workspace.find_window_mut(surface) {
-        //         window.self_update();
+        if let Some(window) = self.windows.find_mut(&surface) {
+            window.self_update();
 
-        //         let geometry = window.geometry();
-        //         let new_location = with_states(surface, |states| {
-        //             let mut data = states
-        //                 .data_map
-        //                 .get::<RefCell<SurfaceData>>()
-        //                 .unwrap()
-        //                 .borrow_mut();
+            let geometry = window.geometry();
+            let new_location = SurfaceData::with_mut(&surface, |data| {
+                let mut new_location = None;
 
-        //             let mut new_location = None;
+                // If the window is being resized by top or left, its location must be adjusted
+                // accordingly.
+                match data.resize_state {
+                    ResizeState::Resizing(resize_data)
+                    | ResizeState::WaitingForFinalAck(resize_data, _)
+                    | ResizeState::WaitingForCommit(resize_data) => {
+                        let ResizeData {
+                            edges,
+                            initial_window_location,
+                            initial_window_size,
+                        } = resize_data;
 
-        //             // If the window is being resized by top or left, its location must be adjusted
-        //             // accordingly.
-        //             match data.resize_state {
-        //                 ResizeState::Resizing(resize_data)
-        //                 | ResizeState::WaitingForFinalAck(resize_data, _)
-        //                 | ResizeState::WaitingForCommit(resize_data) => {
-        //                     let ResizeData {
-        //                         edges,
-        //                         initial_window_location,
-        //                         initial_window_size,
-        //                     } = resize_data;
+                        if edges.intersects(ResizeEdge::TOP_LEFT) {
+                            let mut location = window.location();
 
-        //                     if edges.intersects(ResizeEdge::TOP_LEFT) {
-        //                         let mut location = window.location();
+                            if edges.intersects(ResizeEdge::LEFT) {
+                                location.x = initial_window_location.x
+                                    + (initial_window_size.w - geometry.size.w);
+                            }
+                            if edges.intersects(ResizeEdge::TOP) {
+                                location.y = initial_window_location.y
+                                    + (initial_window_size.h - geometry.size.h);
+                            }
 
-        //                         if edges.intersects(ResizeEdge::LEFT) {
-        //                             location.x = initial_window_location.x
-        //                                 + (initial_window_size.w - geometry.size.w);
-        //                         }
-        //                         if edges.intersects(ResizeEdge::TOP) {
-        //                             location.y = initial_window_location.y
-        //                                 + (initial_window_size.h - geometry.size.h);
-        //                         }
+                            new_location = Some(location);
+                        }
+                    }
+                    ResizeState::NotResizing => (),
+                }
 
-        //                         new_location = Some(location);
-        //                     }
-        //                 }
-        //                 ResizeState::NotResizing => (),
-        //             }
+                // Finish resizing.
+                if let ResizeState::WaitingForCommit(_) = data.resize_state {
+                    data.resize_state = ResizeState::NotResizing;
+                }
 
-        //             // Finish resizing.
-        //             if let ResizeState::WaitingForCommit(_) = data.resize_state {
-        //                 data.resize_state = ResizeState::NotResizing;
-        //             }
+                // If the compositor requested MoveAfterReszie
+                if let MoveAfterResizeState::WaitingForCommit(mdata) = data.move_after_resize_state
+                {
+                    new_location = Some(mdata.target_window_location);
+                    data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
+                }
 
-        //             // If the compositor requested MoveAfterReszie
-        //             if let MoveAfterResizeState::WaitingForCommit(mdata) =
-        //                 data.move_after_resize_state
-        //             {
-        //                 new_location = Some(mdata.target_window_location);
-        //                 data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
-        //             }
+                new_location
+            })
+            .unwrap();
 
-        //             new_location
-        //         })
-        //         .unwrap();
-
-        //         if let Some(location) = new_location {
-        //             window.set_location(location);
-        //         }
-        //     }
-        // }
-
-        // Update currently grabed window
-        // if let Some(grab) = self.desktop_layout.borrow().grabed_window.as_ref() {
-        //     if let Some(s) = grab.toplevel().get_surface() {
-        //         if s == surface {
-        //             with_states(surface, |states| {
-        //                 let mut data = states
-        //                     .data_map
-        //                     .get::<RefCell<SurfaceData>>()
-        //                     .unwrap()
-        //                     .borrow_mut();
-
-        //                 // If the compositor requested MoveAfterReszie
-        //                 if let MoveAfterResizeState::WaitingForCommit(mdata) =
-        //                     data.move_after_resize_state
-        //                 {
-        //                     data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
-        //                 }
-        //             })
-        //             .unwrap();
-        //         }
-        //     }
-        // }
-        // }
+            if let Some(location) = new_location {
+                window.set_location(location);
+            }
+        }
 
         // TODO:
         // if let Some(popup) = self.window_map.borrow().popups().find(surface) {
@@ -302,7 +273,7 @@ impl Inner {
 }
 
 pub struct ShellManager {
-    _inner: Rc<RefCell<Inner>>,
+    inner: Rc<RefCell<Inner>>,
 }
 
 impl ShellManager {
@@ -314,6 +285,7 @@ impl ShellManager {
         let inner = Rc::new(RefCell::new(Inner {
             cb,
             not_mapped_list: Default::default(),
+            windows: Default::default(),
         }));
 
         // Create the compositor
@@ -338,6 +310,10 @@ impl ShellManager {
 
         // wlr_layer_shell_init(display, move |request, mut ddata| {}, slog_scope::logger());
 
-        Self { _inner: inner }
+        Self { inner }
+    }
+
+    pub fn refresh(&mut self) {
+        self.inner.borrow_mut().windows.refresh();
     }
 }

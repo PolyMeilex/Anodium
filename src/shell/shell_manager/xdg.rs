@@ -61,7 +61,7 @@ impl Inner {
                             toplevel: WindowSurface::Xdg(surface),
                             start_data,
                             seat,
-                            edges,
+                            edges: edges.into(),
                             serial,
                         },
                         ddata,
