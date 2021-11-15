@@ -27,7 +27,7 @@ rhai = "1.0.2"
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
 default-features = false
-features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog", "x11rb_event_source"]
+features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog" ]
 
 [dependencies.x11rb]
 optional = true
@@ -40,6 +40,5 @@ default = ["udev","winit", "xwayland"]
 # default = ["udev","winit"]
 winit = [ "smithay/backend_winit" ]
 udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_libseat", "input", "image", "xcursor" ]
-debug = [ "image/png"]
 
-xwayland = [ "smithay/xwayland", "x11rb" ]
+xwayland = [ "smithay/xwayland", "smithay/x11rb_event_source", "x11rb" ]
