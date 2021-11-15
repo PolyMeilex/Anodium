@@ -103,14 +103,6 @@ pub fn run_udev(
     state.primary_gpu = primary_gpu(&state.anodium.seat_name).unwrap_or_default();
     info!("Primary GPU: {:?}", state.primary_gpu);
 
-    // re-render timer
-    // event_loop
-    //     .handle()
-    //     .insert_source(render_timer, |(dev_id, crtc), _, state| {
-    //         state.udev_render(dev_id, Some(crtc))
-    //     })
-    //     .unwrap();
-
     /*
      * Initialize the udev backend
      */
@@ -151,7 +143,7 @@ pub fn run_udev(
     // TODO2: This does not necessarily depend on egl, but mesa makes no use of it without wl_drm right now
     {
         let mut formats = Vec::new();
-        for backend_data in state.backends.values() {
+        for backend_data in state.udev_devices.values() {
             formats.extend(backend_data.renderer.borrow().dmabuf_formats().cloned());
         }
 
@@ -160,7 +152,7 @@ pub fn run_udev(
             formats,
             |buffer, mut ddata| {
                 let anvil_state = ddata.get::<BackendState>().unwrap();
-                for backend_data in anvil_state.backends.values() {
+                for backend_data in anvil_state.udev_devices.values() {
                     if backend_data
                         .renderer
                         .borrow_mut()
@@ -205,7 +197,7 @@ pub fn run_udev(
 
 pub type RenderSurface = GbmBufferedSurface<SessionFd>;
 
-struct SurfaceData {
+struct OutputSurfaceData {
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
     fps: fps_ticker::Fps,
@@ -213,9 +205,9 @@ struct SurfaceData {
     imgui_pipeline: imgui_smithay_renderer::Renderer,
 }
 
-pub struct BackendData {
+pub struct UdevDeviceData {
     _restart_token: SignalToken,
-    surfaces: Rc<RefCell<HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>>>>,
+    surfaces: Rc<RefCell<HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>>>,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
     renderer: Rc<RefCell<Gles2Renderer>>,
     gbm: GbmDevice<SessionFd>,
@@ -232,7 +224,7 @@ fn scan_connectors(
     anodium: &mut Anodium,
     signaler: &Signaler<SessionSignal>,
     logger: &::slog::Logger,
-) -> HashMap<crtc::Handle, Rc<RefCell<SurfaceData>>> {
+) -> HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>> {
     // Get a set of all modesetting resource handles (excluding planes):
     let res_handles = drm.resource_handles().unwrap();
 
@@ -360,7 +352,7 @@ fn scan_connectors(
                         })
                         .unwrap();
 
-                    entry.insert(Rc::new(RefCell::new(SurfaceData {
+                    entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
                         fps: fps_ticker::Fps::default(),
@@ -515,9 +507,9 @@ impl BackendState {
                 );
             }
 
-            self.backends.insert(
+            self.udev_devices.insert(
                 dev_id,
-                BackendData {
+                UdevDeviceData {
                     _restart_token: restart_token,
                     registration_token,
                     event_dispatcher,
@@ -533,7 +525,7 @@ impl BackendState {
 
     fn device_changed(&mut self, device: dev_t, session_signal: &Signaler<SessionSignal>) {
         //quick and dirty, just re-init all backends
-        if let Some(ref mut backend_data) = self.backends.get_mut(&device) {
+        if let Some(ref mut backend_data) = self.udev_devices.get_mut(&device) {
             let logger = self.log.clone();
             let loop_handle = self.handle.clone();
             let signaler = session_signal.clone();
@@ -573,7 +565,7 @@ impl BackendState {
 
     fn device_removed(&mut self, device: dev_t) {
         // drop the backends on this side
-        if let Some(backend_data) = self.backends.remove(&device) {
+        if let Some(backend_data) = self.udev_devices.remove(&device) {
             // drop surfaces
             backend_data.surfaces.borrow_mut().clear();
             debug!("Surfaces dropped");
@@ -599,7 +591,7 @@ impl BackendState {
 
     // If crtc is `Some()`, render it, else render all crtcs
     fn udev_render(&mut self, dev_id: u64, crtc: Option<crtc::Handle>) {
-        let device_backend = match self.backends.get_mut(&dev_id) {
+        let device_backend = match self.udev_devices.get_mut(&dev_id) {
             Some(backend) => backend,
             None => {
                 error!("Trying to render on non-existent backend {}", dev_id);
@@ -615,12 +607,13 @@ impl BackendState {
             .iter()
             .flat_map(|crtc| surfaces.get(crtc).map(|surface| (crtc, surface)));
 
-        let to_render_iter: &mut dyn Iterator<Item = (&crtc::Handle, &Rc<RefCell<SurfaceData>>)> =
-            if crtc.is_some() {
-                &mut option_iter
-            } else {
-                &mut surfaces_iter
-            };
+        let to_render_iter: &mut dyn Iterator<
+            Item = (&crtc::Handle, &Rc<RefCell<OutputSurfaceData>>),
+        > = if crtc.is_some() {
+            &mut option_iter
+        } else {
+            &mut surfaces_iter
+        };
 
         for (&crtc, surface) in to_render_iter {
             // TODO get scale from the rendersurface when supporting HiDPI
@@ -644,7 +637,7 @@ impl BackendState {
                     texture
                 });
 
-            let result = self.anodium.render_surface(
+            let result = self.anodium.render_output_surface(
                 &mut *surface.borrow_mut(),
                 renderer,
                 device_backend.dev_id,
@@ -685,7 +678,7 @@ impl BackendState {
 }
 
 fn schedule_initial_render<Data: 'static>(
-    surface: Rc<RefCell<SurfaceData>>,
+    surface: Rc<RefCell<OutputSurfaceData>>,
     renderer: Rc<RefCell<Gles2Renderer>>,
     evt_handle: &LoopHandle<'static, Data>,
     logger: ::slog::Logger,
@@ -713,9 +706,9 @@ fn schedule_initial_render<Data: 'static>(
 
 impl Anodium {
     #[allow(clippy::too_many_arguments)]
-    fn render_surface(
+    fn render_output_surface(
         &mut self,
-        surface: &mut SurfaceData,
+        surface: &mut OutputSurfaceData,
         renderer: &mut Gles2Renderer,
         device_id: dev_t,
         crtc: crtc::Handle,

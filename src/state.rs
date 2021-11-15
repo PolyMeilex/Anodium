@@ -207,7 +207,7 @@ pub struct BackendState {
 
     // Backend
     pub primary_gpu: Option<PathBuf>,
-    pub backends: HashMap<dev_t, udev::BackendData>,
+    pub udev_devices: HashMap<dev_t, udev::UdevDeviceData>,
     pub pointer_image: crate::cursor::Cursor,
 
     pub log: slog::Logger,
@@ -364,7 +364,7 @@ impl BackendState {
             xwayland,
 
             primary_gpu: None,
-            backends: Default::default(),
+            udev_devices: Default::default(),
             pointer_image: crate::cursor::Cursor::load(&log),
         }
     }
