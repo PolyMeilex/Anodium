@@ -78,96 +78,9 @@ struct Inner {
 }
 
 impl Inner {
-    fn try_map_unmaped(&mut self, surface: &WlSurface, ddata: DispatchData) {
-        if let Some(win) = self.not_mapped_list.find_mut(surface) {
-            win.self_update();
-
-            let toplevel = win.toplevel().clone();
-            // send the initial configure if relevant
-            if let WindowSurface::Xdg(ref toplevel) = toplevel {
-                let initial_configure_sent = compositor::with_states(surface, |states| {
-                    states
-                        .data_map
-                        .get::<Mutex<XdgToplevelSurfaceRoleAttributes>>()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .initial_configure_sent
-                })
-                .unwrap();
-                if !initial_configure_sent {
-                    toplevel.send_configure();
-                }
-            }
-
-            let size = win.geometry().size;
-            if size.w != 0 && size.h != 0 {
-                match toplevel {
-                    WindowSurface::Xdg(_) => {
-                        let configured = compositor::with_states(surface, |states| {
-                            states
-                                .data_map
-                                .get::<Mutex<XdgToplevelSurfaceRoleAttributes>>()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
-                                .configured
-                        })
-                        .unwrap();
-
-                        if configured {
-                            let pending = self.not_mapped_list.remove(&toplevel);
-
-                            if let Some(window) = pending {
-                                self.windows.push(window.clone());
-                                (self.cb)(ShellEvent::WindowCreated { window }, ddata);
-                            }
-                        }
-                    }
-                    #[cfg(feature = "xwayland")]
-                    WindowSurface::X11(_) => {
-                        let pending = self.not_mapped_list.remove(&toplevel);
-
-                        if let Some(window) = pending {
-                            self.windows.push(window.clone());
-                            (self.cb)(ShellEvent::WindowCreated { window }, ddata);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn surface_commit(&mut self, surface: WlSurface, ddata: DispatchData) {
-        #[cfg(feature = "xwayland")]
-        crate::xwayland::commit_hook(&surface);
-
-        if !compositor::is_sync_subsurface(&surface) {
-            // Update the buffer of all child surfaces
-            compositor::with_surface_tree_upward(
-                &surface,
-                (),
-                |_, _, _| TraversalAction::DoChildren(()),
-                |_, states, _| {
-                    states
-                        .data_map
-                        .insert_if_missing(|| RefCell::new(SurfaceData::default()));
-                    let mut data = states
-                        .data_map
-                        .get::<RefCell<SurfaceData>>()
-                        .unwrap()
-                        .borrow_mut();
-                    data.update_buffer(&mut *states.cached_state.current::<SurfaceAttributes>());
-                },
-                |_, _, _| true,
-            );
-        }
-
-        // Map unmaped windows
-        self.try_map_unmaped(&surface, ddata);
-
-        // Update maped windows
-        if let Some(window) = self.windows.find_mut(&surface) {
+    // Try to updated mapped surface
+    fn try_update_maped(&mut self, surface: &WlSurface) {
+        if let Some(window) = self.windows.find_mut(surface) {
             window.self_update();
 
             let geometry = window.geometry();
@@ -224,6 +137,41 @@ impl Inner {
                 window.set_location(location);
             }
         }
+    }
+
+    fn surface_commit(&mut self, surface: WlSurface, ddata: DispatchData) {
+        #[cfg(feature = "xwayland")]
+        crate::xwayland::commit_hook(&surface);
+
+        if !compositor::is_sync_subsurface(&surface) {
+            // Update the buffer of all child surfaces
+            compositor::with_surface_tree_upward(
+                &surface,
+                (),
+                |_, _, _| TraversalAction::DoChildren(()),
+                |_, states, _| {
+                    states
+                        .data_map
+                        .insert_if_missing(|| RefCell::new(SurfaceData::default()));
+                    let mut data = states
+                        .data_map
+                        .get::<RefCell<SurfaceData>>()
+                        .unwrap()
+                        .borrow_mut();
+                    data.update_buffer(&mut *states.cached_state.current::<SurfaceAttributes>());
+                },
+                |_, _, _| true,
+            );
+        }
+
+        // Map unmaped windows
+        if let Some(window) = self.not_mapped_list.try_map(&surface) {
+            self.windows.push(window.clone());
+            (self.cb)(ShellEvent::WindowCreated { window }, ddata);
+        }
+
+        // Update maped windows
+        self.try_update_maped(&surface);
 
         // TODO:
         // if let Some(popup) = self.window_map.borrow().popups().find(surface) {

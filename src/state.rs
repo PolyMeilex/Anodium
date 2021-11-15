@@ -173,6 +173,77 @@ impl Anodium {
         Ok(())
     }
 
+    fn on_shell_event(&mut self, event: ShellEvent) {
+        //
+        match event {
+            ShellEvent::WindowCreated { window } => {
+                let mut space = self.desktop_layout.borrow_mut();
+                space.active_workspace().map_toplevel(window, true);
+            }
+
+            ShellEvent::WindowMove {
+                toplevel,
+                start_data,
+                seat,
+                serial,
+            } => {
+                let mut desktop_layout = self.desktop_layout.borrow_mut();
+                let pointer = seat.get_pointer().unwrap();
+
+                if let Some(space) = desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                    if let Some(res) = space.move_request(&toplevel, &seat, serial, &start_data) {
+                        if let Some(window) = space.unmap_toplevel(&toplevel) {
+                            desktop_layout.grabed_window = Some(window);
+
+                            let grab = MoveSurfaceGrab {
+                                start_data,
+                                toplevel,
+                                initial_window_location: res.initial_window_location,
+                                desktop_layout: self.desktop_layout.clone(),
+                            };
+                            pointer.set_grab(grab, serial);
+                        }
+                    }
+                }
+            }
+            ShellEvent::WindowResize {
+                toplevel,
+                start_data,
+                seat,
+                edges,
+                serial,
+            } => {
+                if let Some(space) = self
+                    .desktop_layout
+                    .borrow_mut()
+                    .find_workspace_by_surface_mut(&toplevel)
+                {
+                    space.resize_request(&toplevel, &seat, serial, start_data, edges);
+                }
+            }
+
+            ShellEvent::WindowMaximize { toplevel } => {
+                if let Some(space) = self
+                    .desktop_layout
+                    .borrow_mut()
+                    .find_workspace_by_surface_mut(&toplevel)
+                {
+                    space.maximize_request(&toplevel);
+                }
+            }
+            ShellEvent::WindowUnMaximize { toplevel } => {
+                if let Some(space) = self
+                    .desktop_layout
+                    .borrow_mut()
+                    .find_workspace_by_surface_mut(&toplevel)
+                {
+                    space.unmaximize_request(&toplevel);
+                }
+            }
+            _ => {}
+        }
+    }
+
     pub fn add_output<N, CB>(
         &mut self,
         name: N,
@@ -250,79 +321,7 @@ impl BackendState {
         let shell_manager =
             ShellManager::init_shell(&mut display.borrow_mut(), |event, mut ddata| {
                 let state = ddata.get::<BackendState>().unwrap();
-                match event {
-                    ShellEvent::WindowCreated { window } => {
-                        let mut space = state.anodium.desktop_layout.borrow_mut();
-                        space.active_workspace().map_toplevel(window, true);
-                    }
-
-                    ShellEvent::WindowMove {
-                        toplevel,
-                        start_data,
-                        seat,
-                        serial,
-                    } => {
-                        let mut desktop_layout = state.anodium.desktop_layout.borrow_mut();
-                        let pointer = seat.get_pointer().unwrap();
-
-                        if let Some(space) = desktop_layout.find_workspace_by_surface_mut(&toplevel)
-                        {
-                            if let Some(res) =
-                                space.move_request(&toplevel, &seat, serial, &start_data)
-                            {
-                                if let Some(window) = space.unmap_toplevel(&toplevel) {
-                                    desktop_layout.grabed_window = Some(window);
-
-                                    let grab = MoveSurfaceGrab {
-                                        start_data,
-                                        toplevel,
-                                        initial_window_location: res.initial_window_location,
-                                        desktop_layout: state.anodium.desktop_layout.clone(),
-                                    };
-                                    pointer.set_grab(grab, serial);
-                                }
-                            }
-                        }
-                    }
-                    ShellEvent::WindowResize {
-                        toplevel,
-                        start_data,
-                        seat,
-                        edges,
-                        serial,
-                    } => {
-                        if let Some(space) = state
-                            .anodium
-                            .desktop_layout
-                            .borrow_mut()
-                            .find_workspace_by_surface_mut(&toplevel)
-                        {
-                            space.resize_request(&toplevel, &seat, serial, start_data, edges);
-                        }
-                    }
-
-                    ShellEvent::WindowMaximize { toplevel } => {
-                        if let Some(space) = state
-                            .anodium
-                            .desktop_layout
-                            .borrow_mut()
-                            .find_workspace_by_surface_mut(&toplevel)
-                        {
-                            space.maximize_request(&toplevel);
-                        }
-                    }
-                    ShellEvent::WindowUnMaximize { toplevel } => {
-                        if let Some(space) = state
-                            .anodium
-                            .desktop_layout
-                            .borrow_mut()
-                            .find_workspace_by_surface_mut(&toplevel)
-                        {
-                            space.unmaximize_request(&toplevel);
-                        }
-                    }
-                    _ => {}
-                }
+                state.anodium.on_shell_event(event);
             });
 
         // init_shell(display.clone(), log.clone());

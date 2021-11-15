@@ -30,8 +30,6 @@ use surface_data::{ResizeData, ResizeEdge, ResizeState};
 
 pub mod shell_manager;
 
-mod xdg_shell;
-
 impl Anodium {
     fn wlr_layer_shell_request(&mut self, request: LayerShellRequest) {
         match request {
@@ -286,16 +284,6 @@ pub fn init_shell(display: Rc<RefCell<Display>>, log: ::slog::Logger) {
         move |surface, mut ddata| {
             let state = ddata.get::<BackendState>().unwrap();
             state.anodium.surface_commit(&surface);
-        },
-        log.clone(),
-    );
-
-    // init the xdg_shell
-    xdg_shell_init(
-        &mut *display.borrow_mut(),
-        move |request, mut dispatch_data| {
-            let state = dispatch_data.get::<BackendState>().unwrap();
-            state.anodium.xdg_shell_request(request);
         },
         log.clone(),
     );

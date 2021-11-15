@@ -1,4 +1,9 @@
+use std::sync::Mutex;
+
+use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
+use smithay::wayland::compositor;
+use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
 use crate::utils::AsWlSurface;
 
@@ -54,6 +59,60 @@ impl NotMappedList {
         } else {
             None
         }
+    }
+
+    pub fn try_map(&mut self, surface: &WlSurface) -> Option<Window> {
+        let toplevel = self.find_mut(surface).and_then(|win| {
+            win.self_update();
+
+            let toplevel = win.toplevel().clone();
+            // send the initial configure if relevant
+            if let WindowSurface::Xdg(ref toplevel) = toplevel {
+                let initial_configure_sent = compositor::with_states(surface, |states| {
+                    states
+                        .data_map
+                        .get::<Mutex<XdgToplevelSurfaceRoleAttributes>>()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .initial_configure_sent
+                })
+                .unwrap();
+                if !initial_configure_sent {
+                    toplevel.send_configure();
+                }
+            }
+
+            let size = win.geometry().size;
+            if size.w != 0 && size.h != 0 {
+                match toplevel {
+                    WindowSurface::Xdg(_) => {
+                        let configured = compositor::with_states(surface, |states| {
+                            states
+                                .data_map
+                                .get::<Mutex<XdgToplevelSurfaceRoleAttributes>>()
+                                .unwrap()
+                                .lock()
+                                .unwrap()
+                                .configured
+                        })
+                        .unwrap();
+
+                        if configured {
+                            Some(toplevel)
+                        } else {
+                            None
+                        }
+                    }
+                    #[cfg(feature = "xwayland")]
+                    WindowSurface::X11(_) => Some(toplevel),
+                }
+            } else {
+                None
+            }
+        });
+
+        toplevel.and_then(|toplevel| self.remove(&toplevel))
     }
 
     pub fn remove(&mut self, kind: &WindowSurface) -> Option<Window> {

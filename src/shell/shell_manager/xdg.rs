@@ -116,9 +116,15 @@ impl Inner {
             //
             // Popup
             //
-            XdgRequest::NewPopup { .. } => todo!(),
-            XdgRequest::Grab { .. } => todo!(),
-            XdgRequest::RePosition { .. } => todo!(),
+            XdgRequest::NewPopup { .. } => {
+                error!("TODO: NewPopup");
+            }
+            XdgRequest::Grab { .. } => {
+                error!("TODO: Popup Grab");
+            }
+            XdgRequest::RePosition { .. } => {
+                error!("TODO: Popup RePosition");
+            }
 
             //
             // Misc
@@ -190,6 +196,7 @@ impl Inner {
                     }
                 }
 
+                // Maximize / Fullscreen
                 SurfaceData::with_mut(&surface, |data| {
                     if let MoveAfterResizeState::WaitingForAck(mdata) = data.move_after_resize_state
                     {
