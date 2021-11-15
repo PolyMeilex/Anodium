@@ -79,7 +79,7 @@ struct Inner {
 
 impl Inner {
     // Try to updated mapped surface
-    fn try_update_maped(&mut self, surface: &WlSurface) {
+    fn try_update_mapped(&mut self, surface: &WlSurface) {
         if let Some(window) = self.windows.find_mut(surface) {
             window.self_update();
 
@@ -170,8 +170,8 @@ impl Inner {
             (self.cb)(ShellEvent::WindowCreated { window }, ddata);
         }
 
-        // Update maped windows
-        self.try_update_maped(&surface);
+        // Update mapped windows
+        self.try_update_mapped(&surface);
 
         // TODO:
         // if let Some(popup) = self.window_map.borrow().popups().find(surface) {
