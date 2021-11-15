@@ -61,17 +61,20 @@ impl Anodium {
 
         let modifiers_state = &mut self.input_state.modifiers_state;
         let suppressed_keys = &mut self.input_state.suppressed_keys;
+        let configvm = self.config.clone();
+
         self.input_state
             .keyboard
             .input(keycode, state, serial, time, |modifiers, handle| {
                 let keysym = handle.modified_sym();
 
+                let keysym_desc = ::xkbcommon::xkb::keysym_get_name(keysym);
+
                 debug!( "keysym";
                     "state" => format!("{:?}", state),
                     "mods" => format!("{:?}", modifiers),
-                    "keysym" => ::xkbcommon::xkb::keysym_get_name(keysym)
+                    "keysym" => &keysym_desc
                 );
-
                 *modifiers_state = *modifiers;
 
                 // If the key is pressed and triggered a action
@@ -84,12 +87,17 @@ impl Anodium {
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);
+                    } else {
+                        if crate::config::keyboard::key_action(&configvm, &keysym_desc, state) {
+                            suppressed_keys.push(keysym);
+                        }
                     }
 
                     action
                         .map(FilterResult::Intercept)
                         .unwrap_or(FilterResult::Forward)
                 } else {
+                    crate::config::keyboard::key_action(&configvm, &keysym_desc, state);
                     let suppressed = suppressed_keys.contains(&keysym);
                     if suppressed {
                         suppressed_keys.retain(|k| *k != keysym);

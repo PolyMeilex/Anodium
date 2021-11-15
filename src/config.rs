@@ -3,7 +3,11 @@ use std::rc::Rc;
 
 use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, Scope, AST};
 
+pub mod keyboard;
+mod log;
 mod output;
+mod system;
+
 use output::OutputConfig;
 use smithay::reexports::drm;
 
@@ -24,14 +28,20 @@ pub struct ConfigVM(Rc<RefCell<Inner>>);
 impl ConfigVM {
     pub fn new() -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
-        let ast = engine.compile(include_str!("../config.rhai"))?;
-        let scope = Scope::new();
+        let mut scope = Scope::new();
 
         engine.register_fn("rev", |array: Array| {
             array.into_iter().rev().collect::<Array>()
         });
 
         output::register(&mut engine);
+
+        keyboard::register(&mut engine);
+        log::register(&mut engine);
+        system::register(&mut engine);
+
+        let ast = engine.compile_file("config.rhai".into())?;
+        engine.eval_ast_with_scope(&mut scope, &ast)?;
 
         Ok(ConfigVM(Rc::new(RefCell::new(Inner {
             engine,
@@ -100,5 +110,14 @@ impl ConfigVM {
         let mode: Option<Mode> = result.try_cast();
         let id = mode.map(|m| m.id).unwrap_or(0);
         Ok(id)
+    }
+
+    pub fn execute_fn(&self, function: &str) {
+        let inner = &mut *self.0.borrow_mut();
+
+        inner
+            .engine
+            .call_fn_dynamic(&mut inner.scope, &inner.ast, false, function, None, [])
+            .unwrap();
     }
 }

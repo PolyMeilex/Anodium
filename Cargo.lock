@@ -44,6 +44,7 @@ dependencies = [
  "imgui",
  "imgui-smithay-renderer",
  "input",
+ "lazy_static",
  "rand",
  "rhai",
  "slog",
