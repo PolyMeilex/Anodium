@@ -389,11 +389,18 @@ impl BackendState {
         #[cfg(feature = "xwayland")]
         let xwayland = {
             let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), log.clone());
-            let ret = handle.insert_source(channel, |event, _, state| match event {
-                XWaylandEvent::Ready { connection, client } => {
-                    state.xwayland_ready(connection, client)
+
+            let ret = handle.insert_source(channel, {
+                let handle = handle.clone();
+                move |event, _, state| match event {
+                    XWaylandEvent::Ready { connection, client } => state
+                        .anodium
+                        .shell_manager
+                        .xwayland_ready(&handle, connection, client),
+                    XWaylandEvent::Exited => {
+                        error!("Xwayland crashed");
+                    }
                 }
-                XWaylandEvent::Exited => state.xwayland_exited(),
             });
             if let Err(e) = ret {
                 error!(

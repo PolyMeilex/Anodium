@@ -23,32 +23,13 @@ use x11rb::{
     rust_connection::{DefaultStream, RustConnection},
 };
 
-use crate::{desktop_layout::WindowSurface, shell::not_mapped_list::NotMappedList, state::BackendState};
+use crate::{desktop_layout::WindowSurface, state::BackendState};
 
 impl BackendState {
     pub fn start_xwayland(&mut self) {
         if let Err(e) = self.xwayland.start() {
             error!("Failed to start XWayland: {}", e);
         }
-    }
-
-    pub fn xwayland_ready(&mut self, connection: UnixStream, client: Client) {
-        let (wm, source) =
-            X11State::start_wm(connection, self.anodium.not_mapped_list.clone()).unwrap();
-        let wm = Rc::new(RefCell::new(wm));
-        client.data_map().insert_if_missing(|| Rc::clone(&wm));
-        self.handle
-            .insert_source(source, move |event, _, _| {
-                match wm.borrow_mut().handle_event(event, &client) {
-                    Ok(()) => {}
-                    Err(err) => error!("Error while handling X11 event: {}", err),
-                }
-            })
-            .unwrap();
-    }
-
-    pub fn xwayland_exited(&mut self) {
-        error!("Xwayland crashed");
     }
 }
 
@@ -61,18 +42,22 @@ x11rb::atom_manager! {
 }
 
 /// The actual runtime state of the XWayland integration.
-struct X11State {
+pub(super) struct X11State {
     conn: Arc<RustConnection>,
     atoms: Atoms,
     unpaired_surfaces: HashMap<u32, (Window, Point<i32, Logical>)>,
-    window_map: Rc<RefCell<NotMappedList>>,
+
+    on_new_window: Box<dyn FnMut(WindowSurface, /*location*/ Point<i32, Logical>)>,
 }
 
 impl X11State {
-    fn start_wm(
+    pub fn start_wm<F>(
         connection: UnixStream,
-        window_map: Rc<RefCell<NotMappedList>>,
-    ) -> Result<(Self, X11Source), Box<dyn std::error::Error>> {
+        on_new_window: F,
+    ) -> Result<(Self, X11Source), Box<dyn std::error::Error>>
+    where
+        F: FnMut(WindowSurface, Point<i32, Logical>) + 'static,
+    {
         // Create an X11 connection. XWayland only uses screen 0.
         let screen = 0;
         let stream = DefaultStream::from_unix_stream(connection)?;
@@ -115,7 +100,8 @@ impl X11State {
             conn: Arc::clone(&conn),
             atoms,
             unpaired_surfaces: Default::default(),
-            window_map,
+
+            on_new_window: Box::new(on_new_window),
         };
 
         Ok((
@@ -129,7 +115,7 @@ impl X11State {
         ))
     }
 
-    fn handle_event(&mut self, event: Event, client: &Client) -> Result<(), ReplyOrIdError> {
+    pub fn handle_event(&mut self, event: Event, client: &Client) -> Result<(), ReplyOrIdError> {
         debug!("X11: Got event {:?}", event);
         match event {
             Event::ConfigureRequest(r) => {
@@ -218,23 +204,21 @@ impl X11State {
             window,
             conn: self.conn.clone(),
         };
-        self.window_map
-            .borrow_mut()
-            .insert(WindowSurface::X11(x11surface), location);
+
+        (self.on_new_window)(WindowSurface::X11(x11surface), location);
     }
 }
 
 // Called when a WlSurface commits.
-pub fn commit_hook(surface: &WlSurface) {
+pub(super) fn commit_hook(surface: &WlSurface) {
     // Is this the Xwayland client?
     if let Some(client) = surface.as_ref().client() {
         if let Some(x11) = client.data_map().get::<Rc<RefCell<X11State>>>() {
-            let mut inner = x11.borrow_mut();
+            let mut x11 = x11.borrow_mut();
             // Is the surface among the unpaired surfaces (see comment next to WL_SURFACE_ID
             // handling above)
-            if let Some((window, location)) = inner.unpaired_surfaces.remove(&surface.as_ref().id())
-            {
-                inner.new_window(window, surface.clone(), location);
+            if let Some((window, location)) = x11.unpaired_surfaces.remove(&surface.as_ref().id()) {
+                x11.new_window(window, surface.clone(), location);
             }
         }
     }

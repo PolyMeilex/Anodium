@@ -14,9 +14,6 @@ mod backend;
 mod render;
 mod utils;
 
-#[cfg(feature = "xwayland")]
-mod xwayland;
-
 mod animations;
 mod desktop_layout;
 mod positioner;

@@ -16,7 +16,7 @@ use smithay::{
 };
 
 #[cfg(feature = "xwayland")]
-use crate::xwayland::X11Surface;
+use crate::shell::shell_manager::X11Surface;
 use crate::{
     animations::enter_exit::EnterExitAnimation,
     shell::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
