@@ -37,7 +37,7 @@ impl Inner {
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
                     (self.cb)(
-                        ShellEvent::ViewMove {
+                        ShellEvent::WindowMove {
                             toplevel: WindowSurface::Xdg(surface),
                             start_data,
                             seat,
@@ -57,7 +57,7 @@ impl Inner {
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
                     (self.cb)(
-                        ShellEvent::ViewResize {
+                        ShellEvent::WindowResize {
                             toplevel: WindowSurface::Xdg(surface),
                             start_data,
                             seat,
@@ -71,7 +71,7 @@ impl Inner {
 
             XdgRequest::Maximize { surface } => {
                 (self.cb)(
-                    ShellEvent::ViewMaximize {
+                    ShellEvent::WindowMaximize {
                         toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,
@@ -79,7 +79,7 @@ impl Inner {
             }
             XdgRequest::UnMaximize { surface } => {
                 (self.cb)(
-                    ShellEvent::ViewUnMaximize {
+                    ShellEvent::WindowUnMaximize {
                         toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,
@@ -88,7 +88,7 @@ impl Inner {
 
             XdgRequest::Fullscreen { surface, output } => {
                 (self.cb)(
-                    ShellEvent::ViewFullscreen {
+                    ShellEvent::WindowFullscreen {
                         toplevel: WindowSurface::Xdg(surface),
                         output,
                     },
@@ -97,7 +97,7 @@ impl Inner {
             }
             XdgRequest::UnFullscreen { surface } => {
                 (self.cb)(
-                    ShellEvent::ViewUnFullscreen {
+                    ShellEvent::WindowUnFullscreen {
                         toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,
@@ -106,7 +106,7 @@ impl Inner {
 
             XdgRequest::Minimize { surface } => {
                 (self.cb)(
-                    ShellEvent::ViewMinimize {
+                    ShellEvent::WindowMinimize {
                         toplevel: WindowSurface::Xdg(surface),
                     },
                     ddata,

@@ -11,7 +11,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Mutex;
 
-use crate::desktop_layout::{WindowSurface, Window};
+use crate::desktop_layout::{Window, WindowSurface};
 
 use super::not_mapped_list::NotMappedList;
 use super::SurfaceData;
@@ -19,18 +19,18 @@ use super::SurfaceData;
 mod xdg;
 
 pub enum ShellEvent {
-    ViewCreated {
+    WindowCreated {
         window: Window,
     },
 
-    ViewMove {
+    WindowMove {
         toplevel: WindowSurface,
         start_data: GrabStartData,
         seat: Seat,
         serial: Serial,
     },
 
-    ViewResize {
+    WindowResize {
         toplevel: WindowSurface,
         start_data: GrabStartData,
         seat: Seat,
@@ -38,22 +38,22 @@ pub enum ShellEvent {
         serial: Serial,
     },
 
-    ViewMaximize {
+    WindowMaximize {
         toplevel: WindowSurface,
     },
-    ViewUnMaximize {
+    WindowUnMaximize {
         toplevel: WindowSurface,
     },
 
-    ViewFullscreen {
+    WindowFullscreen {
         toplevel: WindowSurface,
         output: Option<WlOutput>,
     },
-    ViewUnFullscreen {
+    WindowUnFullscreen {
         toplevel: WindowSurface,
     },
 
-    ViewMinimize {
+    WindowMinimize {
         toplevel: WindowSurface,
     },
 
@@ -115,7 +115,7 @@ impl Inner {
                             let pending = self.not_mapped_list.remove(&toplevel);
 
                             if let Some(window) = pending {
-                                (self.cb)(ShellEvent::ViewCreated { window }, ddata);
+                                (self.cb)(ShellEvent::WindowCreated { window }, ddata);
                             }
                         }
                     }
@@ -124,7 +124,7 @@ impl Inner {
                         let pending = self.not_mapped_list.remove(&toplevel);
 
                         if let Some(window) = pending {
-                            (self.cb)(ShellEvent::ViewCreated { window }, ddata);
+                            (self.cb)(ShellEvent::WindowCreated { window }, ddata);
                         }
                     }
                 }

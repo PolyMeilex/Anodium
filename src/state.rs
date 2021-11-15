@@ -248,12 +248,12 @@ impl BackendState {
         ShellManager::init_shell(&mut display.borrow_mut(), |event, mut ddata| {
             let state = ddata.get::<BackendState>().unwrap();
             match event {
-                ShellEvent::ViewCreated { window } => {
+                ShellEvent::WindowCreated { window } => {
                     let mut space = state.anodium.desktop_layout.borrow_mut();
                     space.active_workspace().map_toplevel(window, true);
                 }
 
-                ShellEvent::ViewMove {
+                ShellEvent::WindowMove {
                     toplevel,
                     start_data,
                     seat,
@@ -279,7 +279,7 @@ impl BackendState {
                         }
                     }
                 }
-                ShellEvent::ViewResize {
+                ShellEvent::WindowResize {
                     toplevel,
                     start_data,
                     seat,
@@ -296,7 +296,7 @@ impl BackendState {
                     }
                 }
 
-                ShellEvent::ViewMaximize { toplevel } => {
+                ShellEvent::WindowMaximize { toplevel } => {
                     if let Some(space) = state
                         .anodium
                         .desktop_layout
@@ -306,7 +306,7 @@ impl BackendState {
                         space.maximize_request(&toplevel);
                     }
                 }
-                ShellEvent::ViewUnMaximize { toplevel } => {
+                ShellEvent::WindowUnMaximize { toplevel } => {
                     if let Some(space) = state
                         .anodium
                         .desktop_layout
