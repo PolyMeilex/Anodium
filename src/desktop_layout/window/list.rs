@@ -7,7 +7,7 @@ use smithay::{
 
 use crate::utils::AsWlSurface;
 
-pub use super::{WindowSurface, Window};
+pub use super::{Window, WindowSurface};
 
 #[derive(Default, Debug)]
 pub struct WindowList {
@@ -21,7 +21,7 @@ impl WindowList {
     }
 
     pub fn refresh(&mut self) {
-        self.windows.retain(|w| !w.animation.exited());
+        self.windows.retain(|w| !w.animation().exited());
 
         for w in self.windows.iter_mut() {
             w.self_update();
@@ -38,7 +38,7 @@ impl WindowList {
     pub fn bring_surface_to_top<S: AsWlSurface>(&mut self, surface: &S) {
         if let Some(surface) = surface.as_surface() {
             let found = self.windows.iter().enumerate().find(|(_, w)| {
-                w.toplevel
+                w.toplevel()
                     .get_surface()
                     .map(|s| s.as_ref().equals(surface.as_ref()))
                     .unwrap_or(false)
@@ -49,11 +49,11 @@ impl WindowList {
 
                 // Take activation away from all the windows
                 for window in self.windows.iter() {
-                    window.toplevel.set_activated(false);
+                    window.toplevel().set_activated(false);
                 }
 
                 // Give activation to our winner
-                winner.toplevel.set_activated(true);
+                winner.toplevel().set_activated(true);
 
                 self.windows.insert(0, winner);
             }
@@ -73,7 +73,7 @@ impl WindowList {
     pub fn find<S: AsWlSurface>(&self, surface: &S) -> Option<&Window> {
         surface.as_surface().and_then(|surface| {
             self.windows.iter().find_map(|w| {
-                if w.toplevel
+                if w.toplevel()
                     .get_surface()
                     .map(|s| s.as_ref().equals(surface.as_ref()))
                     .unwrap_or(false)
@@ -90,7 +90,7 @@ impl WindowList {
     pub fn find_mut<S: AsWlSurface>(&mut self, surface: &S) -> Option<&mut Window> {
         if let Some(surface) = surface.as_surface() {
             self.windows.iter_mut().find_map(|w| {
-                if w.toplevel
+                if w.toplevel()
                     .get_surface()
                     .map(|s| s.as_ref().equals(surface.as_ref()))
                     .unwrap_or(false)
@@ -109,7 +109,7 @@ impl WindowList {
     pub fn remove<S: AsWlSurface>(&mut self, surface: &S) -> Option<Window> {
         if let Some(surface) = surface.as_surface() {
             let id = self.windows.iter().enumerate().find_map(|(id, w)| {
-                if w.toplevel
+                if w.toplevel()
                     .get_surface()
                     .map(|s| s.as_ref().equals(surface.as_ref()))
                     .unwrap_or(false)

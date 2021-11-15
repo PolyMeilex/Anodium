@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use smithay::{
     reexports::{
@@ -105,8 +106,28 @@ impl WindowSurface {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Window {
+    inner: Rc<RefCell<Inner>>,
+}
+
+impl Window {
+    pub fn new(toplevel: WindowSurface, location: Point<i32, Logical>) -> Self {
+        let mut window = Window {
+            inner: Rc::new(RefCell::new(Inner {
+                location,
+                bbox: Default::default(),
+                toplevel,
+
+                animation: EnterExitAnimation::Enter(0.0),
+            })),
+        };
+        window.self_update();
+        window
+    }
+}
+#[derive(Debug)]
+struct Inner {
     location: Point<i32, Logical>,
     /// A bounding box over this window and its children.
     ///
@@ -115,60 +136,22 @@ pub struct Window {
     bbox: Rectangle<i32, Logical>,
     toplevel: WindowSurface,
 
-    surface: Option<wl_surface::WlSurface>,
-
     animation: EnterExitAnimation,
 }
 
-impl Window {
-    pub fn location(&self) -> Point<i32, Logical> {
-        self.location
-    }
-
+impl Inner {
     pub fn set_location(&mut self, location: Point<i32, Logical>) {
         self.location = location;
         self.self_update();
     }
-
-    pub fn bbox(&self) -> Rectangle<i32, Logical> {
-        self.bbox
-    }
-
-    pub fn toplevel(&self) -> &WindowSurface {
-        &self.toplevel
-    }
-
-    pub fn surface(&self) -> Option<wl_surface::WlSurface> {
-        self.surface.clone()
-    }
-
-    #[allow(dead_code)]
-    pub fn animation(&self) -> EnterExitAnimation {
-        self.animation
-    }
 }
 
-impl Window {
-    pub fn new(toplevel: WindowSurface, location: Point<i32, Logical>) -> Self {
-        let surface = toplevel.get_surface().cloned();
-        let mut window = Window {
-            location,
-            bbox: Default::default(),
-            toplevel,
-
-            surface,
-
-            animation: EnterExitAnimation::Enter(0.0),
-        };
-        window.self_update();
-        window
-    }
-
+impl Inner {
     pub fn maximize(&mut self, target_geometry: Rectangle<i32, Logical>) {
-        let initial_window_location = self.location();
+        let initial_window_location = self.location;
         let initial_size = self.geometry().size;
 
-        if let Some(wl_surface) = self.toplevel().get_surface() {
+        if let Some(wl_surface) = self.toplevel.get_surface() {
             with_states(wl_surface, |states| {
                 let surface_data = states.data_map.get::<RefCell<SurfaceData>>();
 
@@ -190,10 +173,10 @@ impl Window {
     }
 
     pub fn unmaximize(&mut self) {
-        let initial_window_location = self.location();
+        let initial_window_location = self.location;
         let initial_size = self.geometry().size;
 
-        let size = if let Some(surface) = self.toplevel().get_surface() {
+        let size = if let Some(surface) = self.toplevel.get_surface() {
             let fullscreen_state = with_states(surface, |states| {
                 let mut data = states
                     .data_map
@@ -358,7 +341,7 @@ impl Window {
     }
 
     pub fn update_animation(&mut self, delta: f64) {
-        self.animation.update(delta, self.toplevel().alive());
+        self.animation.update(delta, self.toplevel.alive());
     }
 
     pub fn render_location(&self) -> Point<i32, Logical> {
@@ -368,5 +351,73 @@ impl Window {
         location.y += (self.animation.value() * 1000.0) as i32;
 
         location
+    }
+}
+
+impl Window {
+    pub fn location(&self) -> Point<i32, Logical> {
+        self.inner.borrow().location
+    }
+
+    pub fn set_location(&mut self, location: Point<i32, Logical>) {
+        self.inner.borrow_mut().set_location(location)
+    }
+
+    pub fn bbox(&self) -> Rectangle<i32, Logical> {
+        self.inner.borrow().bbox
+    }
+
+    pub fn toplevel(&self) -> WindowSurface {
+        self.inner.borrow().toplevel.clone()
+    }
+
+    pub fn surface(&self) -> Option<wl_surface::WlSurface> {
+        self.inner.borrow().toplevel.get_surface().cloned()
+    }
+
+    pub fn animation(&self) -> EnterExitAnimation {
+        self.inner.borrow().animation
+    }
+}
+
+impl Window {
+    pub fn maximize(&mut self, target_geometry: Rectangle<i32, Logical>) {
+        self.inner.borrow_mut().maximize(target_geometry)
+    }
+
+    pub fn unmaximize(&mut self) {
+        self.inner.borrow_mut().unmaximize()
+    }
+
+    /// Finds the topmost surface under this point if any and returns it together with the location of this
+    /// surface.
+    pub fn matching(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(wl_surface::WlSurface, Point<i32, Logical>)> {
+        self.inner.borrow().matching(point)
+    }
+
+    pub fn self_update(&mut self) {
+        self.inner.borrow_mut().self_update()
+    }
+
+    /// Returns the geometry of this window.
+    pub fn geometry(&self) -> Rectangle<i32, Logical> {
+        self.inner.borrow().geometry()
+    }
+
+    /// Sends the frame callback to all the subsurfaces in this
+    /// window that requested it
+    pub fn send_frame(&self, time: u32) {
+        self.inner.borrow().send_frame(time)
+    }
+
+    pub fn update_animation(&mut self, delta: f64) {
+        self.inner.borrow_mut().update_animation(delta)
+    }
+
+    pub fn render_location(&self) -> Point<i32, Logical> {
+        self.inner.borrow().render_location()
     }
 }

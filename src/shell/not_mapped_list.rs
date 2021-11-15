@@ -2,7 +2,7 @@ use smithay::utils::{Logical, Point};
 
 use crate::utils::AsWlSurface;
 
-use crate::desktop_layout::window::{WindowSurface, Window};
+use crate::desktop_layout::window::{Window, WindowSurface};
 
 #[derive(Default)]
 pub struct NotMappedList {
@@ -58,7 +58,7 @@ impl NotMappedList {
 
     pub fn remove(&mut self, kind: &WindowSurface) -> Option<Window> {
         let id = self.windows.iter().enumerate().find_map(|(id, win)| {
-            if win.toplevel() == kind {
+            if &win.toplevel() == kind {
                 Some(id)
             } else {
                 None

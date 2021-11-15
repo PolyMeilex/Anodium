@@ -66,7 +66,7 @@ impl PopupList {
         point: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<i32, Logical>)> {
         for w in windows.iter() {
-            let parent = if let Some(parent) = w.toplevel().get_surface() {
+            let parent = if let Some(parent) = w.surface() {
                 parent
             } else {
                 continue;
@@ -78,7 +78,7 @@ impl PopupList {
             let mut res = None;
 
             self.with_child_popups(
-                parent,
+                &parent,
                 parent_location + parent_geometry.loc,
                 |p, initial_place| {
                     if res.is_none() {
