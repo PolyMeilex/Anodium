@@ -5,12 +5,15 @@ use smithay::reexports::wayland_server::{Client, DispatchData, Display};
 use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor::{self, SurfaceAttributes, TraversalAction};
 use smithay::wayland::seat::{GrabStartData, Seat};
-use smithay::wayland::shell::wlr_layer::{wlr_layer_shell_init, Layer, LayerSurfaceConfigure};
+use smithay::wayland::shell::wlr_layer::{
+    wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
+};
 use smithay::wayland::shell::xdg::xdg_shell_init;
 use smithay::wayland::Serial;
 use std::cell::RefCell;
 use std::os::unix::net::UnixStream;
 use std::rc::Rc;
+use std::sync::Mutex;
 
 use crate::desktop_layout::{LayerSurface, Window, WindowSurface};
 use crate::state::BackendState;
@@ -22,6 +25,9 @@ use super::{MoveAfterResizeState, SurfaceData};
 
 mod window_list;
 use window_list::ShellWindowList;
+
+mod layer_list;
+use layer_list::ShellLayerList;
 
 mod wlr_layer;
 mod xdg;
@@ -103,7 +109,7 @@ struct Inner {
     cb: Box<dyn FnMut(ShellEvent, DispatchData)>,
     not_mapped_list: NotMappedList,
     windows: ShellWindowList,
-    layers: Vec<LayerSurface>,
+    layers: ShellLayerList,
 }
 
 impl Inner {
@@ -226,31 +232,21 @@ impl Inner {
         //     }
         // }
 
-        // let found = self.desktop_layout.borrow().output_map.iter().any(|o| {
-        //     let layer = o.layer_map().find(surface);
-
-        //     if let Some(layer) = layer.as_ref() {
-        //         let initial_configure_sent = with_states(surface, |states| {
-        //             states
-        //                 .data_map
-        //                 .get::<Mutex<LayerSurfaceAttributes>>()
-        //                 .unwrap()
-        //                 .lock()
-        //                 .unwrap()
-        //                 .initial_configure_sent
-        //         })
-        //         .unwrap();
-        //         if !initial_configure_sent {
-        //             layer.surface.send_configure();
-        //         }
-        //     }
-
-        //     layer.is_some()
-        // });
-
-        // if found {
-        //     self.desktop_layout.borrow_mut().arrange_layers();
-        // }
+        if let Some(layer) = self.layers.find(&surface) {
+            let initial_configure_sent = compositor::with_states(&surface, |states| {
+                states
+                    .data_map
+                    .get::<Mutex<LayerSurfaceAttributes>>()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .initial_configure_sent
+            })
+            .unwrap();
+            if !initial_configure_sent {
+                layer.surface().send_configure();
+            }
+        }
 
         (self.cb)(ShellEvent::SurfaceCommit { surface }, ddata);
     }
@@ -328,5 +324,6 @@ impl ShellManager {
 
     pub fn refresh(&mut self) {
         self.inner.borrow_mut().windows.refresh();
+        self.inner.borrow_mut().layers.refresh();
     }
 }

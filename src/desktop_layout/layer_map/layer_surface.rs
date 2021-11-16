@@ -23,7 +23,7 @@ struct Inner {
     pub layer: wlr_layer::Layer,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LayerSurface {
     inner: Rc<RefCell<Inner>>,
 }

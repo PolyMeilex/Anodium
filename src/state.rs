@@ -19,13 +19,12 @@ use smithay::{
     },
     utils::{Logical, Point, Rectangle},
     wayland::{
-        compositor,
         data_device::{
             default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent,
         },
         output::{xdg::init_xdg_output_manager, PhysicalProperties},
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
-        shell::wlr_layer::{Layer, LayerSurfaceAttributes},
+        shell::wlr_layer::Layer,
         shm::init_shm_global,
         tablet_manager::{init_tablet_manager_global, TabletSeatTrait},
     },
@@ -254,27 +253,12 @@ impl Anodium {
             }
 
             ShellEvent::SurfaceCommit { surface } => {
-                let found = self.desktop_layout.borrow().output_map.iter().any(|o| {
-                    let layer = o.layer_map().find(&surface);
-
-                    if let Some(layer) = layer.as_ref() {
-                        let initial_configure_sent = compositor::with_states(&surface, |states| {
-                            states
-                                .data_map
-                                .get::<Mutex<LayerSurfaceAttributes>>()
-                                .unwrap()
-                                .lock()
-                                .unwrap()
-                                .initial_configure_sent
-                        })
-                        .unwrap();
-                        if !initial_configure_sent {
-                            layer.surface().send_configure();
-                        }
-                    }
-
-                    layer.is_some()
-                });
+                let found = self
+                    .desktop_layout
+                    .borrow()
+                    .output_map
+                    .iter()
+                    .any(|o| o.layer_map().find(&surface).is_some());
 
                 if found {
                     self.desktop_layout.borrow_mut().arrange_layers();

@@ -17,6 +17,9 @@ impl super::Inner {
             } => {
                 let surface = LayerSurface::new(surface, layer);
 
+                // TODO: Wait for first commit
+                self.layers.push(surface.clone());
+
                 (self.cb)(
                     ShellEvent::LayerCreated {
                         surface,

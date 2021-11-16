@@ -61,9 +61,10 @@ impl LayerMap {
     pub fn refresh(&mut self) {
         self.surfaces.retain(|l| l.surface().alive());
 
-        for l in self.surfaces.iter_mut() {
-            l.self_update();
-        }
+        // Note: Already updated in ShellManager::refresh
+        // for l in self.surfaces.iter_mut() {
+        //     l.self_update();
+        // }
     }
 
     #[allow(dead_code)]
