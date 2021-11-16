@@ -44,7 +44,6 @@ impl SurfaceData {
         .ok()?
     }
 
-    #[allow(unused)]
     pub fn with_mut<F, R>(surface: &WlSurface, cb: F) -> Option<R>
     where
         F: FnOnce(&mut SurfaceData) -> R,
@@ -58,7 +57,7 @@ impl SurfaceData {
                 None
             }
         })
-        .log_err("SurfaceData::with:")
+        .log_err("SurfaceData::with_mut:")
         .ok()?
     }
 }

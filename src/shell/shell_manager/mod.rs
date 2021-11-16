@@ -162,7 +162,7 @@ impl Inner {
 
                 new_location
             })
-            .unwrap();
+            .expect("Commited surface without SurfaceData");
 
             if let Some(location) = new_location {
                 window.set_location(location);

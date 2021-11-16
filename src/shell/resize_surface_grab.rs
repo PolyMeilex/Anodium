@@ -69,7 +69,7 @@ impl PointerGrab for ResizeSurfaceGrab {
             let data = states.cached_state.current::<SurfaceCachedState>();
             (data.min_size, data.max_size)
         })
-        .unwrap();
+        .expect("Can't resize surface");
 
         let min_width = min_size.w.max(1);
         let min_height = min_size.h.max(1);
@@ -133,33 +133,23 @@ impl PointerGrab for ResizeSurfaceGrab {
                     xdg.send_configure();
                 }
 
-                with_states(self.toplevel.get_surface().unwrap(), |states| {
-                    let mut data = states
-                        .data_map
-                        .get::<RefCell<SurfaceData>>()
-                        .unwrap()
-                        .borrow_mut();
+                SurfaceData::with_mut(self.toplevel.get_surface().unwrap(), |data| {
                     if let ResizeState::Resizing(resize_data) = data.resize_state {
                         data.resize_state = ResizeState::WaitingForFinalAck(resize_data, serial);
                     } else {
                         panic!("invalid resize state: {:?}", data.resize_state);
                     }
                 })
-                .unwrap();
+                .expect("Can't resize surface, lack of SurfaceData!");
             } else {
-                with_states(self.toplevel.get_surface().unwrap(), |states| {
-                    let mut data = states
-                        .data_map
-                        .get::<RefCell<SurfaceData>>()
-                        .unwrap()
-                        .borrow_mut();
+                SurfaceData::with_mut(self.toplevel.get_surface().unwrap(), |data| {
                     if let ResizeState::Resizing(resize_data) = data.resize_state {
                         data.resize_state = ResizeState::WaitingForCommit(resize_data);
                     } else {
                         panic!("invalid resize state: {:?}", data.resize_state);
                     }
                 })
-                .unwrap();
+                .expect("Can't resize surface, lack of SurfaceData!");
             }
         }
     }

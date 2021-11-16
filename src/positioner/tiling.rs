@@ -15,7 +15,7 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::{WindowSurface, Window, WindowList},
+    desktop_layout::{Window, WindowList, WindowSurface},
     shell::{MoveAfterResizeState, SurfaceData},
 };
 
@@ -118,18 +118,13 @@ impl Positioner for Tiling {
                         .contains(xdg_toplevel::State::Maximized)
                     {
                         let new_size = surface.get_surface().and_then(|surface| {
-                            let fullscreen_state = compositor::with_states(surface, |states| {
-                                let mut data = states
-                                    .data_map
-                                    .get::<RefCell<SurfaceData>>()
-                                    .unwrap()
-                                    .borrow_mut();
+                            let fullscreen_state = SurfaceData::with_mut(surface, |data| {
                                 let fullscreen_state = data.move_after_resize_state;
                                 data.move_after_resize_state = MoveAfterResizeState::None;
 
                                 fullscreen_state
                             })
-                            .unwrap();
+                            .expect("Can't move surface, lack of SurfaceData!");
 
                             if let MoveAfterResizeState::Current(data) = fullscreen_state {
                                 Some(data.initial_size)

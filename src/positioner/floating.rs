@@ -91,12 +91,7 @@ impl Positioner for Floating {
                         .contains(xdg_toplevel::State::Maximized)
                     {
                         let new_size = surface.get_surface().and_then(|surface| {
-                            compositor::with_states(surface, |states| {
-                                let mut data = states
-                                    .data_map
-                                    .get::<RefCell<SurfaceData>>()
-                                    .unwrap()
-                                    .borrow_mut();
+                            SurfaceData::with_mut(surface, |data| {
                                 let fullscreen_state = data.move_after_resize_state;
                                 data.move_after_resize_state = MoveAfterResizeState::None;
 
@@ -106,7 +101,7 @@ impl Positioner for Floating {
                                     None
                                 }
                             })
-                            .unwrap()
+                            .expect("Can't move surface, lack of SurfaceData!")
                         });
 
                         let fs_changed = surface.with_pending_state(|state| {
@@ -132,13 +127,7 @@ impl Positioner for Floating {
                                 target_window_location.x = (pointer_pos.x - w * p) as i32;
 
                                 if let Some(surface) = surface.get_surface() {
-                                    compositor::with_states(surface, |states| {
-                                        let mut data = states
-                                            .data_map
-                                            .get::<RefCell<SurfaceData>>()
-                                            .unwrap()
-                                            .borrow_mut();
-
+                                    SurfaceData::with_mut(surface, |data| {
                                         data.move_after_resize_state =
                                             MoveAfterResizeState::WaitingForAck(
                                                 MoveAfterResizeData {
@@ -150,7 +139,7 @@ impl Positioner for Floating {
                                                 },
                                             );
                                     })
-                                    .unwrap();
+                                    .expect("Can't move surface, lack of SurfaceData!");
                                 } else {
                                     target_window_location = pointer_pos.to_i32_round();
                                 }
@@ -180,30 +169,27 @@ impl Positioner for Floating {
             let initial_window_location = window.location();
             let initial_window_size = window.geometry().size;
 
-            compositor::with_states(toplevel.get_surface().unwrap(), move |states| {
-                states
-                    .data_map
-                    .get::<RefCell<SurfaceData>>()
-                    .unwrap()
-                    .borrow_mut()
-                    .resize_state = ResizeState::Resizing(ResizeData {
+            let is_ok = SurfaceData::with_mut(toplevel.get_surface().unwrap(), |data| {
+                data.resize_state = ResizeState::Resizing(ResizeData {
                     edges: edges.into(),
                     initial_window_location,
                     initial_window_size,
                 });
             })
-            .unwrap();
+            .is_some();
 
-            let grab = ResizeSurfaceGrab {
-                start_data,
-                toplevel: toplevel.clone(),
-                edges: edges.into(),
-                initial_window_size,
-                last_window_size: initial_window_size,
-            };
+            if is_ok {
+                let grab = ResizeSurfaceGrab {
+                    start_data,
+                    toplevel: toplevel.clone(),
+                    edges: edges.into(),
+                    initial_window_size,
+                    last_window_size: initial_window_size,
+                };
 
-            let pointer = seat.get_pointer().unwrap();
-            pointer.set_grab(grab, serial);
+                let pointer = seat.get_pointer().unwrap();
+                pointer.set_grab(grab, serial);
+            }
         };
     }
 

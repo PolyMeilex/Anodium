@@ -37,13 +37,7 @@ impl PointerGrab for MoveSurfaceGrab {
         if let Some(window) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
             if let Some(surface) = window.toplevel().get_surface() {
                 // Check if there is MoveAfterResize in progress
-                let started = compositor::with_states(surface, |states| {
-                    let data = states
-                        .data_map
-                        .get::<RefCell<SurfaceData>>()
-                        .unwrap()
-                        .borrow();
-
+                let started = SurfaceData::with(surface, |data| {
                     matches!(
                         &data.move_after_resize_state,
                         // If done
@@ -52,7 +46,7 @@ impl PointerGrab for MoveSurfaceGrab {
                         MoveAfterResizeState::None,
                     )
                 })
-                .unwrap();
+                .expect("Can't move surface, lack of SurfaceData!");
 
                 if started {
                     let new_location = self.initial_window_location.to_f64() + delta;
