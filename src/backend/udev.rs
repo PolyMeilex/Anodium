@@ -11,6 +11,8 @@ use std::{
 use image::ImageBuffer;
 use slog::Logger;
 
+use smithay::reexports::drm::control::connector;
+use smithay::reexports::wayland_server::DispatchData;
 use smithay::{
     backend::{
         allocator::dmabuf::Dmabuf,
@@ -63,8 +65,17 @@ use smithay::{
 };
 
 use super::session::AnodiumSession;
+use super::BackendEvent;
+use crate::desktop_layout::Output;
 use crate::state::Anodium;
 use crate::{render::renderer::RenderFrame, render::*, state::BackendState};
+
+struct Inner {
+    cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
+    display: Rc<RefCell<Display>>,
+}
+
+type InnerRc = Rc<RefCell<Inner>>;
 
 #[derive(Clone)]
 pub struct SessionFd(RawFd);
@@ -82,11 +93,19 @@ struct UdevOutputId {
 
 type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
 
-pub fn run_udev(
+pub fn run_udev<F>(
     display: Rc<RefCell<Display>>,
     event_loop: &mut EventLoop<'static, BackendState>,
-    log: Logger,
-) -> Result<BackendState, ()> {
+    cb: F,
+) -> Result<BackendState, ()>
+where
+    F: FnMut(BackendEvent, DispatchData) + 'static,
+{
+    let log = slog_scope::logger();
+    let inner = Rc::new(RefCell::new(Inner {
+        cb: Box::new(cb),
+        display: display.clone(),
+    }));
     /*
      * Initialize session
      */
@@ -135,7 +154,7 @@ pub fn run_udev(
         .insert_source(notifier, |(), &mut (), _anvil_state| {})
         .unwrap();
     for (dev, path) in udev_backend.device_list() {
-        state.device_added(dev, path.into(), &session_signal)
+        state.device_added(inner.clone(), dev, path.into(), &session_signal)
     }
 
     // init dmabuf support with format list from all gpus
@@ -170,21 +189,25 @@ pub fn run_udev(
 
     let _udev_event_source = event_loop
         .handle()
-        .insert_source(udev_backend, move |event, _, state| match event {
-            UdevEvent::Added { device_id, path } => {
-                state.device_added(device_id, path, &session_signal)
+        .insert_source(udev_backend, {
+            let inner = inner.clone();
+            move |event, _, state| match event {
+                UdevEvent::Added { device_id, path } => {
+                    state.device_added(inner.clone(), device_id, path, &session_signal)
+                }
+                UdevEvent::Changed { device_id } => {
+                    state.device_changed(inner.clone(), device_id, &session_signal)
+                }
+                UdevEvent::Removed { device_id } => state.device_removed(device_id),
             }
-            UdevEvent::Changed { device_id } => state.device_changed(device_id, &session_signal),
-            UdevEvent::Removed { device_id } => state.device_removed(device_id),
         })
         .map_err(|e| -> IoError { e.into() })
         .unwrap();
 
     /*
-     * Start XWayland if supported
+     * Start XWayland and Wayland Socket
      */
-    #[cfg(feature = "xwayland")]
-    state.start_xwayland();
+    state.start();
 
     // Cleanup stuff
 
@@ -203,6 +226,11 @@ struct OutputSurfaceData {
     fps: fps_ticker::Fps,
     imgui: Option<imgui::SuspendedContext>,
     imgui_pipeline: imgui_smithay_renderer::Renderer,
+
+    output_name: String,
+    mode: Mode,
+    connector_info: connector::Info,
+    crtc: crtc::Handle,
 }
 
 pub struct UdevDeviceData {
@@ -319,22 +347,22 @@ fn scan_connectors(
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 
-                    anodium.add_output(
-                        &output_name,
-                        PhysicalProperties {
-                            size: (phys_w as i32, phys_h as i32).into(),
-                            subpixel: wl_output::Subpixel::Unknown,
-                            make: "Smithay".into(),
-                            model: "Generic DRM".into(),
-                        },
-                        mode,
-                        |output| {
-                            output.userdata().insert_if_missing(|| UdevOutputId {
-                                crtc,
-                                device_id: drm.device_id(),
-                            });
-                        },
-                    );
+                    // anodium.add_output(
+                    //     &output_name,
+                    //     PhysicalProperties {
+                    //         size: (phys_w as i32, phys_h as i32).into(),
+                    //         subpixel: wl_output::Subpixel::Unknown,
+                    //         make: "Smithay".into(),
+                    //         model: "Generic DRM".into(),
+                    //     },
+                    //     mode,
+                    //     |output| {
+                    //         output.userdata().insert_if_missing(|| UdevOutputId {
+                    //             crtc,
+                    //             device_id: drm.device_id(),
+                    //         });
+                    //     },
+                    // );
 
                     let timer = Timer::new().unwrap();
 
@@ -358,6 +386,11 @@ fn scan_connectors(
                         fps: fps_ticker::Fps::default(),
                         imgui: Some(imgui.suspend()),
                         imgui_pipeline,
+
+                        output_name,
+                        mode,
+                        connector_info,
+                        crtc,
                     })));
 
                     handle
@@ -417,6 +450,7 @@ impl BackendState {
 
     fn device_added(
         &mut self,
+        inner: InnerRc,
         device_id: dev_t,
         path: PathBuf,
         session_signal: &Signaler<SessionSignal>,
@@ -461,7 +495,7 @@ impl BackendState {
                 }
             }
 
-            let outputs = Rc::new(RefCell::new(scan_connectors(
+            let outputs = scan_connectors(
                 self.handle.clone(),
                 &mut drm,
                 &gbm,
@@ -469,7 +503,51 @@ impl BackendState {
                 &mut self.anodium,
                 session_signal,
                 &self.log,
-            )));
+            );
+
+            {
+                let mut inner = inner.borrow_mut();
+
+                for output in outputs.values() {
+                    let output = {
+                        let display = inner.display.clone();
+                        let display = &mut *display.borrow_mut();
+
+                        let output = &*output.borrow();
+                        let crtc = output.crtc;
+
+                        let output = Output::new(
+                            &output.output_name,
+                            Default::default(),
+                            display,
+                            PhysicalProperties {
+                                size: (0, 0).into(),
+                                subpixel: wl_output::Subpixel::Unknown,
+                                make: "Smithay".into(),
+                                model: "Winit".into(),
+                            },
+                            output.mode,
+                            // TODO: output should always have a workspace
+                            "Unknown".into(),
+                            slog_scope::logger(),
+                        );
+
+                        output.userdata().insert_if_missing(|| UdevOutputId {
+                            crtc,
+                            device_id: drm.device_id(),
+                        });
+
+                        output
+                    };
+
+                    (inner.cb)(
+                        BackendEvent::OutputCreated { output },
+                        DispatchData::wrap(self),
+                    );
+                }
+            }
+
+            let outputs = Rc::new(RefCell::new(outputs));
 
             let dev_id = drm.device_id();
             let handle = self.handle.clone();
@@ -523,70 +601,79 @@ impl BackendState {
         }
     }
 
-    fn device_changed(&mut self, device: dev_t, session_signal: &Signaler<SessionSignal>) {
+    fn device_changed(
+        &mut self,
+        _inner: InnerRc,
+        _device: dev_t,
+        _session_signal: &Signaler<SessionSignal>,
+    ) {
+        error!("Udev device changed: unimplemented");
+
         //quick and dirty, just re-init all backends
-        if let Some(ref mut backend_data) = self.udev_devices.get_mut(&device) {
-            let logger = self.log.clone();
-            let loop_handle = self.handle.clone();
-            let signaler = session_signal.clone();
+        // if let Some(ref mut backend_data) = self.udev_devices.get_mut(&device) {
+        //     let logger = self.log.clone();
+        //     let loop_handle = self.handle.clone();
+        //     let signaler = session_signal.clone();
 
-            self.anodium.retain_outputs(|output| {
-                output
-                    .userdata()
-                    .get::<UdevOutputId>()
-                    .map(|id| id.device_id != device)
-                    .unwrap_or(true)
-            });
+        //     self.anodium.retain_outputs(|output| {
+        //         output
+        //             .userdata()
+        //             .get::<UdevOutputId>()
+        //             .map(|id| id.device_id != device)
+        //             .unwrap_or(true)
+        //     });
 
-            let mut source = backend_data.event_dispatcher.as_source_mut();
-            let mut backends = backend_data.surfaces.borrow_mut();
-            *backends = scan_connectors(
-                self.handle.clone(),
-                &mut *source,
-                &backend_data.gbm,
-                &mut *backend_data.renderer.borrow_mut(),
-                &mut self.anodium,
-                &signaler,
-                &logger,
-            );
+        //     let mut source = backend_data.event_dispatcher.as_source_mut();
+        //     let mut backends = backend_data.surfaces.borrow_mut();
+        //     *backends = scan_connectors(
+        //         self.handle.clone(),
+        //         &mut *source,
+        //         &backend_data.gbm,
+        //         &mut *backend_data.renderer.borrow_mut(),
+        //         &mut self.anodium,
+        //         &signaler,
+        //         &logger,
+        //     );
 
-            for renderer in backends.values() {
-                let logger = logger.clone();
-                // render first frame
-                schedule_initial_render(
-                    renderer.clone(),
-                    backend_data.renderer.clone(),
-                    &loop_handle,
-                    logger,
-                );
-            }
-        }
+        //     for renderer in backends.values() {
+        //         let logger = logger.clone();
+        //         // render first frame
+        //         schedule_initial_render(
+        //             renderer.clone(),
+        //             backend_data.renderer.clone(),
+        //             &loop_handle,
+        //             logger,
+        //         );
+        //     }
+        // }
     }
 
     fn device_removed(&mut self, device: dev_t) {
+        warn!("Udev device was removed: {}", device);
+        unimplemented!("Udev device_removed");
         // drop the backends on this side
-        if let Some(backend_data) = self.udev_devices.remove(&device) {
-            // drop surfaces
-            backend_data.surfaces.borrow_mut().clear();
-            debug!("Surfaces dropped");
+        // if let Some(backend_data) = self.udev_devices.remove(&device) {
+        //     // drop surfaces
+        //     backend_data.surfaces.borrow_mut().clear();
+        //     debug!("Surfaces dropped");
 
-            self.anodium.retain_outputs(|output| {
-                output
-                    .userdata()
-                    .get::<UdevOutputId>()
-                    .map(|id| id.device_id != device)
-                    .unwrap_or(true)
-            });
+        //     self.anodium.retain_outputs(|output| {
+        //         output
+        //             .userdata()
+        //             .get::<UdevOutputId>()
+        //             .map(|id| id.device_id != device)
+        //             .unwrap_or(true)
+        //     });
 
-            let _device = self.handle.remove(backend_data.registration_token);
-            let _device = backend_data.event_dispatcher.into_source_inner();
+        //     let _device = self.handle.remove(backend_data.registration_token);
+        //     let _device = backend_data.event_dispatcher.into_source_inner();
 
-            // don't use hardware acceleration anymore, if this was the primary gpu
-            if _device.dev_path().and_then(|path| path.canonicalize().ok()) == self.primary_gpu {
-                backend_data.renderer.borrow_mut().unbind_wl_display();
-            }
-            debug!("Dropping device");
-        }
+        //     // don't use hardware acceleration anymore, if this was the primary gpu
+        //     if _device.dev_path().and_then(|path| path.canonicalize().ok()) == self.primary_gpu {
+        //         backend_data.renderer.borrow_mut().unbind_wl_display();
+        //     }
+        //     debug!("Dropping device");
+        // }
     }
 
     // If crtc is `Some()`, render it, else render all crtcs

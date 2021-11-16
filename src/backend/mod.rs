@@ -9,26 +9,59 @@ use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
 use std::sync::atomic::Ordering;
 use std::{cell::RefCell, rc::Rc};
 
+use crate::desktop_layout::Output;
 use crate::state::BackendState;
 
+pub enum BackendEvent {
+    OutputCreated { output: Output },
+}
+
 #[cfg(feature = "winit")]
-pub fn winit(log: slog::Logger, event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
-    info!("Starting anvil with winit backend");
+pub fn winit(
+    _log: slog::Logger,
+    event_loop: &mut EventLoop<'static, BackendState>,
+) -> BackendState {
+    use crate::backend::session::AnodiumSession;
+
+    info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    if let Ok(state) = winit::run_winit(display, event_loop, log.clone()) {
-        state
-    } else {
-        panic!("Failed to initialize winit backend.");
-    }
+    let mut state = BackendState::init(
+        display.clone(),
+        event_loop.handle(),
+        AnodiumSession::new_winit(),
+        slog_scope::logger(),
+    );
+
+    winit::run_winit(
+        display,
+        &mut state,
+        event_loop,
+        |event, mut ddata| match event {
+            BackendEvent::OutputCreated { output } => {
+                let state = ddata.get::<BackendState>().unwrap();
+                state.anodium.add_output(output, |_| {});
+            }
+        },
+    )
+    .expect("Failed to initialize winit backend.");
+
+    info!("Winit initialized");
+
+    state
 }
 
 #[cfg(feature = "udev")]
 pub fn udev(log: slog::Logger, event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
-    info!("Starting anvil on a tty using udev");
+    info!("Starting Anodium on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    if let Ok(state) = udev::run_udev(display, event_loop, log.clone()) {
+    if let Ok(state) = udev::run_udev(display, event_loop, |event, mut ddata| match event {
+        BackendEvent::OutputCreated { output } => {
+            let state = ddata.get::<BackendState>().unwrap();
+            state.anodium.add_output(output, |_| {});
+        }
+    }) {
         state
     } else {
         panic!("Failed to initialize tty backend.");

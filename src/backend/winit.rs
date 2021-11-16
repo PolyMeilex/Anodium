@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering, time::Duration};
 
 use smithay::backend::winit::WinitEvent;
+use smithay::reexports::wayland_server::DispatchData;
 use smithay::{
     backend::renderer::{ImportDma, ImportEgl, Transform},
     reexports::calloop::timer::Timer,
@@ -21,23 +22,30 @@ use smithay::{
 use slog::Logger;
 
 use super::session::AnodiumSession;
+use super::BackendEvent;
 
+use crate::desktop_layout::Output;
 use crate::{render::renderer::RenderFrame, render::*, state::BackendState};
 
 pub const OUTPUT_NAME: &str = "winit";
 
 mod input;
 
-#[derive(Default)]
-pub struct WinitData {}
+struct WinitData {
+    cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
+}
 
-pub fn run_winit(
+pub fn run_winit<F>(
     display: Rc<RefCell<Display>>,
+    state: &mut BackendState,
     event_loop: &mut EventLoop<'static, BackendState>,
-    log: Logger,
-) -> Result<BackendState, ()> {
-    let (renderer, mut input) = winit::init(log.clone()).map_err(|err| {
-        slog::crit!(log, "Failed to initialize Winit backend: {}", err);
+    mut cb: F,
+) -> Result<(), ()>
+where
+    F: FnMut(BackendEvent, DispatchData),
+{
+    let (renderer, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
+        crit!("Failed to initialize Winit backend: {}", err);
     })?;
     let renderer = Rc::new(RefCell::new(renderer));
 
@@ -65,7 +73,7 @@ pub fn run_winit(
                     .import_dmabuf(buffer)
                     .is_ok()
             },
-            log.clone(),
+            slog_scope::logger(),
         );
     };
 
@@ -75,35 +83,37 @@ pub fn run_winit(
      * Initialize the globals
      */
 
-    let mut state = BackendState::init(
-        display,
-        event_loop.handle(),
-        AnodiumSession::new_winit(),
-        log.clone(),
-    );
-
     let mode = Mode {
         size,
         refresh: 60_000,
     };
 
-    state.anodium.add_output(
-        OUTPUT_NAME,
-        PhysicalProperties {
-            size: (0, 0).into(),
-            subpixel: wl_output::Subpixel::Unknown,
-            make: "Smithay".into(),
-            model: "Winit".into(),
+    cb(
+        BackendEvent::OutputCreated {
+            output: Output::new(
+                OUTPUT_NAME,
+                Default::default(),
+                &mut *display.borrow_mut(),
+                PhysicalProperties {
+                    size: (0, 0).into(),
+                    subpixel: wl_output::Subpixel::Unknown,
+                    make: "Smithay".into(),
+                    model: "Winit".into(),
+                },
+                mode,
+                // TODO: output should always have a workspace
+                "Unknown".into(),
+                slog_scope::logger(),
+            ),
         },
-        mode,
-        |_| {},
+        DispatchData::wrap(state),
     );
 
     let start_time = std::time::Instant::now();
 
-    #[cfg(feature = "xwayland")]
-    state.start_xwayland();
+    state.start();
 
+    info!("imgui!");
     let mut imgui = imgui::Context::create();
     {
         imgui.set_ini_filename(None);
@@ -221,5 +231,5 @@ pub fn run_winit(
         .unwrap();
     timer_handle.add_timeout(Duration::ZERO, ());
 
-    Ok(state)
+    Ok(())
 }

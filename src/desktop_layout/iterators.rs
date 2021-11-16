@@ -26,7 +26,7 @@ impl<'a> Iterator for VisibleWorkspaceIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.outputs.next().map(|output| {
             self.workspaces
-                .get(output.active_workspace())
+                .get(&output.active_workspace())
                 .unwrap()
                 .as_ref()
         })

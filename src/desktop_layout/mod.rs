@@ -176,7 +176,7 @@ impl DesktopLayout {
     pub fn update_workspaces_geometry(&mut self) {
         for output in self.output_map.iter() {
             let key = output.active_workspace();
-            if let Some(w) = self.workspaces.get_mut(key) {
+            if let Some(w) = self.workspaces.get_mut(&key) {
                 w.set_geometry(output.usable_geometry());
             }
         }
@@ -201,14 +201,8 @@ impl DesktopLayout {
 
 // Outputs
 impl DesktopLayout {
-    pub fn add_output<N, CB>(
-        &mut self,
-        name: N,
-        physical: PhysicalProperties,
-        mode: smithay::wayland::output::Mode,
-        after: CB,
-    ) where
-        N: AsRef<str>,
+    pub fn add_output<CB>(&mut self, mut output: Output, after: CB)
+    where
         CB: FnOnce(&Output),
     {
         let id = self.workspaces.len() + 1;
@@ -218,8 +212,9 @@ impl DesktopLayout {
             self.active_workspace = Some(id.clone());
         }
 
-        let output = self.output_map.add(name, physical, mode, id.clone());
-        after(output);
+        output.set_active_workspace(id.clone());
+        let output = self.output_map.add(output);
+        after(&output);
 
         let mut positioner = Universal::new(Default::default(), Default::default());
         positioner.set_geometry(output.usable_geometry());
@@ -232,7 +227,7 @@ impl DesktopLayout {
         self.output_map.update_by_name(Some(mode), None, name);
 
         let output = self.output_map.find_by_name(name).unwrap();
-        let space = self.workspaces.get_mut(output.active_workspace()).unwrap();
+        let space = self.workspaces.get_mut(&output.active_workspace()).unwrap();
         space.set_geometry(output.usable_geometry());
     }
 

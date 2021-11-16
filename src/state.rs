@@ -265,19 +265,11 @@ impl Anodium {
         }
     }
 
-    pub fn add_output<N, CB>(
-        &mut self,
-        name: N,
-        physical: PhysicalProperties,
-        mode: smithay::wayland::output::Mode,
-        after: CB,
-    ) where
-        N: AsRef<str>,
+    pub fn add_output<CB>(&mut self, output: Output, after: CB)
+    where
         CB: FnOnce(&Output),
     {
-        self.desktop_layout
-            .borrow_mut()
-            .add_output(name, physical, mode, after);
+        self.desktop_layout.borrow_mut().add_output(output, after);
     }
 
     pub fn retain_outputs<F>(&mut self, f: F)
@@ -348,16 +340,6 @@ impl BackendState {
         // init_shell(display.clone(), log.clone());
 
         init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
-
-        let socket_name = display
-            .borrow_mut()
-            .add_socket_auto()
-            .unwrap()
-            .into_string()
-            .unwrap();
-
-        info!( "Listening on wayland socket"; "name" => socket_name.clone());
-        ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
 
         // init data device
 
@@ -478,13 +460,27 @@ impl BackendState {
         }
     }
 
-    #[cfg(feature = "xwayland")]
-    pub fn start_xwayland(&mut self) {
-        use crate::utils::LogResult;
+    pub fn start(&mut self) {
+        let socket_name = self
+            .anodium
+            .display
+            .borrow_mut()
+            .add_socket_auto()
+            .unwrap()
+            .into_string()
+            .unwrap();
 
-        self.xwayland
-            .start()
-            .log_err("Failed to start XWayland:")
-            .ok();
+        info!("Listening on wayland socket"; "name" => socket_name.clone());
+        ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
+
+        #[cfg(feature = "xwayland")]
+        {
+            use crate::utils::LogResult;
+
+            self.xwayland
+                .start()
+                .log_err("Failed to start XWayland:")
+                .ok();
+        }
     }
 }
