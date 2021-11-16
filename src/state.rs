@@ -243,14 +243,11 @@ impl Anodium {
             }
 
             ShellEvent::LayerCreated {
-                surface,
-                output,
-                layer,
-                ..
+                surface, output, ..
             } => {
                 self.desktop_layout
                     .borrow_mut()
-                    .insert_layer(output, LayerSurface::new(surface, layer));
+                    .insert_layer(output, surface);
             }
             ShellEvent::LayerAckConfigure { .. } => {
                 self.desktop_layout.borrow_mut().arrange_layers();

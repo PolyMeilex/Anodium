@@ -2,6 +2,8 @@ use smithay::{
     reexports::wayland_server::DispatchData, wayland::shell::wlr_layer::LayerShellRequest,
 };
 
+use crate::desktop_layout::LayerSurface;
+
 use super::ShellEvent;
 
 impl super::Inner {
@@ -13,6 +15,8 @@ impl super::Inner {
                 layer,
                 namespace,
             } => {
+                let surface = LayerSurface::new(surface, layer);
+
                 (self.cb)(
                     ShellEvent::LayerCreated {
                         surface,

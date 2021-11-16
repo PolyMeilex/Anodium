@@ -5,16 +5,14 @@ use smithay::reexports::wayland_server::{Client, DispatchData, Display};
 use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor::{self, SurfaceAttributes, TraversalAction};
 use smithay::wayland::seat::{GrabStartData, Seat};
-use smithay::wayland::shell::wlr_layer::{
-    wlr_layer_shell_init, Layer, LayerSurface, LayerSurfaceConfigure,
-};
+use smithay::wayland::shell::wlr_layer::{wlr_layer_shell_init, Layer, LayerSurfaceConfigure};
 use smithay::wayland::shell::xdg::xdg_shell_init;
 use smithay::wayland::Serial;
 use std::cell::RefCell;
 use std::os::unix::net::UnixStream;
 use std::rc::Rc;
 
-use crate::desktop_layout::{Window, WindowSurface};
+use crate::desktop_layout::{LayerSurface, Window, WindowSurface};
 use crate::state::BackendState;
 use crate::utils::LogResult;
 
@@ -105,6 +103,7 @@ struct Inner {
     cb: Box<dyn FnMut(ShellEvent, DispatchData)>,
     not_mapped_list: NotMappedList,
     windows: ShellWindowList,
+    layers: Vec<LayerSurface>,
 }
 
 impl Inner {
@@ -266,6 +265,7 @@ impl ShellManager {
             cb,
             not_mapped_list: Default::default(),
             windows: Default::default(),
+            layers: Default::default(),
         }));
 
         // Create the compositor
