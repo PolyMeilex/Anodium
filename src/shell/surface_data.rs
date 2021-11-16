@@ -27,38 +27,36 @@ pub struct SurfaceData {
 }
 
 impl SurfaceData {
-    pub fn with<F, R>(surface: &WlSurface, cb: F) -> Option<R>
+    pub fn with<F, R>(surface: &WlSurface, cb: F) -> R
     where
         F: FnOnce(&SurfaceData) -> R,
     {
         compositor::with_states(surface, |states| {
-            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
-                let data = data.borrow();
-                Some(cb(&data))
-            } else {
-                warn!("Surface: {:?} does not have SurfaceData", surface);
-                None
-            }
+            let data = states
+                .data_map
+                .get::<RefCell<SurfaceData>>()
+                .expect("Surface does not have SurfaceData");
+
+            let data = data.borrow();
+            cb(&data)
         })
-        .log_err("SurfaceData::with:")
-        .ok()?
+        .expect("The surface is dead")
     }
 
-    pub fn with_mut<F, R>(surface: &WlSurface, cb: F) -> Option<R>
+    pub fn with_mut<F, R>(surface: &WlSurface, cb: F) -> R
     where
         F: FnOnce(&mut SurfaceData) -> R,
     {
         compositor::with_states(surface, |states| {
-            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
-                let mut data = data.borrow_mut();
-                Some(cb(&mut data))
-            } else {
-                warn!("Surface: {:?} does not have SurfaceData", surface);
-                None
-            }
+            let data = states
+                .data_map
+                .get::<RefCell<SurfaceData>>()
+                .expect("Surface does not have SurfaceData");
+
+            let mut data = data.borrow_mut();
+            cb(&mut data)
         })
-        .log_err("SurfaceData::with_mut:")
-        .ok()?
+        .expect("The surface is dead")
     }
 }
 

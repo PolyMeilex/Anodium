@@ -156,8 +156,7 @@ impl super::Inner {
                     } else {
                         None
                     }
-                })
-                .expect("Cant AckConfigure, lack of SurfaceData!");
+                });
 
                 if let Some(serial) = waiting_for_serial {
                     // When the resize grab is released the surface
@@ -192,8 +191,7 @@ impl super::Inner {
                             } else {
                                 unreachable!()
                             }
-                        })
-                        .expect("Cant AckConfigure, lack of SurfaceData!");
+                        });
                     }
                 }
 
@@ -204,8 +202,7 @@ impl super::Inner {
                         data.move_after_resize_state =
                             MoveAfterResizeState::WaitingForCommit(mdata);
                     }
-                })
-                .expect("Cant AckConfigure, lack of SurfaceData!");
+                });
             }
             _ => {}
         }

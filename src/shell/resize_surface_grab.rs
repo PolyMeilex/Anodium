@@ -139,8 +139,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                     } else {
                         panic!("invalid resize state: {:?}", data.resize_state);
                     }
-                })
-                .expect("Can't resize surface, lack of SurfaceData!");
+                });
             } else {
                 SurfaceData::with_mut(self.toplevel.get_surface().unwrap(), |data| {
                     if let ResizeState::Resizing(resize_data) = data.resize_state {
@@ -148,8 +147,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                     } else {
                         panic!("invalid resize state: {:?}", data.resize_state);
                     }
-                })
-                .expect("Can't resize surface, lack of SurfaceData!");
+                });
             }
         }
     }

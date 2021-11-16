@@ -101,7 +101,6 @@ impl Positioner for Floating {
                                     None
                                 }
                             })
-                            .expect("Can't move surface, lack of SurfaceData!")
                         });
 
                         let fs_changed = surface.with_pending_state(|state| {
@@ -138,8 +137,7 @@ impl Positioner for Floating {
                                                     target_size,
                                                 },
                                             );
-                                    })
-                                    .expect("Can't move surface, lack of SurfaceData!");
+                                    });
                                 } else {
                                     target_window_location = pointer_pos.to_i32_round();
                                 }
@@ -169,27 +167,24 @@ impl Positioner for Floating {
             let initial_window_location = window.location();
             let initial_window_size = window.geometry().size;
 
-            let is_ok = SurfaceData::with_mut(toplevel.get_surface().unwrap(), |data| {
+            SurfaceData::with_mut(toplevel.get_surface().unwrap(), |data| {
                 data.resize_state = ResizeState::Resizing(ResizeData {
                     edges: edges.into(),
                     initial_window_location,
                     initial_window_size,
                 });
-            })
-            .is_some();
+            });
 
-            if is_ok {
-                let grab = ResizeSurfaceGrab {
-                    start_data,
-                    toplevel: toplevel.clone(),
-                    edges: edges.into(),
-                    initial_window_size,
-                    last_window_size: initial_window_size,
-                };
+            let grab = ResizeSurfaceGrab {
+                start_data,
+                toplevel: toplevel.clone(),
+                edges: edges.into(),
+                initial_window_size,
+                last_window_size: initial_window_size,
+            };
 
-                let pointer = seat.get_pointer().unwrap();
-                pointer.set_grab(grab, serial);
-            }
+            let pointer = seat.get_pointer().unwrap();
+            pointer.set_grab(grab, serial);
         };
     }
 

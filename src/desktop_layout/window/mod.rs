@@ -176,7 +176,7 @@ impl Inner {
         }
 
         if let Some(surface) = self.toplevel.get_surface() {
-            let is_ok = SurfaceData::with_mut(surface, |data| {
+            SurfaceData::with_mut(surface, |data| {
                 data.move_after_resize_state =
                     MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
                         initial_window_location,
@@ -185,12 +185,9 @@ impl Inner {
                         target_window_location,
                         target_size,
                     });
-            })
-            .is_some();
+            });
 
-            if is_ok {
-                self.toplevel.maximize(target_geometry.size);
-            }
+            self.toplevel.maximize(target_geometry.size);
         }
     }
 
@@ -214,8 +211,7 @@ impl Inner {
                 }
 
                 fullscreen_state
-            })
-            .expect("Can not unmaximize surface, lack of surface data!");
+            });
 
             if let MoveAfterResizeState::Current(data) = fullscreen_state {
                 Some(data.initial_size)

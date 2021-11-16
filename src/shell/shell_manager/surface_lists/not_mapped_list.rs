@@ -84,8 +84,7 @@ impl NotMappedList {
                 }
             }
 
-            let has_buffer =
-                SurfaceData::with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+            let has_buffer = SurfaceData::with(surface, |data| data.buffer.is_some());
 
             if has_buffer {
                 match toplevel {

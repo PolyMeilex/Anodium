@@ -123,8 +123,7 @@ impl Positioner for Tiling {
                                 data.move_after_resize_state = MoveAfterResizeState::None;
 
                                 fullscreen_state
-                            })
-                            .expect("Can't move surface, lack of SurfaceData!");
+                            });
 
                             if let MoveAfterResizeState::Current(data) = fullscreen_state {
                                 Some(data.initial_size)

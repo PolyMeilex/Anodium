@@ -45,8 +45,7 @@ impl PointerGrab for MoveSurfaceGrab {
                         // Or if non-existent
                         MoveAfterResizeState::None,
                     )
-                })
-                .expect("Can't move surface, lack of SurfaceData!");
+                });
 
                 if started {
                     let new_location = self.initial_window_location.to_f64() + delta;
