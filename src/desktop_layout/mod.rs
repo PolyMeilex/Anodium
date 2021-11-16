@@ -118,12 +118,6 @@ impl DesktopLayout {
         None
     }
 
-    // pub fn bring_surface_to_top<S: AsWlSurface>(&mut self, surface: &S) {
-    //     for w in self.visible_workspaces() {
-    //         w.windows_mut().bring_surface_to_top(surface);
-    //     }
-    // }
-
     pub fn update(&mut self, delta: f64) {
         for (_, w) in self.workspaces.iter_mut() {
             w.update(delta);

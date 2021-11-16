@@ -36,28 +36,49 @@ impl WindowList {
         self.windows.iter().find_map(|w| w.matching(point))
     }
 
-    pub fn bring_surface_to_top<S: AsWlSurface>(&mut self, surface: &S) {
-        if let Some(surface) = surface.as_surface() {
-            let found = self.windows.iter().enumerate().find(|(_, w)| {
-                w.toplevel()
-                    .get_surface()
-                    .map(|s| s.as_ref().equals(surface.as_ref()))
-                    .unwrap_or(false)
-            });
+    fn bring_nth_window_to_top(&mut self, id: usize) {
+        let winner = self.windows.remove(id);
 
-            if let Some((id, _)) = found {
-                let winner = self.windows.remove(id);
+        // Take activation away from all the windows
+        for window in self.windows.iter() {
+            window.toplevel().set_activated(false);
+        }
 
-                // Take activation away from all the windows
-                for window in self.windows.iter() {
-                    window.toplevel().set_activated(false);
-                }
+        // Give activation to our winner
+        winner.toplevel().set_activated(true);
+        self.windows.insert(0, winner);
+    }
 
-                // Give activation to our winner
-                winner.toplevel().set_activated(true);
+    #[allow(unused)]
+    pub fn bring_surface_to_top(&mut self, surface: &WlSurface) {
+        let found = self.windows.iter().enumerate().find(|(_, w)| {
+            w.toplevel()
+                .get_surface()
+                .map(|s| s.as_ref().equals(surface.as_ref()))
+                .unwrap_or(false)
+        });
 
-                self.windows.insert(0, winner);
+        if let Some((id, _)) = found {
+            self.bring_nth_window_to_top(id);
+        }
+    }
+
+    pub fn get_surface_and_bring_to_top(
+        &mut self,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
+        let mut found = None;
+        for (i, w) in self.windows.iter().enumerate() {
+            if let Some(surface) = w.matching(point) {
+                found = Some((i, surface));
+                break;
             }
+        }
+        if let Some((id, surface)) = found {
+            self.bring_nth_window_to_top(id);
+            Some(surface)
+        } else {
+            None
         }
     }
 

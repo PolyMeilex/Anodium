@@ -226,10 +226,8 @@ impl Positioner for Floating {
     fn on_pointer_button(&mut self, button: input::MouseButton, state: input::ButtonState) {
         if let input::MouseButton::Left = button {
             if let input::ButtonState::Pressed = state {
-                let under = self.windows.surface_under(self.pointer_position);
-                if let Some(under) = under {
-                    self.windows.bring_surface_to_top(&under.0);
-                }
+                self.windows
+                    .get_surface_and_bring_to_top(self.pointer_position);
             }
         };
     }
