@@ -15,7 +15,7 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::{Toplevel, Window, WindowList},
+    desktop_layout::{WindowSurface, Window, WindowList},
     shell::{MoveAfterResizeState, SurfaceData},
 };
 
@@ -77,7 +77,7 @@ impl Tiling {
 
 impl Positioner for Tiling {
     fn map_toplevel(&mut self, window: Window, mut reposition: bool) {
-        if let Toplevel::Xdg(toplevel) = window.toplevel() {
+        if let WindowSurface::Xdg(toplevel) = window.toplevel() {
             if let Some(state) = toplevel.current_state() {
                 if state.states.contains(xdg_toplevel::State::Maximized)
                     || state.states.contains(xdg_toplevel::State::Fullscreen)
@@ -94,13 +94,13 @@ impl Positioner for Tiling {
         }
     }
 
-    fn unmap_toplevel(&mut self, toplevel: &Toplevel) -> Option<Window> {
+    fn unmap_toplevel(&mut self, toplevel: &WindowSurface) -> Option<Window> {
         self.windows.remove(toplevel)
     }
 
     fn move_request(
         &mut self,
-        toplevel: &Toplevel,
+        toplevel: &WindowSurface,
         seat: &Seat,
         _serial: Serial,
         _start_data: &GrabStartData,
@@ -111,7 +111,7 @@ impl Positioner for Tiling {
             let mut initial_window_location = window.location();
 
             // If surface is maximized then unmaximize it
-            if let Toplevel::Xdg(ref surface) = toplevel {
+            if let WindowSurface::Xdg(ref surface) = toplevel {
                 if let Some(current_state) = surface.current_state() {
                     if current_state
                         .states

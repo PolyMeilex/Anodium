@@ -257,14 +257,14 @@ impl Anodium {
                 .layer_map()
                 .with_layers_from_bottom_to_top(&layer, |layer_surface| {
                     // skip layers that do not overlap with a given output
-                    if !output_rect.overlaps(layer_surface.bbox) {
+                    if !output_rect.overlaps(layer_surface.bbox()) {
                         return;
                     }
 
-                    let mut initial_place: Point<i32, Logical> = layer_surface.location;
+                    let mut initial_place: Point<i32, Logical> = layer_surface.location();
                     initial_place.x -= output_rect.loc.x;
 
-                    if let Some(wl_surface) = layer_surface.surface.get_surface() {
+                    if let Some(wl_surface) = layer_surface.surface().get_surface() {
                         // this surface is a root of a subsurface tree that needs to be drawn
                         if let Err(err) =
                             draw_surface_tree(frame, wl_surface, initial_place, output_scale)

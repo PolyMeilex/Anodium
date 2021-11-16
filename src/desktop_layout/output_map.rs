@@ -6,15 +6,12 @@ use smithay::{
         Display, Global, UserDataMap,
     },
     utils::{Logical, Point, Rectangle, Size},
-    wayland::{
-        output::{self, Mode, PhysicalProperties},
-        shell::wlr_layer,
-    },
+    wayland::output::{self, Mode, PhysicalProperties},
 };
 
 use crate::config::ConfigVM;
 
-use super::layer_map::LayerMap;
+use super::layer_map::{LayerMap, LayerSurface};
 
 #[derive(Debug)]
 
@@ -337,20 +334,15 @@ impl OutputMap {
         }
     }
 
-    pub(super) fn insert_layer(
-        &mut self,
-        output: Option<WlOutput>,
-        surface: wlr_layer::LayerSurface,
-        layer: wlr_layer::Layer,
-    ) {
+    pub(super) fn insert_layer(&mut self, output: Option<WlOutput>, layer: LayerSurface) {
         let output =
             output.and_then(|output| self.outputs.iter_mut().find(|o| o.output.owns(&output)));
 
         if let Some(output) = output {
-            output.layer_map.insert(surface, layer);
+            output.layer_map.insert(layer);
             output.layer_map.arange(output.geometry());
         } else if let Some(output) = self.outputs.get_mut(0) {
-            output.layer_map.insert(surface, layer);
+            output.layer_map.insert(layer);
             output.layer_map.arange(output.geometry());
         }
     }

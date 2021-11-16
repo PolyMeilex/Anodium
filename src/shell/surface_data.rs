@@ -1,15 +1,19 @@
+use std::cell::RefCell;
+
 use smithay::{
     backend::renderer::buffer_dimensions,
     reexports::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
-        wayland_server::protocol::{wl_buffer, wl_shell_surface},
+        wayland_server::protocol::{wl_buffer, wl_shell_surface, wl_surface::WlSurface},
     },
     utils::{Logical, Physical, Point, Rectangle, Size},
     wayland::{
-        compositor::{BufferAssignment, SurfaceAttributes},
+        compositor::{self, BufferAssignment, SurfaceAttributes},
         Serial,
     },
 };
+
+use crate::utils::LogResult;
 
 #[derive(Default)]
 pub struct SurfaceData {
@@ -20,6 +24,43 @@ pub struct SurfaceData {
     pub move_after_resize_state: MoveAfterResizeState,
     pub buffer_dimensions: Option<Size<i32, Physical>>,
     pub buffer_scale: i32,
+}
+
+impl SurfaceData {
+    pub fn with<F, R>(surface: &WlSurface, cb: F) -> Option<R>
+    where
+        F: FnOnce(&SurfaceData) -> R,
+    {
+        compositor::with_states(surface, |states| {
+            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
+                let data = data.borrow();
+                Some(cb(&data))
+            } else {
+                warn!("Surface: {:?} does not have SurfaceData", surface);
+                None
+            }
+        })
+        .log_err("SurfaceData::with:")
+        .ok()?
+    }
+
+    #[allow(unused)]
+    pub fn with_mut<F, R>(surface: &WlSurface, cb: F) -> Option<R>
+    where
+        F: FnOnce(&mut SurfaceData) -> R,
+    {
+        compositor::with_states(surface, |states| {
+            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
+                let mut data = data.borrow_mut();
+                Some(cb(&mut data))
+            } else {
+                warn!("Surface: {:?} does not have SurfaceData", surface);
+                None
+            }
+        })
+        .log_err("SurfaceData::with:")
+        .ok()?
+    }
 }
 
 impl SurfaceData {
