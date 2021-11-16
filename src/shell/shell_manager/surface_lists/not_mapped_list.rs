@@ -129,4 +129,8 @@ impl NotMappedList {
 
         id.map(|id| self.windows.remove(id))
     }
+
+    pub fn refresh(&mut self) {
+        self.windows.retain(|w| w.toplevel().alive());
+    }
 }

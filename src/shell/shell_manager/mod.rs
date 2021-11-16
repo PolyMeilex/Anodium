@@ -19,15 +19,11 @@ use crate::desktop_layout::{LayerSurface, Window, WindowSurface};
 use crate::state::BackendState;
 use crate::utils::LogResult;
 
-use super::not_mapped_list::NotMappedList;
 use super::surface_data::{ResizeData, ResizeEdge, ResizeState};
 use super::{MoveAfterResizeState, SurfaceData};
 
-mod window_list;
-use window_list::ShellWindowList;
-
-mod layer_list;
-use layer_list::ShellLayerList;
+mod surface_lists;
+use surface_lists::{NotMappedList, ShellLayerList, ShellWindowList};
 
 mod wlr_layer;
 mod xdg;
@@ -325,5 +321,6 @@ impl ShellManager {
     pub fn refresh(&mut self) {
         self.inner.borrow_mut().windows.refresh();
         self.inner.borrow_mut().layers.refresh();
+        self.inner.borrow_mut().not_mapped_list.refresh();
     }
 }

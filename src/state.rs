@@ -40,7 +40,6 @@ use crate::{
     render::{self, renderer::RenderFrame},
     shell::{
         move_surface_grab::MoveSurfaceGrab,
-        not_mapped_list::NotMappedList,
         shell_manager::{ShellEvent, ShellManager},
     },
 };
@@ -58,8 +57,6 @@ pub struct InputState {
 pub struct Anodium {
     pub running: Arc<AtomicBool>,
     pub display: Rc<RefCell<Display>>,
-
-    pub not_mapped_list: Rc<RefCell<NotMappedList>>,
 
     pub shell_manager: ShellManager,
     pub desktop_layout: Rc<RefCell<DesktopLayout>>,
@@ -451,8 +448,6 @@ impl BackendState {
                 ))),
 
                 display,
-                not_mapped_list: Default::default(),
-
                 dnd_icon,
 
                 input_state: InputState {
