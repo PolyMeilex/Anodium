@@ -5,6 +5,9 @@ use smithay::reexports::wayland_server::{Client, DispatchData, Display};
 use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor::{self, SurfaceAttributes, TraversalAction};
 use smithay::wayland::seat::{GrabStartData, Seat};
+use smithay::wayland::shell::wlr_layer::{
+    wlr_layer_shell_init, Layer, LayerSurface, LayerSurfaceConfigure,
+};
 use smithay::wayland::shell::xdg::xdg_shell_init;
 use smithay::wayland::Serial;
 use std::cell::RefCell;
@@ -22,6 +25,7 @@ use super::{MoveAfterResizeState, SurfaceData};
 mod window_list;
 use window_list::ShellWindowList;
 
+mod wlr_layer;
 mod xdg;
 
 #[cfg(feature = "xwayland")]
@@ -76,6 +80,24 @@ pub enum ShellEvent {
         seat: Seat,
         serial: Serial,
         location: Point<i32, Logical>,
+    },
+
+    SurfaceCommit {
+        surface: WlSurface,
+    },
+
+    //
+    // Wlr Layer Shell
+    //
+    LayerCreated {
+        surface: LayerSurface,
+        output: Option<WlOutput>,
+        layer: Layer,
+        namespace: String,
+    },
+    LayerAckConfigure {
+        surface: WlSurface,
+        configure: LayerSurfaceConfigure,
     },
 }
 
@@ -147,7 +169,7 @@ impl Inner {
         }
     }
 
-    fn surface_commit(&mut self, surface: WlSurface, ddata: DispatchData) {
+    fn surface_commit(&mut self, surface: WlSurface, mut ddata: DispatchData) {
         #[cfg(feature = "xwayland")]
         self.xwayland_commit_hook(&surface);
 
@@ -175,7 +197,7 @@ impl Inner {
         // Map unmaped windows
         if let Some(window) = self.not_mapped_list.try_map(&surface) {
             self.windows.push(window.clone());
-            (self.cb)(ShellEvent::WindowCreated { window }, ddata);
+            (self.cb)(ShellEvent::WindowCreated { window }, ddata.reborrow());
         }
 
         // Update mapped windows
@@ -225,6 +247,8 @@ impl Inner {
         // if found {
         //     self.desktop_layout.borrow_mut().arrange_layers();
         // }
+
+        (self.cb)(ShellEvent::SurfaceCommit { surface }, ddata);
     }
 }
 
@@ -264,7 +288,15 @@ impl ShellManager {
             slog_scope::logger(),
         );
 
-        // wlr_layer_shell_init(display, move |request, mut ddata| {}, slog_scope::logger());
+        // init the wlr_layer_shell
+        wlr_layer_shell_init(
+            display,
+            {
+                let inner = inner.clone();
+                move |request, ddata| inner.borrow_mut().wlr_layer_shell_request(request, ddata)
+            },
+            slog_scope::logger(),
+        );
 
         Self { inner }
     }
