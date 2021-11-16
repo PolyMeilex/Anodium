@@ -41,6 +41,9 @@ impl ConfigVM {
         system::register(&mut engine);
 
         let ast = engine.compile_file("config.rhai".into())?;
+
+        keyboard::callbacks_clear();
+
         engine.eval_ast_with_scope(&mut scope, &ast)?;
 
         Ok(ConfigVM(Rc::new(RefCell::new(Inner {
