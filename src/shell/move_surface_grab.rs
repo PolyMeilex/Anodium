@@ -4,7 +4,6 @@ use smithay::{
     reexports::wayland_server::protocol::{wl_pointer::ButtonState, wl_surface},
     utils::{Logical, Point},
     wayland::{
-        compositor,
         seat::{AxisFrame, GrabStartData, PointerGrab, PointerInnerHandle},
         Serial,
     },

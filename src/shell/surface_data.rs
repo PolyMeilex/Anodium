@@ -13,8 +13,6 @@ use smithay::{
     },
 };
 
-use crate::utils::LogResult;
-
 #[derive(Default)]
 pub struct SurfaceData {
     pub buffer: Option<wl_buffer::WlBuffer>,

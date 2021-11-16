@@ -115,7 +115,7 @@ impl Inner {
             window.self_update();
 
             let geometry = window.geometry();
-            let new_location = SurfaceData::with_mut(&surface, |data| {
+            let new_location = SurfaceData::with_mut(surface, |data| {
                 let mut new_location = None;
 
                 // If the window is being resized by top or left, its location must be adjusted
@@ -171,7 +171,7 @@ impl Inner {
 
     // Try to map surface
     fn try_map_unmaped(&mut self, surface: &WlSurface, ddata: DispatchData) {
-        if let Some(window) = self.not_mapped_list.try_map(&surface) {
+        if let Some(window) = self.not_mapped_list.try_map(surface) {
             self.windows.push(window.clone());
             (self.cb)(ShellEvent::WindowCreated { window }, ddata);
         }

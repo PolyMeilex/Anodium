@@ -150,7 +150,7 @@ impl Anodium {
                                 desktop_layout.find_workspace_by_surface_mut(&surface)
                             {
                                 if let Some(window) = space.find_window(&surface) {
-                                    let toplevel = window.toplevel().clone();
+                                    let toplevel = window.toplevel();
 
                                     if let Some(res) = space.move_request(
                                         &toplevel,

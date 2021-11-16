@@ -89,7 +89,7 @@ impl Popup {
     /// window that requested it
     pub fn send_frame(&self, time: u32) {
         if let Some(surface) = self.popup.get_surface() {
-            utils::surface_send_frame(&surface, time)
+            utils::surface_send_frame(surface, time)
         }
     }
 

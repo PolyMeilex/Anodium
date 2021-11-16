@@ -99,7 +99,7 @@ impl super::Inner {
                             x11.unpaired_surfaces.insert(id, (msg.window, location));
                         }
                         Some(surface) => {
-                            self.new_window(&x11, msg.window, surface.clone(), location);
+                            self.new_window(x11, msg.window, surface.clone(), location);
                             self.try_map_unmaped(&surface, ddata);
                         }
                     }

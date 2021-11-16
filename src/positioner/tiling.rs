@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use smithay::{
     backend::input,
     reexports::{
@@ -8,7 +6,6 @@ use smithay::{
     },
     utils::{Logical, Point, Rectangle},
     wayland::{
-        compositor,
         seat::{GrabStartData, Seat},
         Serial,
     },

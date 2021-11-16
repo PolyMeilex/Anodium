@@ -45,7 +45,7 @@ impl LayerSurface {
     }
 
     pub fn layer(&self) -> wlr_layer::Layer {
-        self.inner.borrow().layer.clone()
+        self.inner.borrow().layer
     }
 }
 
@@ -136,7 +136,7 @@ impl LayerSurface {
         let inner = &self.inner.borrow();
 
         if let Some(surface) = inner.surface.get_surface() {
-            utils::surface_send_frame(&surface, time)
+            utils::surface_send_frame(surface, time)
         }
     }
 }

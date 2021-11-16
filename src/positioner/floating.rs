@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use smithay::{
     backend::input,
     reexports::{
@@ -8,7 +6,6 @@ use smithay::{
     },
     utils::{Logical, Point, Rectangle},
     wayland::{
-        compositor,
         seat::{GrabStartData, Seat},
         Serial,
     },
@@ -169,7 +166,7 @@ impl Positioner for Floating {
 
             SurfaceData::with_mut(toplevel.get_surface().unwrap(), |data| {
                 data.resize_state = ResizeState::Resizing(ResizeData {
-                    edges: edges.into(),
+                    edges,
                     initial_window_location,
                     initial_window_size,
                 });
@@ -178,7 +175,7 @@ impl Positioner for Floating {
             let grab = ResizeSurfaceGrab {
                 start_data,
                 toplevel: toplevel.clone(),
-                edges: edges.into(),
+                edges,
                 initial_window_size,
                 last_window_size: initial_window_size,
             };

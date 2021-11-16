@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use smithay::{
     reexports::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
