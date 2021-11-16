@@ -146,10 +146,14 @@ impl Inner {
         self.self_update();
     }
 
-    pub fn bbox_in_window_space(&self) -> Rectangle<i32, Logical> {
+    pub fn bbox_in_comp_space(&self) -> Rectangle<i32, Logical> {
         let mut bbox = self.bbox;
-        bbox.loc -= self.location;
+        bbox.loc += self.location;
         bbox
+    }
+
+    pub fn bbox_in_window_space(&self) -> Rectangle<i32, Logical> {
+        self.bbox
     }
 }
 
@@ -158,22 +162,30 @@ impl Inner {
         let initial_window_location = self.location;
         let initial_size = self.geometry().size;
 
-        if let Some(wl_surface) = self.toplevel.get_surface() {
-            with_states(wl_surface, |states| {
-                let surface_data = states.data_map.get::<RefCell<SurfaceData>>();
+        let geometry = self.geometry();
 
-                if let Some(data) = surface_data {
-                    data.borrow_mut().move_after_resize_state =
-                        MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
-                            initial_window_location,
-                            initial_size,
+        let mut target_window_location = target_geometry.loc;
+        let target_size = target_geometry.size;
 
-                            target_window_location: target_geometry.loc,
-                            target_size: target_geometry.size,
-                        });
-                }
-            })
-            .unwrap();
+        // If decoration sticks out of output
+        if geometry.loc.y < 0 {
+            target_window_location.y -= geometry.loc.y;
+        }
+        if geometry.loc.x < 0 {
+            target_window_location.x -= geometry.loc.x;
+        }
+
+        if let Some(surface) = self.toplevel.get_surface() {
+            SurfaceData::with_mut(surface, |data| {
+                data.move_after_resize_state =
+                    MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
+                        initial_window_location,
+                        initial_size,
+
+                        target_window_location,
+                        target_size,
+                    });
+            });
         }
 
         self.toplevel.maximize(target_geometry.size);
@@ -229,7 +241,7 @@ impl Inner {
             return None;
         }
 
-        if !self.bbox.to_f64().contains(point) {
+        if !self.bbox_in_comp_space().to_f64().contains(point) {
             return None;
         }
         // need to check more carefully
@@ -273,9 +285,7 @@ impl Inner {
 
     pub fn self_update(&mut self) {
         if let Some(surface) = self.toplevel.get_surface() {
-            let mut bbox = utils::surface_bounding_box(surface);
-            bbox.loc += self.location;
-            self.bbox = bbox;
+            self.bbox = utils::surface_bounding_box(surface);
         }
     }
 
@@ -325,8 +335,8 @@ impl Window {
         self.inner.borrow_mut().set_location(location)
     }
 
-    pub fn bbox(&self) -> Rectangle<i32, Logical> {
-        self.inner.borrow().bbox
+    pub fn bbox_in_comp_space(&self) -> Rectangle<i32, Logical> {
+        self.inner.borrow().bbox_in_comp_space()
     }
 
     #[allow(unused)]

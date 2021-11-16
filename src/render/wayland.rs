@@ -192,7 +192,7 @@ impl Anodium {
             let mut initial_place = window.render_location();
 
             // skip windows that do not overlap with a given output
-            if !output_rect.overlaps(window.bbox()) {
+            if !output_rect.overlaps(window.bbox_in_comp_space()) {
                 return;
             }
             initial_place.x -= output_rect.loc.x;
