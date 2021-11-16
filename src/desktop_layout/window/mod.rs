@@ -20,6 +20,7 @@ use crate::shell::shell_manager::X11Surface;
 use crate::{
     animations::enter_exit::EnterExitAnimation,
     shell::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
+    utils,
 };
 
 mod list;
@@ -144,6 +145,12 @@ impl Inner {
         self.location = location;
         self.self_update();
     }
+
+    pub fn bbox_in_window_space(&self) -> Rectangle<i32, Logical> {
+        let mut bbox = self.bbox;
+        bbox.loc -= self.location;
+        bbox
+    }
 }
 
 impl Inner {
@@ -265,40 +272,11 @@ impl Inner {
     }
 
     pub fn self_update(&mut self) {
-        if !self.toplevel.alive() {
-            return;
+        if let Some(surface) = self.toplevel.get_surface() {
+            let mut bbox = utils::surface_bounding_box(surface);
+            bbox.loc += self.location;
+            self.bbox = bbox;
         }
-
-        let mut bounding_box = Rectangle::from_loc_and_size(self.location, (0, 0));
-        if let Some(wl_surface) = self.toplevel.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                self.location,
-                |_, states, &loc| {
-                    let mut loc = loc;
-                    let data = states.data_map.get::<RefCell<SurfaceData>>();
-
-                    if let Some(size) = data.and_then(|d| d.borrow().size()) {
-                        if states.role == Some("subsurface") {
-                            let current = states.cached_state.current::<SubsurfaceCachedState>();
-                            loc += current.location;
-                        }
-
-                        // Update the bounding box.
-                        bounding_box = bounding_box.merge(Rectangle::from_loc_and_size(loc, size));
-
-                        TraversalAction::DoChildren(loc)
-                    } else {
-                        // If the parent surface is unmapped, then the child surfaces are hidden as
-                        // well, no need to consider them here.
-                        TraversalAction::SkipChildren
-                    }
-                },
-                |_, _, _| {},
-                |_, _, _| true,
-            );
-        }
-        self.bbox = bounding_box;
     }
 
     /// Returns the geometry of this window.
@@ -310,33 +288,17 @@ impl Inner {
                 // .and_then(|g| if g.size.w == 0 { None } else { Some(g) })
             })
             .unwrap()
-            .unwrap_or_else(|| {
-                let mut bbox = self.bbox;
-                bbox.loc = (0, 0).into();
-                bbox
-            })
+            .unwrap_or_else(|| self.bbox_in_window_space())
         } else {
-            let mut bbox = self.bbox;
-            bbox.loc = (0, 0).into();
-            bbox
+            self.bbox_in_window_space()
         }
     }
 
     /// Sends the frame callback to all the subsurfaces in this
     /// window that requested it
     pub fn send_frame(&self, time: u32) {
-        if let Some(wl_surface) = self.toplevel.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                (),
-                |_, _, &()| TraversalAction::DoChildren(()),
-                |_, states, &()| {
-                    // the surface may not have any user_data if it is a subsurface and has not
-                    // yet been commited
-                    SurfaceData::send_frame(&mut *states.cached_state.current(), time)
-                },
-                |_, _, &()| true,
-            );
+        if let Some(surface) = self.toplevel.get_surface() {
+            utils::surface_send_frame(&surface, time)
         }
     }
 
@@ -365,6 +327,11 @@ impl Window {
 
     pub fn bbox(&self) -> Rectangle<i32, Logical> {
         self.inner.borrow().bbox
+    }
+
+    #[allow(unused)]
+    pub fn bbox_in_window_space(&self) -> Rectangle<i32, Logical> {
+        self.inner.borrow().bbox_in_window_space()
     }
 
     pub fn toplevel(&self) -> WindowSurface {

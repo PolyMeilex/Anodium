@@ -12,7 +12,7 @@ use smithay::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::shell::SurfaceData;
+use crate::{shell::SurfaceData, utils};
 
 #[derive(Debug)]
 struct Inner {
@@ -115,36 +115,11 @@ impl LayerSurface {
     pub fn self_update(&mut self) {
         let inner = &mut self.inner.borrow_mut();
 
-        let mut bounding_box = Rectangle::from_loc_and_size(inner.location, (0, 0));
-        if let Some(wl_surface) = inner.surface.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                inner.location,
-                |_, states, &loc| {
-                    let mut loc = loc;
-                    let data = states.data_map.get::<RefCell<SurfaceData>>();
-
-                    if let Some(size) = data.and_then(|d| d.borrow().size()) {
-                        if states.role == Some("subsurface") {
-                            let current = states.cached_state.current::<SubsurfaceCachedState>();
-                            loc += current.location;
-                        }
-
-                        // Update the bounding box.
-                        bounding_box = bounding_box.merge(Rectangle::from_loc_and_size(loc, size));
-
-                        TraversalAction::DoChildren(loc)
-                    } else {
-                        // If the parent surface is unmapped, then the child surfaces are hidden as
-                        // well, no need to consider them here.
-                        TraversalAction::SkipChildren
-                    }
-                },
-                |_, _, _| {},
-                |_, _, _| true,
-            );
+        if let Some(surface) = inner.surface.get_surface() {
+            let mut bbox = utils::surface_bounding_box(surface);
+            bbox.loc += inner.location;
+            inner.bbox = bbox;
         }
-        inner.bbox = bounding_box;
 
         if let Some(surface) = inner.surface.get_surface() {
             inner.layer = with_states(surface, |states| {
@@ -160,18 +135,8 @@ impl LayerSurface {
     pub fn send_frame(&self, time: u32) {
         let inner = &self.inner.borrow();
 
-        if let Some(wl_surface) = inner.surface.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                (),
-                |_, _, &()| TraversalAction::DoChildren(()),
-                |_, states, &()| {
-                    // the surface may not have any user_data if it is a subsurface and has not
-                    // yet been commited
-                    SurfaceData::send_frame(&mut *states.cached_state.current(), time)
-                },
-                |_, _, &()| true,
-            );
+        if let Some(surface) = inner.surface.get_surface() {
+            utils::surface_send_frame(&surface, time)
         }
     }
 }

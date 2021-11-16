@@ -13,7 +13,7 @@ use smithay::{
     },
 };
 
-use crate::shell::SurfaceData;
+use crate::{shell::SurfaceData, utils};
 
 mod list;
 pub use list::PopupList;
@@ -88,18 +88,8 @@ impl Popup {
     /// Sends the frame callback to all the subsurfaces in this
     /// window that requested it
     pub fn send_frame(&self, time: u32) {
-        if let Some(wl_surface) = self.popup.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                (),
-                |_, _, &()| TraversalAction::DoChildren(()),
-                |_, states, &()| {
-                    // the surface may not have any user_data if it is a subsurface and has not
-                    // yet been commited
-                    SurfaceData::send_frame(&mut *states.cached_state.current(), time)
-                },
-                |_, _, &()| true,
-            );
+        if let Some(surface) = self.popup.get_surface() {
+            utils::surface_send_frame(&surface, time)
         }
     }
 
@@ -160,40 +150,11 @@ impl Popup {
     }
 
     pub fn self_update(&mut self) {
-        if !self.popup.alive() {
-            return;
+        if let Some(surface) = self.popup.get_surface() {
+            let mut bbox = utils::surface_bounding_box(surface);
+            bbox.loc += self.popup.location();
+            self.bbox = bbox;
         }
-
-        let mut bounding_box = Rectangle::from_loc_and_size(self.popup.location(), (0, 0));
-        if let Some(wl_surface) = self.popup.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                self.popup.location(),
-                |_, states, &loc| {
-                    let mut loc = loc;
-                    let data = states.data_map.get::<RefCell<SurfaceData>>();
-
-                    if let Some(size) = data.and_then(|d| d.borrow().size()) {
-                        if states.role == Some("subsurface") {
-                            let current = states.cached_state.current::<SubsurfaceCachedState>();
-                            loc += current.location;
-                        }
-
-                        // Update the bounding box.
-                        bounding_box = bounding_box.merge(Rectangle::from_loc_and_size(loc, size));
-
-                        TraversalAction::DoChildren(loc)
-                    } else {
-                        // If the parent surface is unmapped, then the child surfaces are hidden as
-                        // well, no need to consider them here.
-                        TraversalAction::SkipChildren
-                    }
-                },
-                |_, _, _| {},
-                |_, _, _| true,
-            );
-        }
-        self.bbox = bounding_box;
     }
 
     /// Returns the geometry of this window.
