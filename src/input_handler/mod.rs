@@ -290,8 +290,6 @@ enum KeyAction {
     Quit,
     /// Trigger a vt-switch
     VtSwitch(i32),
-    /// run a command
-    Run(process::Command),
     /// Switch the current screen
     Workspace(usize),
     MoveToWorkspace(usize),
@@ -307,17 +305,6 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
         Some(KeyAction::VtSwitch(
             (keysym - xkb::KEY_XF86Switch_VT_1 + 1) as i32,
         ))
-    } else if modifiers.logo && keysym == xkb::KEY_Return {
-        // run terminal
-        // KeyAction::Run("yavt".into())
-        Some(KeyAction::Run(Command::new("alacritty")))
-        // KeyAction::Run("weston-terminal".into())
-    } else if modifiers.logo && keysym == xkb::KEY_d {
-        let mut c = Command::new("rofi");
-        c.arg("-show");
-        c.arg("combi");
-
-        Some(KeyAction::Run(c))
     } else if modifiers.logo && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
         Some(KeyAction::Workspace((keysym - xkb::KEY_1) as usize + 1))
     } else if modifiers.logo && modifiers.shift && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
@@ -338,15 +325,6 @@ impl Anodium {
             KeyAction::VtSwitch(vt) => {
                 info!("Trying to switch to vt {}", vt);
                 self.session.change_vt(vt).ok();
-            }
-            KeyAction::Run(mut cmd) => {
-                info!("Starting program");
-                if let Err(e) = cmd.spawn() {
-                    error!(
-                        "Failed to start program";
-                        "err" => format!("{:?}", e)
-                    );
-                }
             }
             // KeyAction::MoveToWorkspace(num) => {
             // let mut window_map = self.window_map.borrow_mut();
