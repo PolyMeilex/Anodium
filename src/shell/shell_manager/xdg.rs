@@ -15,9 +15,9 @@ use crate::{
     shell::{surface_data::ResizeState, MoveAfterResizeState, SurfaceData},
 };
 
-use super::{Inner, ShellEvent};
+use super::ShellEvent;
 
-impl Inner {
+impl super::Inner {
     pub fn xdg_shell_request(&mut self, request: XdgRequest, ddata: DispatchData) {
         match request {
             //

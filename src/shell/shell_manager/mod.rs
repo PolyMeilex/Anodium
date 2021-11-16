@@ -279,10 +279,10 @@ impl ShellManager {
         xwayland::xwayland_shell_init(handle, connection, client, {
             let inner = self.inner.clone();
 
-            move |event, client, ddata| {
+            move |event, x11, client, ddata| {
                 inner
                     .borrow_mut()
-                    .xwayland_shell_event(event, client, ddata)
+                    .xwayland_shell_event(event, x11, client, ddata)
                     .log_err("Error while handling X11 event:")
                     .ok();
             }

@@ -1,18 +1,11 @@
-use std::{
-    cell::{RefCell, RefMut},
-    collections::HashMap,
-    convert::TryFrom,
-    os::unix::net::UnixStream,
-    rc::Rc,
-    sync::Arc,
-};
+use std::{cell::RefCell, convert::TryFrom, os::unix::net::UnixStream, rc::Rc};
 
 use smithay::{
     reexports::{
         calloop::LoopHandle,
         wayland_server::{protocol::wl_surface::WlSurface, Client, DispatchData},
     },
-    utils::{x11rb::X11Source, Logical, Point},
+    utils::{Logical, Point},
     wayland::compositor::give_role,
 };
 
@@ -20,115 +13,27 @@ use x11rb::{
     connection::Connection as _,
     errors::ReplyOrIdError,
     protocol::{
-        composite::{ConnectionExt as _, Redirect},
-        xproto::{
-            ChangeWindowAttributesAux, ConfigWindow, ConfigureWindowAux, ConnectionExt as _,
-            EventMask, Window, WindowClass,
-        },
+        xproto::{ConfigWindow, ConfigureWindowAux, ConnectionExt as _, Window},
         Event,
     },
-    rust_connection::{DefaultStream, RustConnection},
 };
 
 use crate::desktop_layout::WindowSurface;
 
-use super::Inner;
+mod x11_state;
+use x11_state::X11State;
 
-x11rb::atom_manager! {
-    Atoms: AtomsCookie {
-        WM_S0,
-        WL_SURFACE_ID,
-        _ANVIL_CLOSE_CONNECTION,
-    }
-}
+mod x11_surface;
+pub use x11_surface::X11Surface;
 
-/// The actual runtime state of the XWayland integration.
-struct X11State {
-    conn: Arc<RustConnection>,
-    atoms: Atoms,
-    unpaired_surfaces: HashMap<u32, (Window, Point<i32, Logical>)>,
-}
-
-impl X11State {
-    fn start_wm(connection: UnixStream) -> Result<(Self, X11Source), Box<dyn std::error::Error>> {
-        // Create an X11 connection. XWayland only uses screen 0.
-        let screen = 0;
-        let stream = DefaultStream::from_unix_stream(connection)?;
-        let conn = RustConnection::connect_to_stream(stream, screen)?;
-        let atoms = Atoms::new(&conn)?.reply()?;
-
-        let screen = &conn.setup().roots[0];
-
-        // Actually become the WM by redirecting some operations
-        conn.change_window_attributes(
-            screen.root,
-            &ChangeWindowAttributesAux::default().event_mask(EventMask::SUBSTRUCTURE_REDIRECT),
-        )?;
-
-        // Tell XWayland that we are the WM by acquiring the WM_S0 selection. No X11 clients are accepted before this.
-        let win = conn.generate_id()?;
-        conn.create_window(
-            screen.root_depth,
-            win,
-            screen.root,
-            // x, y, width, height, border width
-            0,
-            0,
-            1,
-            1,
-            0,
-            WindowClass::INPUT_OUTPUT,
-            x11rb::COPY_FROM_PARENT,
-            &Default::default(),
-        )?;
-        conn.set_selection_owner(win, atoms.WM_S0, x11rb::CURRENT_TIME)?;
-
-        // XWayland wants us to do this to function properly...?
-        conn.composite_redirect_subwindows(screen.root, Redirect::MANUAL)?;
-
-        conn.flush()?;
-
-        let conn = Arc::new(conn);
-        let wm = Self {
-            conn: Arc::clone(&conn),
-            atoms,
-            unpaired_surfaces: Default::default(),
-        };
-
-        Ok((
-            wm,
-            X11Source::new(
-                conn,
-                win,
-                atoms._ANVIL_CLOSE_CONNECTION,
-                slog_scope::logger(),
-            ),
-        ))
-    }
-
-    fn get_mut(client: &Client) -> Option<RefMut<Self>> {
-        if let Some(x11) = client.data_map().get::<Rc<RefCell<X11State>>>() {
-            let x11 = x11.borrow_mut();
-            Some(x11)
-        } else {
-            None
-        }
-    }
-}
-
-impl Inner {
+impl super::Inner {
     pub fn xwayland_shell_event(
         &mut self,
         event: Event,
+        x11: &mut X11State,
         client: &Client,
         _ddata: DispatchData,
     ) -> Result<(), ReplyOrIdError> {
-        let mut x11 = if let Some(x11) = X11State::get_mut(client) {
-            x11
-        } else {
-            return Ok(());
-        };
-
         debug!("X11: Got event {:?}", event);
         match event {
             Event::ConfigureRequest(r) => {
@@ -234,54 +139,10 @@ impl Inner {
             return;
         }
 
-        let x11surface = X11Surface {
-            surface,
-            window,
-            conn: x11.conn.clone(),
-        };
+        let x11surface = X11Surface::new(x11.conn.clone(), window, surface);
 
         self.not_mapped_list
             .insert(WindowSurface::X11(x11surface), location);
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct X11Surface {
-    conn: Arc<RustConnection>,
-    window: Window,
-    surface: WlSurface,
-}
-
-impl std::cmp::PartialEq for X11Surface {
-    fn eq(&self, other: &Self) -> bool {
-        self.alive() && other.alive() && self.surface == other.surface
-    }
-}
-
-impl X11Surface {
-    pub fn alive(&self) -> bool {
-        self.surface.as_ref().is_alive()
-    }
-
-    pub fn get_surface(&self) -> Option<&WlSurface> {
-        if self.alive() {
-            Some(&self.surface)
-        } else {
-            None
-        }
-    }
-
-    pub fn resize(&self, width: u32, height: u32) {
-        let aux = ConfigureWindowAux::default().width(width).height(height);
-        self.conn.configure_window(self.window, &aux).ok();
-        self.conn.flush().unwrap();
-    }
-
-    #[allow(dead_code)]
-    pub fn move_to(&self, x: i32, y: i32) {
-        let aux = ConfigureWindowAux::default().x(x).y(y);
-        self.conn.configure_window(self.window, &aux).ok();
-        self.conn.flush().unwrap();
     }
 }
 
@@ -291,7 +152,7 @@ pub fn xwayland_shell_init<F, D: 'static>(
     client: Client,
     mut cb: F,
 ) where
-    F: FnMut(Event, &Client, DispatchData) + 'static,
+    F: FnMut(Event, &mut X11State, &Client, DispatchData) + 'static,
 {
     let (x11_state, source) = X11State::start_wm(connection).unwrap();
 
@@ -302,7 +163,9 @@ pub fn xwayland_shell_init<F, D: 'static>(
 
     handle
         .insert_source(source, move |event, _, ddata| {
-            cb(event, &client, DispatchData::wrap(ddata));
+            if let Some(mut x11) = X11State::get_mut(&client) {
+                cb(event, &mut x11, &client, DispatchData::wrap(ddata));
+            }
         })
         .unwrap();
 }
