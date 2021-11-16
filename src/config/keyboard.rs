@@ -9,6 +9,7 @@ use rhai::FnPtr;
 
 use lazy_static::lazy_static;
 use smithay::backend::input::KeyState;
+use xkbcommon::xkb;
 
 use super::ConfigVM;
 
@@ -17,15 +18,13 @@ lazy_static! {
 }
 
 struct Callbacks {
-    callbacks: Mutex<HashMap<String, Vec<Callback>>>,
-    keys_pressed: Mutex<HashSet<String>>,
+    callbacks: Mutex<HashMap<u32, Vec<Callback>>>,
 }
 
 impl Callbacks {
     pub fn new() -> Self {
         Self {
             callbacks: Mutex::new(HashMap::new()),
-            keys_pressed: Mutex::new(HashSet::new()),
         }
     }
 
@@ -34,9 +33,11 @@ impl Callbacks {
     }
 
     pub fn insert(&self, key: &str, callback: Callback) {
+        let key = xkb::keysym_from_name(key, xkb::KEYSYM_CASE_INSENSITIVE);
+
         let mut callbacks = self.callbacks.lock().unwrap();
 
-        if let Some(callbacks) = callbacks.get_mut(key) {
+        if let Some(callbacks) = callbacks.get_mut(&key) {
             callbacks.push(callback);
         } else {
             let callbacks_vec = vec![callback];
@@ -44,21 +45,21 @@ impl Callbacks {
         }
     }
 
-    pub fn key_action(&self, config: &ConfigVM, key: &str, state: KeyState) -> bool {
+    pub fn key_action(
+        &self,
+        config: &ConfigVM,
+        key: &str,
+        state: KeyState,
+        keys_pressed: &HashSet<u32>,
+    ) -> bool {
         let mut executed = false;
-        let mut keys_pressed = self.keys_pressed.lock().unwrap();
-
-        match state {
-            KeyState::Pressed => keys_pressed.insert(key.to_owned()),
-            KeyState::Released => keys_pressed.remove(key),
-        };
 
         if keys_pressed.len() > 0 {
-            let mut callbacks = self.callbacks.lock().unwrap();
+            let callbacks = self.callbacks.lock().unwrap();
             for (key, callbacks) in callbacks.iter() {
                 if keys_pressed.contains(key) {
                     for callback in callbacks {
-                        if callback.execute(config, &keys_pressed) {
+                        if callback.execute(config, keys_pressed) {
                             executed = true;
                             break;
                         }
@@ -73,16 +74,16 @@ impl Callbacks {
 
 #[derive(Debug)]
 struct Callback {
-    keys: Vec<String>,
+    keys: Vec<u32>,
     callback: String,
 }
 
 impl Callback {
-    pub fn new(callback: String, keys: Vec<String>) -> Self {
+    pub fn new(callback: String, keys: Vec<u32>) -> Self {
         Self { callback, keys }
     }
 
-    pub fn execute(&self, config: &ConfigVM, keys_pressed: &HashSet<String>) -> bool {
+    pub fn execute(&self, config: &ConfigVM, keys_pressed: &HashSet<u32>) -> bool {
         if self.keys.iter().all(|item| keys_pressed.contains(item)) {
             config.execute_fn(&self.callback);
             true
@@ -97,7 +98,10 @@ pub mod exports {
     pub fn register(callback: FnPtr, key: &str, keys: rhai::Array) {
         let callback = callback.fn_name().to_string();
 
-        let keys_parsed: Vec<String> = keys.iter().map(|k| format!("{}", k)).collect();
+        let keys_parsed: Vec<u32> = keys
+            .iter()
+            .map(|k| xkb::keysym_from_name(&format!("{}", k), xkb::KEYSYM_CASE_INSENSITIVE))
+            .collect();
         let callback = Callback::new(callback, keys_parsed);
 
         CALLBACKS.insert(key, callback);
@@ -109,6 +113,15 @@ pub fn register(engine: &mut Engine) {
     engine.register_static_module("keyboard", exports_module.into());
 }
 
-pub fn key_action(config: &ConfigVM, key: &str, state: KeyState) -> bool {
-    CALLBACKS.key_action(config, key, state)
+pub fn key_action(
+    config: &ConfigVM,
+    key: &str,
+    state: KeyState,
+    keys_pressed: &HashSet<u32>,
+) -> bool {
+    CALLBACKS.key_action(config, key, state, keys_pressed)
+}
+
+pub fn callbacks_clear() {
+    CALLBACKS.clear();
 }

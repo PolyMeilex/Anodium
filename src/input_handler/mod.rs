@@ -3,7 +3,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::{shell::move_surface_grab::MoveSurfaceGrab, Anodium};
+use crate::{config, shell::move_surface_grab::MoveSurfaceGrab, Anodium};
 
 use smithay::{
     backend::{
@@ -61,12 +61,19 @@ impl Anodium {
 
         let modifiers_state = &mut self.input_state.modifiers_state;
         let suppressed_keys = &mut self.input_state.suppressed_keys;
+        let pressed_keys = &mut self.input_state.pressed_keys;
         let configvm = self.config.clone();
 
         self.input_state
             .keyboard
             .input(keycode, state, serial, time, |modifiers, handle| {
                 let keysym = handle.modified_sym();
+
+                if let KeyState::Pressed = state {
+                    pressed_keys.insert(keysym);
+                } else {
+                    pressed_keys.remove(&keysym);
+                }
 
                 let keysym_desc = ::xkbcommon::xkb::keysym_get_name(keysym);
 
@@ -82,14 +89,21 @@ impl Anodium {
                 // Additionally add the key to the suppressed keys
                 // so that we can decide on a release if the key
                 // should be forwarded to the client or not.
+
                 if let KeyState::Pressed = state {
-                    let action = process_keyboard_shortcut(*modifiers, keysym);
+                    let mut action = process_keyboard_shortcut(*modifiers, keysym);
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);
                     } else {
-                        if crate::config::keyboard::key_action(&configvm, &keysym_desc, state) {
+                        if config::keyboard::key_action(
+                            &configvm,
+                            &keysym_desc,
+                            state,
+                            pressed_keys,
+                        ) {
                             suppressed_keys.push(keysym);
+                            action = None;
                         }
                     }
 
@@ -97,7 +111,6 @@ impl Anodium {
                         .map(FilterResult::Intercept)
                         .unwrap_or(FilterResult::Forward)
                 } else {
-                    crate::config::keyboard::key_action(&configvm, &keysym_desc, state);
                     let suppressed = suppressed_keys.contains(&keysym);
                     if suppressed {
                         suppressed_keys.retain(|k| *k != keysym);

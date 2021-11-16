@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::PathBuf,
     rc::Rc,
     sync::{
@@ -50,6 +50,7 @@ pub struct InputState {
     pub modifiers_state: ModifiersState,
 
     pub suppressed_keys: Vec<u32>,
+    pub pressed_keys: HashSet<u32>,
 }
 
 pub struct Anodium {
@@ -347,6 +348,7 @@ impl BackendState {
                     keyboard,
                     modifiers_state: Default::default(),
                     suppressed_keys: Vec::new(),
+                    pressed_keys: HashSet::new(),
                 },
 
                 seat_name,
