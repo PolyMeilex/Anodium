@@ -40,7 +40,7 @@ impl SurfaceData {
                 None
             }
         })
-        .log_err()
+        .log_err("SurfaceData::with:")
         .ok()?
     }
 
@@ -58,7 +58,7 @@ impl SurfaceData {
                 None
             }
         })
-        .log_err()
+        .log_err("SurfaceData::with:")
         .ok()?
     }
 }

@@ -458,4 +458,14 @@ impl BackendState {
             pointer_image: crate::cursor::Cursor::load(&log),
         }
     }
+
+    #[cfg(feature = "xwayland")]
+    pub fn start_xwayland(&mut self) {
+        use crate::utils::LogResult;
+
+        self.xwayland
+            .start()
+            .log_err("Failed to start XWayland:")
+            .ok();
+    }
 }

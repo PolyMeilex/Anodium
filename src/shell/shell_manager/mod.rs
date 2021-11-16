@@ -13,6 +13,7 @@ use std::rc::Rc;
 
 use crate::desktop_layout::{Window, WindowSurface};
 use crate::state::BackendState;
+use crate::utils::LogResult;
 
 use super::not_mapped_list::NotMappedList;
 use super::surface_data::{ResizeData, ResizeEdge, ResizeState};
@@ -25,8 +26,6 @@ mod xdg;
 
 #[cfg(feature = "xwayland")]
 pub mod xwayland;
-#[cfg(feature = "xwayland")]
-use xwayland::X11State;
 #[cfg(feature = "xwayland")]
 pub use xwayland::X11Surface;
 
@@ -150,7 +149,7 @@ impl Inner {
 
     fn surface_commit(&mut self, surface: WlSurface, ddata: DispatchData) {
         #[cfg(feature = "xwayland")]
-        xwayland::commit_hook(&surface);
+        self.xwayland_commit_hook(&surface);
 
         if !compositor::is_sync_subsurface(&surface) {
             // Update the buffer of all child surfaces
@@ -270,10 +269,6 @@ impl ShellManager {
         Self { inner }
     }
 
-    pub fn refresh(&mut self) {
-        self.inner.borrow_mut().windows.refresh();
-    }
-
     #[cfg(feature = "xwayland")]
     pub fn xwayland_ready(
         &mut self,
@@ -281,30 +276,20 @@ impl ShellManager {
         connection: UnixStream,
         client: Client,
     ) {
-        let (x11_state, source) = X11State::start_wm(connection, {
+        xwayland::xwayland_shell_init(handle, connection, client, {
             let inner = self.inner.clone();
-            // Listen for new windows
-            move |window_surface, location| {
+
+            move |event, client, ddata| {
                 inner
                     .borrow_mut()
-                    .not_mapped_list
-                    .insert(window_surface, location);
+                    .xwayland_shell_event(event, client, ddata)
+                    .log_err("Error while handling X11 event:")
+                    .ok();
             }
-        })
-        .unwrap();
+        });
+    }
 
-        let x11_state = Rc::new(RefCell::new(x11_state));
-        client
-            .data_map()
-            .insert_if_missing(|| Rc::clone(&x11_state));
-
-        handle
-            .insert_source(source, move |event, _, _| {
-                match x11_state.borrow_mut().handle_event(event, &client) {
-                    Ok(()) => {}
-                    Err(err) => error!("Error while handling X11 event: {}", err),
-                }
-            })
-            .unwrap();
+    pub fn refresh(&mut self) {
+        self.inner.borrow_mut().windows.refresh();
     }
 }

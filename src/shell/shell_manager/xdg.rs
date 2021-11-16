@@ -18,7 +18,7 @@ use crate::{
 use super::{Inner, ShellEvent};
 
 impl Inner {
-    pub(super) fn xdg_shell_request(&mut self, request: XdgRequest, ddata: DispatchData) {
+    pub fn xdg_shell_request(&mut self, request: XdgRequest, ddata: DispatchData) {
         match request {
             //
             // Toplevel
