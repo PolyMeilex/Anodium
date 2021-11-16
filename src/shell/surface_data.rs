@@ -13,6 +13,8 @@ use smithay::{
     },
 };
 
+use crate::utils::LogResult;
+
 #[derive(Default)]
 pub struct SurfaceData {
     pub buffer: Option<wl_buffer::WlBuffer>,
@@ -25,6 +27,23 @@ pub struct SurfaceData {
 }
 
 impl SurfaceData {
+    pub fn try_with<F, R>(surface: &WlSurface, cb: F) -> Option<R>
+    where
+        F: FnOnce(&SurfaceData) -> R,
+    {
+        compositor::with_states(surface, |states| {
+            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
+                let data = data.borrow();
+                Some(cb(&data))
+            } else {
+                warn!("Surface: {:?} does not have SurfaceData", surface);
+                None
+            }
+        })
+        .log_err("Surface is dead!")
+        .ok()?
+    }
+
     pub fn with<F, R>(surface: &WlSurface, cb: F) -> R
     where
         F: FnOnce(&SurfaceData) -> R,
