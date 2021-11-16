@@ -5,6 +5,7 @@ use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
+use crate::shell::SurfaceData;
 use crate::utils::AsWlSurface;
 
 use crate::desktop_layout::window::{Window, WindowSurface};
@@ -65,7 +66,7 @@ impl NotMappedList {
         let toplevel = self.find_mut(surface).and_then(|win| {
             win.self_update();
 
-            let toplevel = win.toplevel().clone();
+            let toplevel = win.toplevel();
             // send the initial configure if relevant
             if let WindowSurface::Xdg(ref toplevel) = toplevel {
                 let initial_configure_sent = compositor::with_states(surface, |states| {
@@ -83,8 +84,10 @@ impl NotMappedList {
                 }
             }
 
-            let size = win.geometry().size;
-            if size.w != 0 && size.h != 0 {
+            let has_buffer =
+                SurfaceData::with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+
+            if has_buffer {
                 match toplevel {
                     WindowSurface::Xdg(_) => {
                         let configured = compositor::with_states(surface, |states| {

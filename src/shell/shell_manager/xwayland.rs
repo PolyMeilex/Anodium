@@ -32,7 +32,7 @@ impl super::Inner {
         event: Event,
         x11: &mut X11State,
         client: &Client,
-        _ddata: DispatchData,
+        ddata: DispatchData,
     ) -> Result<(), ReplyOrIdError> {
         debug!("X11: Got event {:?}", event);
         match event {
@@ -98,7 +98,10 @@ impl super::Inner {
                         None => {
                             x11.unpaired_surfaces.insert(id, (msg.window, location));
                         }
-                        Some(surface) => self.new_window(&x11, msg.window, surface, location),
+                        Some(surface) => {
+                            self.new_window(&x11, msg.window, surface.clone(), location);
+                            self.try_map_unmaped(&surface, ddata);
+                        }
                     }
                 }
             }

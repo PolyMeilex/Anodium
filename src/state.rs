@@ -37,7 +37,7 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 use crate::{
     backend::{session::AnodiumSession, udev},
     config::ConfigVM,
-    desktop_layout::{DesktopLayout, LayerSurface, Output},
+    desktop_layout::{DesktopLayout, Output},
     render::{self, renderer::RenderFrame},
     shell::{
         move_surface_grab::MoveSurfaceGrab,

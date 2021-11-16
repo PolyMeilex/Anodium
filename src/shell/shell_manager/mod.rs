@@ -168,6 +168,14 @@ impl Inner {
         }
     }
 
+    // Try to map surface
+    fn try_map_unmaped(&mut self, surface: &WlSurface, ddata: DispatchData) {
+        if let Some(window) = self.not_mapped_list.try_map(&surface) {
+            self.windows.push(window.clone());
+            (self.cb)(ShellEvent::WindowCreated { window }, ddata);
+        }
+    }
+
     fn surface_commit(&mut self, surface: WlSurface, mut ddata: DispatchData) {
         #[cfg(feature = "xwayland")]
         self.xwayland_commit_hook(&surface);
@@ -194,10 +202,7 @@ impl Inner {
         }
 
         // Map unmaped windows
-        if let Some(window) = self.not_mapped_list.try_map(&surface) {
-            self.windows.push(window.clone());
-            (self.cb)(ShellEvent::WindowCreated { window }, ddata.reborrow());
-        }
+        self.try_map_unmaped(&surface, ddata.reborrow());
 
         // Update mapped windows
         self.try_update_mapped(&surface);
