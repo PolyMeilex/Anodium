@@ -37,7 +37,7 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 use crate::{
     backend::{session::AnodiumSession, udev},
     config::ConfigVM,
-    desktop_layout::{DesktopLayout, Output},
+    desktop_layout::{DesktopLayout, LayerSurface, Output},
     render::{self, renderer::RenderFrame},
     shell::{
         move_surface_grab::MoveSurfaceGrab,
@@ -250,7 +250,7 @@ impl Anodium {
             } => {
                 self.desktop_layout
                     .borrow_mut()
-                    .insert_layer(output, surface, layer);
+                    .insert_layer(output, LayerSurface::new(surface, layer));
             }
             ShellEvent::LayerAckConfigure { .. } => {
                 self.desktop_layout.borrow_mut().arrange_layers();
@@ -272,7 +272,7 @@ impl Anodium {
                         })
                         .unwrap();
                         if !initial_configure_sent {
-                            layer.surface.send_configure();
+                            layer.surface().send_configure();
                         }
                     }
 

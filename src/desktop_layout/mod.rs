@@ -5,7 +5,7 @@ use smithay::backend::input::{ButtonState, MouseButton};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::output::Mode;
-use smithay::wayland::shell::wlr_layer::{self, Layer};
+use smithay::wayland::shell::wlr_layer::Layer;
 use smithay::{reexports::wayland_server::Display, wayland::output::PhysicalProperties};
 
 mod output_map;
@@ -24,9 +24,10 @@ pub mod popup;
 pub use popup::{Popup, PopupKind, PopupList};
 
 pub mod window;
-pub use window::{WindowSurface, Window, WindowList};
+pub use window::{Window, WindowList, WindowSurface};
 
 mod layer_map;
+pub use layer_map::LayerSurface;
 
 #[derive(Debug)]
 pub struct DesktopLayout {
@@ -258,10 +259,9 @@ impl DesktopLayout {
     pub fn insert_layer(
         &mut self,
         output: Option<smithay::reexports::wayland_server::protocol::wl_output::WlOutput>,
-        surface: wlr_layer::LayerSurface,
-        layer: wlr_layer::Layer,
+        layer: LayerSurface,
     ) {
-        self.output_map.insert_layer(output, surface, layer);
+        self.output_map.insert_layer(output, layer);
         self.update_workspaces_geometry();
     }
 }
