@@ -252,7 +252,10 @@ fn scan_connectors(
     anodium: &mut Anodium,
     signaler: &Signaler<SessionSignal>,
     logger: &::slog::Logger,
-) -> HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>> {
+) -> (
+    HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
+    Vec<crtc::Handle>,
+) {
     // Get a set of all modesetting resource handles (excluding planes):
     let res_handles = drm.resource_handles().unwrap();
 
@@ -266,6 +269,7 @@ fn scan_connectors(
         .collect();
 
     let mut backends = HashMap::new();
+    let mut backends_order = Vec::new();
 
     // very naive way of finding good crtc/encoder/connector combinations. This problem is np-complete
     for connector_info in connector_infos {
@@ -345,25 +349,6 @@ fn scan_connectors(
                         refresh: (mode.vrefresh() * 1000) as i32,
                     };
 
-                    let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
-
-                    // anodium.add_output(
-                    //     &output_name,
-                    //     PhysicalProperties {
-                    //         size: (phys_w as i32, phys_h as i32).into(),
-                    //         subpixel: wl_output::Subpixel::Unknown,
-                    //         make: "Smithay".into(),
-                    //         model: "Generic DRM".into(),
-                    //     },
-                    //     mode,
-                    //     |output| {
-                    //         output.userdata().insert_if_missing(|| UdevOutputId {
-                    //             crtc,
-                    //             device_id: drm.device_id(),
-                    //         });
-                    //     },
-                    // );
-
                     let timer = Timer::new().unwrap();
 
                     let mut imgui = imgui::Context::create();
@@ -392,6 +377,7 @@ fn scan_connectors(
                         connector_info,
                         crtc,
                     })));
+                    backends_order.push(crtc);
 
                     handle
                         .insert_source(timer, |(dev_id, crtc), _, state| {
@@ -405,7 +391,7 @@ fn scan_connectors(
         }
     }
 
-    backends
+    (backends, backends_order)
 }
 
 impl BackendState {
@@ -495,7 +481,7 @@ impl BackendState {
                 }
             }
 
-            let outputs = scan_connectors(
+            let (outputs, outputs_order) = scan_connectors(
                 self.handle.clone(),
                 &mut drm,
                 &gbm,
@@ -508,23 +494,27 @@ impl BackendState {
             {
                 let mut inner = inner.borrow_mut();
 
-                for output in outputs.values() {
+                for output in outputs_order {
                     let output = {
+                        let output = outputs.get(&output).unwrap();
+
                         let display = inner.display.clone();
                         let display = &mut *display.borrow_mut();
 
                         let output = &*output.borrow();
                         let crtc = output.crtc;
 
+                        let (phys_w, phys_h) = output.connector_info.size().unwrap_or((0, 0));
+
                         let output = Output::new(
                             &output.output_name,
                             Default::default(),
                             display,
                             PhysicalProperties {
-                                size: (0, 0).into(),
+                                size: (phys_w as i32, phys_h as i32).into(),
                                 subpixel: wl_output::Subpixel::Unknown,
                                 make: "Smithay".into(),
-                                model: "Winit".into(),
+                                model: "Generic DRM".into(),
                             },
                             output.mode,
                             // TODO: output should always have a workspace
