@@ -50,7 +50,6 @@ impl X11Surface {
         self.conn.flush().unwrap();
     }
 
-    #[allow(dead_code)]
     pub fn move_to(&self, x: i32, y: i32) {
         let aux = ConfigureWindowAux::default().x(x).y(y);
         self.conn.configure_window(self.window, &aux).ok();

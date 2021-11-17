@@ -49,6 +49,8 @@ impl Positioner for Floating {
                     reposition = false;
                 }
             }
+        } else if let WindowSurface::X11(_) = window.toplevel() {
+            reposition = false;
         }
 
         if reposition {

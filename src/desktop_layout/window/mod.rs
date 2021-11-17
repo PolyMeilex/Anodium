@@ -90,7 +90,6 @@ impl WindowSurface {
         }
     }
 
-    #[allow(dead_code)]
     pub fn resize(&self, size: Size<i32, Logical>) {
         match self {
             WindowSurface::Xdg(t) => {
@@ -103,6 +102,14 @@ impl WindowSurface {
             }
             #[cfg(feature = "xwayland")]
             WindowSurface::X11(t) => t.resize(size.w as u32, size.h as u32),
+        };
+    }
+
+    pub fn notify_move(&self, pos: Point<i32, Logical>) {
+        match self {
+            #[cfg(feature = "xwayland")]
+            WindowSurface::X11(t) => t.move_to(pos.x as i32, pos.y as i32),
+            _ => {}
         };
     }
 }
@@ -143,6 +150,7 @@ struct Inner {
 impl Inner {
     pub fn set_location(&mut self, location: Point<i32, Logical>) {
         self.location = location;
+        self.toplevel.notify_move(location);
         self.self_update();
     }
 
