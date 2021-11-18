@@ -11,18 +11,21 @@ use std::{
 };
 
 use smithay::{
-    backend::{renderer::Frame, session::Session},
+    backend::{
+        renderer::{gles2::Gles2Texture, Frame, Transform},
+        session::Session,
+    },
     nix::libc::dev_t,
     reexports::{
         calloop::{generic::Generic, Interest, LoopHandle, Mode, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point, Rectangle},
+    utils::{Logical, Point},
     wayland::{
         data_device::{
             default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent,
         },
-        output::{xdg::init_xdg_output_manager, PhysicalProperties},
+        output::xdg::init_xdg_output_manager,
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
         shell::wlr_layer::Layer,
         shm::init_shm_global,
@@ -34,7 +37,7 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
-    backend::{session::AnodiumSession, udev},
+    backend::{session::AnodiumSession, udev, BackendEvent},
     config::ConfigVM,
     desktop_layout::{DesktopLayout, Output},
     render::{self, renderer::RenderFrame},
@@ -62,6 +65,8 @@ pub struct Anodium {
     pub desktop_layout: Rc<RefCell<DesktopLayout>>,
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
+    pub cursor_status: Arc<Mutex<CursorImageStatus>>,
+    pub pointer_image: crate::cursor::Cursor,
 
     pub input_state: InputState,
 
@@ -90,8 +95,11 @@ impl Anodium {
     pub fn render(
         &mut self,
         frame: &mut RenderFrame,
-        (output_geometry, output_scale): (Rectangle<i32, Logical>, f64),
+        output: &Output,
+        pointer_image: Option<&Gles2Texture>,
     ) -> Result<(), smithay::backend::SwapBuffersError> {
+        let (output_geometry, output_scale) = (output.geometry(), output.scale());
+
         frame.clear([0.1, 0.1, 0.1, 1.0])?;
 
         // Layers bellow windows
@@ -162,6 +170,48 @@ impl Anodium {
                             relative_ptr_location,
                             output_scale,
                         )?;
+                    }
+                }
+            }
+
+            // set cursor
+            {
+                let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
+                let relative_ptr_location =
+                    Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
+                // draw the cursor as relevant
+                {
+                    let mut cursor_status = self.cursor_status.lock().unwrap();
+                    // reset the cursor if the surface is no longer alive
+                    let mut reset = false;
+                    if let CursorImageStatus::Image(ref surface) = *cursor_status {
+                        reset = !surface.as_ref().is_alive();
+                    }
+                    if reset {
+                        *cursor_status = CursorImageStatus::Default;
+                    }
+
+                    if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
+                        render::draw_cursor(
+                            frame,
+                            wl_surface,
+                            relative_ptr_location,
+                            output_scale,
+                        )?;
+                    } else {
+                        if let Some(pointer_image) = pointer_image {
+                            frame.render_texture_at(
+                                pointer_image,
+                                relative_ptr_location
+                                    .to_f64()
+                                    .to_physical(output_scale as f64)
+                                    .to_i32_round(),
+                                1,
+                                output_scale as f64,
+                                Transform::Normal,
+                                1.0,
+                            )?;
+                        }
                     }
                 }
             }
@@ -279,14 +329,14 @@ impl Anodium {
         self.desktop_layout.borrow_mut().retain_outputs(f);
     }
 
-    pub fn send_frames(&self, time: u32) {
+    pub fn send_frames(&self) {
+        let time = self.start_time.elapsed().as_millis() as u32;
         self.desktop_layout.borrow().send_frames(time);
     }
 }
 
 pub struct BackendState {
     pub handle: LoopHandle<'static, Self>,
-    pub cursor_status: Arc<Mutex<CursorImageStatus>>,
 
     pub anodium: Anodium,
 
@@ -296,7 +346,6 @@ pub struct BackendState {
     // Backend
     pub primary_gpu: Option<PathBuf>,
     pub udev_devices: HashMap<dev_t, udev::UdevDeviceData>,
-    pub pointer_image: crate::cursor::Cursor,
 
     pub log: slog::Logger,
 }
@@ -306,8 +355,9 @@ impl BackendState {
         display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
         session: AnodiumSession,
-        log: slog::Logger,
     ) -> Self {
+        let log = slog_scope::logger();
+
         // init the wayland connection
         handle
             .insert_source(
@@ -418,7 +468,6 @@ impl BackendState {
 
         BackendState {
             handle,
-            cursor_status,
             anodium: Anodium {
                 running: Arc::new(AtomicBool::new(true)),
 
@@ -430,7 +479,10 @@ impl BackendState {
                 ))),
 
                 display,
+
                 dnd_icon,
+                cursor_status,
+                pointer_image: crate::cursor::Cursor::load(&log),
 
                 input_state: InputState {
                     pointer_location: (0.0, 0.0).into(),
@@ -456,7 +508,36 @@ impl BackendState {
 
             primary_gpu: None,
             udev_devices: Default::default(),
-            pointer_image: crate::cursor::Cursor::load(&log),
+        }
+    }
+
+    pub fn handle_backend_event(&mut self, event: BackendEvent) {
+        match event {
+            BackendEvent::OutputCreated { output } => {
+                self.anodium.add_output(output, |_| {});
+            }
+            BackendEvent::OutputModeUpdate { output, mode } => {
+                self.anodium
+                    .desktop_layout
+                    .borrow_mut()
+                    .update_output_mode_by_name(mode, output.name());
+            }
+            BackendEvent::OutputRender {
+                frame,
+                output,
+                pointer_image,
+            } => {
+                self.anodium.render(frame, output, pointer_image).ok();
+            }
+            BackendEvent::SendFrames => {
+                self.anodium.send_frames();
+            }
+            BackendEvent::StartCompositor => {
+                self.start();
+            }
+            BackendEvent::CloseCompositor => {
+                self.anodium.running.store(false, Ordering::SeqCst);
+            }
         }
     }
 

@@ -6,7 +6,7 @@ use smithay::{
         Display,
     },
     utils::{Logical, Point},
-    wayland::output::{Mode, PhysicalProperties},
+    wayland::output::Mode,
 };
 
 use crate::config::ConfigVM;

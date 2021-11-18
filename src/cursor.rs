@@ -10,6 +10,7 @@ static FALLBACK_CURSOR_DATA: &[u8] = include_bytes!("../resources/cursor.rgba");
 pub struct Cursor {
     icons: Vec<Image>,
     size: u32,
+    start_time: std::time::Instant,
 }
 
 impl Cursor {
@@ -44,11 +45,17 @@ impl Cursor {
                 }]
             });
 
-        Cursor { icons, size }
+        Cursor {
+            icons,
+            size,
+            start_time: std::time::Instant::now(),
+        }
     }
 
-    pub fn get_image(&self, scale: u32, millis: u32) -> Image {
+    pub fn get_image(&self, scale: u32) -> Image {
         let size = self.size * scale;
+        let millis = self.start_time.elapsed().as_millis();
+
         frame(millis, size, &self.icons)
     }
 }
@@ -65,15 +72,15 @@ fn nearest_images(size: u32, images: &[Image]) -> impl Iterator<Item = &Image> {
     })
 }
 
-fn frame(mut millis: u32, size: u32, images: &[Image]) -> Image {
-    let total = nearest_images(size, images).fold(0, |acc, image| acc + image.delay);
+fn frame(mut millis: u128, size: u32, images: &[Image]) -> Image {
+    let total = nearest_images(size, images).fold(0, |acc, image| acc + image.delay) as u128;
     millis %= total;
 
     for img in nearest_images(size, images) {
-        if millis < img.delay {
+        if millis < img.delay as u128 {
             return img.clone();
         }
-        millis -= img.delay;
+        millis -= img.delay as u128;
     }
 
     unreachable!()

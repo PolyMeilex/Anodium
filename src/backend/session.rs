@@ -1,5 +1,5 @@
 use smithay::backend::session::{
-    auto::{AutoSession, Error},
+    auto::{AutoSession, AutoSessionNotifier, Error},
     Session,
 };
 use smithay::reexports::nix::fcntl::OFlag;
@@ -12,8 +12,15 @@ pub struct AnodiumSession {
 }
 
 impl AnodiumSession {
-    pub fn new_udev(s: AutoSession) -> Self {
-        Self { udev: Some(s) }
+    pub fn new_udev() -> Option<(Self, AutoSessionNotifier)> {
+        let (session, notifier) = AutoSession::new(slog_scope::logger())?;
+
+        Some((
+            Self {
+                udev: Some(session),
+            },
+            notifier,
+        ))
     }
 
     pub fn new_winit() -> Self {

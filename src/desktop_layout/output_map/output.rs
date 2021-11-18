@@ -25,7 +25,7 @@ struct Inner {
     pub(super) layer_map: LayerMap,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Output {
     inner: Rc<RefCell<Inner>>,
 }

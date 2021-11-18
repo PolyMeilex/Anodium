@@ -5,24 +5,38 @@ pub mod winit;
 
 pub mod session;
 
+use smithay::backend::renderer::gles2::Gles2Texture;
 use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
+use smithay::wayland::output::Mode;
 use std::sync::atomic::Ordering;
 use std::{cell::RefCell, rc::Rc};
 
+use crate::backend::session::AnodiumSession;
 use crate::desktop_layout::Output;
+use crate::render::renderer::RenderFrame;
 use crate::state::BackendState;
 
-pub enum BackendEvent {
-    OutputCreated { output: Output },
+pub enum BackendEvent<'a, 'frame> {
+    OutputCreated {
+        output: Output,
+    },
+    OutputModeUpdate {
+        output: &'a Output,
+        mode: Mode,
+    },
+    OutputRender {
+        frame: &'a mut RenderFrame<'frame>,
+        output: &'a Output,
+        pointer_image: Option<&'a Gles2Texture>,
+    },
+    SendFrames,
+
+    StartCompositor,
+    CloseCompositor,
 }
 
 #[cfg(feature = "winit")]
-pub fn winit(
-    _log: slog::Logger,
-    event_loop: &mut EventLoop<'static, BackendState>,
-) -> BackendState {
-    use crate::backend::session::AnodiumSession;
-
+pub fn winit(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
     info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -30,18 +44,19 @@ pub fn winit(
         display.clone(),
         event_loop.handle(),
         AnodiumSession::new_winit(),
-        slog_scope::logger(),
     );
 
     winit::run_winit(
         display,
-        &mut state,
         event_loop,
-        |event, mut ddata| match event {
-            BackendEvent::OutputCreated { output } => {
-                let state = ddata.get::<BackendState>().unwrap();
-                state.anodium.add_output(output, |_| {});
-            }
+        &mut state,
+        |event, mut ddata| {
+            let state = ddata.get::<BackendState>().unwrap();
+            state.handle_backend_event(event);
+        },
+        |event, mut ddata| {
+            let state = ddata.get::<BackendState>().unwrap();
+            state.anodium.process_input_event(event);
         },
     )
     .expect("Failed to initialize winit backend.");
@@ -52,35 +67,51 @@ pub fn winit(
 }
 
 #[cfg(feature = "udev")]
-pub fn udev(log: slog::Logger, event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
+pub fn udev(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
     info!("Starting Anodium on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    if let Ok(state) = udev::run_udev(display, event_loop, |event, mut ddata| match event {
-        BackendEvent::OutputCreated { output } => {
+    let (session, notifier) = AnodiumSession::new_udev().expect("Could not init session!");
+
+    /*
+     * Initialize the compositor
+     */
+
+    let mut state = BackendState::init(display.clone(), event_loop.handle(), session.clone());
+
+    udev::run_udev(
+        display,
+        event_loop,
+        &mut state,
+        session,
+        notifier,
+        |event, mut ddata| {
             let state = ddata.get::<BackendState>().unwrap();
-            state.anodium.add_output(output, |_| {});
-        }
-    }) {
-        state
-    } else {
-        panic!("Failed to initialize tty backend.");
-    }
+            state.handle_backend_event(event);
+        },
+        |event, mut ddata| {
+            let state = ddata.get::<BackendState>().unwrap();
+            state.anodium.process_input_event(event);
+        },
+    )
+    .expect("Failed to initialize tty backend.");
+
+    state
 }
 
-pub fn auto(log: slog::Logger) {
+pub fn auto() {
     let mut event_loop = EventLoop::try_new().unwrap();
 
     if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
         #[cfg(feature = "winit")]
         {
-            let state = winit(log, &mut event_loop);
+            let state = winit(&mut event_loop);
             run_loop(state, event_loop)
         }
     } else {
         #[cfg(feature = "udev")]
         {
-            let state = udev(log, &mut event_loop);
+            let state = udev(&mut event_loop);
             run_loop(state, event_loop)
         }
     }

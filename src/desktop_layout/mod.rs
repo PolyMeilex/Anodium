@@ -3,10 +3,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use smithay::backend::input::{ButtonState, MouseButton};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+use smithay::reexports::wayland_server::Display;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::output::Mode;
 use smithay::wayland::shell::wlr_layer::Layer;
-use smithay::{reexports::wayland_server::Display, wayland::output::PhysicalProperties};
 
 mod output_map;
 pub use output_map::{Output, OutputMap};

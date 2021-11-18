@@ -1,49 +1,43 @@
-use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering, time::Duration};
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use smithay::backend::winit::WinitEvent;
-use smithay::reexports::wayland_server::DispatchData;
 use smithay::{
-    backend::renderer::{ImportDma, ImportEgl, Transform},
-    reexports::calloop::timer::Timer,
-    wayland::dmabuf::init_dmabuf_global,
-};
-use smithay::{
-    backend::winit,
+    backend::{
+        input::InputEvent,
+        renderer::{ImportDma, ImportEgl, Transform},
+        winit::{self, WinitEvent, WinitInput},
+    },
     reexports::{
-        calloop::EventLoop,
-        wayland_server::{protocol::wl_output, Display},
+        calloop::{timer::Timer, EventLoop},
+        wayland_server::{protocol::wl_output, DispatchData, Display},
     },
     wayland::{
+        dmabuf::init_dmabuf_global,
         output::{Mode, PhysicalProperties},
-        seat::CursorImageStatus,
     },
 };
 
-use slog::Logger;
-
-use super::session::AnodiumSession;
 use super::BackendEvent;
 
-use crate::desktop_layout::Output;
-use crate::{render::renderer::RenderFrame, render::*, state::BackendState};
+use crate::{desktop_layout::Output, render::renderer::RenderFrame, render::*};
 
 pub const OUTPUT_NAME: &str = "winit";
 
-mod input;
-
-struct WinitData {
-    cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
-}
-
-pub fn run_winit<F>(
+pub fn run_winit<F, IF, D>(
     display: Rc<RefCell<Display>>,
-    state: &mut BackendState,
-    event_loop: &mut EventLoop<'static, BackendState>,
+
+    event_loop: &mut EventLoop<'static, D>,
+    state: &mut D,
+
     mut cb: F,
+    mut input_cb: IF,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData),
+    F: FnMut(BackendEvent, DispatchData) + 'static,
+    IF: FnMut(InputEvent<WinitInput>, DispatchData) + 'static,
+    D: 'static,
 {
+    let mut ddata = DispatchData::wrap(state);
+
     let (renderer, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
         crit!("Failed to initialize Winit backend: {}", err);
     })?;
@@ -88,30 +82,30 @@ where
         refresh: 60_000,
     };
 
-    cb(
-        BackendEvent::OutputCreated {
-            output: Output::new(
-                OUTPUT_NAME,
-                Default::default(),
-                &mut *display.borrow_mut(),
-                PhysicalProperties {
-                    size: (0, 0).into(),
-                    subpixel: wl_output::Subpixel::Unknown,
-                    make: "Smithay".into(),
-                    model: "Winit".into(),
-                },
-                mode,
-                // TODO: output should always have a workspace
-                "Unknown".into(),
-                slog_scope::logger(),
-            ),
+    let output = Output::new(
+        OUTPUT_NAME,
+        Default::default(),
+        &mut *display.borrow_mut(),
+        PhysicalProperties {
+            size: (0, 0).into(),
+            subpixel: wl_output::Subpixel::Unknown,
+            make: "Smithay".into(),
+            model: "Winit".into(),
         },
-        DispatchData::wrap(state),
+        mode,
+        // TODO: output should always have a workspace
+        "Unknown".into(),
+        slog_scope::logger(),
     );
 
-    let start_time = std::time::Instant::now();
+    cb(
+        BackendEvent::OutputCreated {
+            output: output.clone(),
+        },
+        ddata.reborrow(),
+    );
 
-    state.start();
+    cb(BackendEvent::StartCompositor, ddata.reborrow());
 
     info!("imgui!");
     let mut imgui = imgui::Context::create();
@@ -138,93 +132,76 @@ where
     event_loop
         .handle()
         .insert_source(timer, move |_: (), handle, state| {
-            match input.dispatch_new_events(|event| {
-                if let WinitEvent::Resized { size, scale_factor } = &event {
-                    let io = imgui.io_mut();
-                    io.display_framebuffer_scale = [*scale_factor as f32, *scale_factor as f32];
-                    io.display_size = [size.w as f32, size.h as f32];
-                }
+            let mut ddata = DispatchData::wrap(state);
 
-                state.process_winit_event(event)
-            }) {
-                Ok(()) => {
-                    let mut renderer = renderer.borrow_mut();
-                    let outputs: Vec<_> = state
-                        .anodium
-                        .desktop_layout
-                        .borrow()
-                        .output_map
-                        .iter()
-                        .map(|o| (o.geometry(), o.scale()))
-                        .collect();
-
-                    for (output_geometry, output_scale) in outputs {
-                        renderer
-                            .render(|renderer, frame| {
-                                let mut frame = RenderFrame {
-                                    transform: Transform::Normal,
-                                    renderer,
-                                    frame,
-                                };
-
-                                state
-                                    .anodium
-                                    .render(&mut frame, (output_geometry, output_scale))
-                                    .unwrap();
-
-                                {
-                                    let ui = imgui.frame();
-                                    draw_fps(&ui, 1.0, fps.avg());
-                                    let draw_data = ui.render();
-                                    frame
-                                        .renderer
-                                        .with_context(|_renderer, gles| {
-                                            imgui_pipeline.render(
-                                                Transform::Normal,
-                                                gles,
-                                                draw_data,
-                                            );
-                                        })
-                                        .unwrap();
-                                }
-
-                                // draw the cursor as relevant
-                                {
-                                    let (x, y) = state.anodium.input_state.pointer_location.into();
-                                    let mut guard = state.cursor_status.lock().unwrap();
-                                    // reset the cursor if the surface is no longer alive
-                                    let mut reset = false;
-                                    if let CursorImageStatus::Image(ref surface) = *guard {
-                                        reset = !surface.as_ref().is_alive();
-                                    }
-                                    if reset {
-                                        *guard = CursorImageStatus::Default;
-                                    }
-
-                                    // draw as relevant
-                                    if let CursorImageStatus::Image(ref surface) = *guard {
-                                        draw_cursor(
-                                            &mut frame,
-                                            surface,
-                                            (x as i32, y as i32).into(),
-                                            output_scale,
-                                        )
-                                        .unwrap();
-                                    }
-                                }
-                            })
-                            .unwrap();
+            let res = input.dispatch_new_events(|event| match event {
+                WinitEvent::Resized { size, scale_factor } => {
+                    {
+                        let io = imgui.io_mut();
+                        io.display_framebuffer_scale = [scale_factor as f32, scale_factor as f32];
+                        io.display_size = [size.w as f32, size.h as f32];
                     }
 
-                    let time = start_time.elapsed().as_millis() as u32;
-                    state.anodium.send_frames(time);
+                    cb(
+                        BackendEvent::OutputModeUpdate {
+                            output: &output,
+                            mode: Mode {
+                                size,
+                                refresh: 60_000,
+                            },
+                        },
+                        ddata.reborrow(),
+                    );
+                }
+                WinitEvent::Input(event) => {
+                    input_cb(event, ddata.reborrow());
+                }
+                _ => {}
+            });
+
+            match res {
+                Ok(()) => {
+                    let mut renderer = renderer.borrow_mut();
+
+                    renderer
+                        .render(|renderer, frame| {
+                            let mut frame = RenderFrame {
+                                transform: Transform::Normal,
+                                renderer,
+                                frame,
+                            };
+
+                            cb(
+                                BackendEvent::OutputRender {
+                                    frame: &mut frame,
+                                    output: &output,
+                                    pointer_image: None,
+                                },
+                                ddata.reborrow(),
+                            );
+
+                            {
+                                let ui = imgui.frame();
+                                draw_fps(&ui, 1.0, fps.avg());
+                                let draw_data = ui.render();
+                                frame
+                                    .renderer
+                                    .with_context(|_renderer, gles| {
+                                        imgui_pipeline.render(Transform::Normal, gles, draw_data);
+                                    })
+                                    .unwrap();
+                            }
+                        })
+                        .unwrap();
+
+                    cb(BackendEvent::SendFrames, ddata);
 
                     fps.tick();
 
                     handle.add_timeout(Duration::from_millis(16), ());
                 }
                 Err(winit::WinitError::WindowClosed) => {
-                    state.anodium.running.store(false, Ordering::SeqCst);
+                    cb(BackendEvent::CloseCompositor, ddata);
                 }
             }
         })
