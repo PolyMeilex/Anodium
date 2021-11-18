@@ -32,5 +32,5 @@ fn main() {
     let _guard = slog_scope::set_global_logger(log.clone());
     slog_stdlog::init().expect("Could not setup log backend");
 
-    backend::auto(log);
+    backend::auto();
 }

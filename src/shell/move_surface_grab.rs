@@ -111,7 +111,7 @@ impl PointerGrab for MoveSurfaceGrab {
                 {
                     desktop_layout
                         .workspaces
-                        .get_mut(key)
+                        .get_mut(&key)
                         .unwrap()
                         .map_toplevel(window, false);
                 } else {

@@ -6,7 +6,7 @@ use smithay::{
         Display,
     },
     utils::{Logical, Point},
-    wayland::output::{Mode, PhysicalProperties},
+    wayland::output::Mode,
 };
 
 use crate::config::ConfigVM;
@@ -42,40 +42,22 @@ impl OutputMap {
 
         for config in configs {
             if let Some(output) = self.outputs.get_mut(config.id()) {
-                output.location = config.location();
-                output
-                    .output
-                    .change_current_state(None, None, None, Some(output.location));
+                output.set_location(config.location());
+                output.change_current_state(None, None, None, Some(output.location()));
 
-                output.layer_map.arange(output.geometry())
+                let geometry = output.geometry();
+                output.layer_map_mut().arange(geometry)
             }
         }
     }
 
-    pub fn add<N>(
-        &mut self,
-        name: N,
-        physical: PhysicalProperties,
-        mode: Mode,
-        active_workspace: String,
-    ) -> &Output
-    where
-        N: AsRef<str>,
-    {
+    pub fn add(&mut self, mut output: Output) -> &Output {
         // Append the output to the end of the existing
         // outputs by placing it after the current overall
         // width
         let location = (self.width(), 0);
 
-        let output = Output::new(
-            name,
-            location.into(),
-            &mut *self.display.borrow_mut(),
-            physical,
-            mode,
-            active_workspace,
-            self.logger.clone(),
-        );
+        output.set_location(location.into());
 
         self.outputs.push(output);
 
@@ -132,14 +114,14 @@ impl OutputMap {
 
     #[allow(dead_code)]
     pub fn find_by_output(&self, output: &wl_output::WlOutput) -> Option<&Output> {
-        self.find(|o| o.output.owns(output))
+        self.find(|o| o.inner_output().owns(output))
     }
 
     pub fn find_by_name<N>(&self, name: N) -> Option<&Output>
     where
         N: AsRef<str>,
     {
-        self.find(|o| o.name == name.as_ref())
+        self.find(|o| &o.name() == name.as_ref())
     }
 
     #[allow(dead_code)]
@@ -167,23 +149,26 @@ impl OutputMap {
 
         if let Some(output) = output {
             if let Some(mode) = mode {
-                output.output.delete_mode(output.current_mode);
-                output.output.change_current_state(
-                    Some(mode),
-                    None,
-                    Some(output.scale.round() as i32),
-                    None,
-                );
-                output.output.set_preferred(mode);
-                output.current_mode = mode;
+                let scale = output.scale().round() as i32;
+                let current_mode = output.current_mode();
+
+                {
+                    let output = output.inner_output();
+                    output.delete_mode(current_mode);
+                    output.change_current_state(Some(mode), None, Some(scale), None);
+                    output.set_preferred(mode);
+                }
+                output.set_current_mode(mode);
             }
 
             if let Some(scale) = scale {
-                if output.scale.round() as u32 != scale.round() as u32 {
-                    output.scale = scale;
+                if output.scale().round() as u32 != scale.round() as u32 {
+                    let current_mode = output.current_mode();
 
-                    output.output.change_current_state(
-                        Some(output.current_mode),
+                    output.set_scale(scale);
+
+                    output.inner_output().change_current_state(
+                        Some(current_mode),
                         None,
                         Some(scale.round() as i32),
                         None,
@@ -197,7 +182,7 @@ impl OutputMap {
 
     pub fn refresh(&mut self) {
         for output in self.outputs.iter_mut() {
-            output.layer_map.refresh();
+            output.layer_map_mut().refresh();
         }
     }
 
@@ -214,26 +199,36 @@ impl OutputMap {
 impl OutputMap {
     pub(super) fn arrange_layers(&mut self) {
         for output in self.outputs.iter_mut() {
-            output.layer_map.arange(output.geometry())
+            let geometry = output.geometry();
+            output.layer_map_mut().arange(geometry);
         }
     }
 
     pub(super) fn insert_layer(&mut self, output: Option<WlOutput>, layer: LayerSurface) {
-        let output =
-            output.and_then(|output| self.outputs.iter_mut().find(|o| o.output.owns(&output)));
+        let output = output.and_then(|output| {
+            self.outputs
+                .iter_mut()
+                .find(|o| o.inner_output().owns(&output))
+        });
 
         if let Some(output) = output {
-            output.layer_map.insert(layer);
-            output.layer_map.arange(output.geometry());
+            let geometry = output.geometry();
+            let mut layer_map = output.layer_map_mut();
+
+            layer_map.insert(layer);
+            layer_map.arange(geometry);
         } else if let Some(output) = self.outputs.get_mut(0) {
-            output.layer_map.insert(layer);
-            output.layer_map.arange(output.geometry());
+            let geometry = output.geometry();
+            let mut layer_map = output.layer_map_mut();
+
+            layer_map.insert(layer);
+            layer_map.arange(geometry);
         }
     }
 
     pub(super) fn send_frames(&self, time: u32) {
         for output in self.outputs.iter() {
-            output.layer_map.send_frames(time);
+            output.layer_map().send_frames(time);
         }
     }
 }
