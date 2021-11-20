@@ -201,10 +201,7 @@ impl DesktopLayout {
 
 // Outputs
 impl DesktopLayout {
-    pub fn add_output<CB>(&mut self, mut output: Output, after: CB)
-    where
-        CB: FnOnce(&Output),
-    {
+    pub fn add_output(&mut self, mut output: Output) {
         let id = self.workspaces.len() + 1;
         let id = format!("{}", id);
 
@@ -214,7 +211,6 @@ impl DesktopLayout {
 
         output.set_active_workspace(id.clone());
         let output = self.output_map.add(output);
-        after(&output);
 
         let mut positioner = Universal::new(Default::default(), Default::default());
         positioner.set_geometry(output.usable_geometry());

@@ -16,7 +16,7 @@ use std::rc::Rc;
 use std::sync::Mutex;
 
 use crate::desktop_layout::{LayerSurface, Window, WindowSurface};
-use crate::state::BackendState;
+use crate::state::Anodium;
 use crate::utils::LogResult;
 
 use super::surface_data::{ResizeData, ResizeEdge, ResizeState};
@@ -300,7 +300,7 @@ impl ShellManager {
     #[cfg(feature = "xwayland")]
     pub fn xwayland_ready(
         &mut self,
-        handle: &LoopHandle<BackendState>,
+        handle: &LoopHandle<Anodium>,
         connection: UnixStream,
         client: Client,
     ) {

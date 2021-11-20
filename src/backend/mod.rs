@@ -14,7 +14,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::backend::session::AnodiumSession;
 use crate::desktop_layout::Output;
 use crate::render::renderer::RenderFrame;
-use crate::state::BackendState;
+use crate::state::Anodium;
 
 pub enum BackendEvent<'a, 'frame> {
     OutputCreated {
@@ -36,11 +36,11 @@ pub enum BackendEvent<'a, 'frame> {
 }
 
 #[cfg(feature = "winit")]
-pub fn winit(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
+pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    let mut state = BackendState::init(
+    let mut state = Anodium::init(
         display.clone(),
         event_loop.handle(),
         AnodiumSession::new_winit(),
@@ -51,12 +51,12 @@ pub fn winit(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState 
         event_loop,
         &mut state,
         |event, mut ddata| {
-            let state = ddata.get::<BackendState>().unwrap();
+            let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);
         },
         |event, mut ddata| {
-            let state = ddata.get::<BackendState>().unwrap();
-            state.anodium.process_input_event(event);
+            let state = ddata.get::<Anodium>().unwrap();
+            state.process_input_event(event);
         },
     )
     .expect("Failed to initialize winit backend.");
@@ -67,7 +67,7 @@ pub fn winit(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState 
 }
 
 #[cfg(feature = "udev")]
-pub fn udev(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
+pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -77,7 +77,7 @@ pub fn udev(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
      * Initialize the compositor
      */
 
-    let mut state = BackendState::init(display.clone(), event_loop.handle(), session.clone());
+    let mut state = Anodium::init(display.clone(), event_loop.handle(), session.clone());
 
     udev::run_udev(
         display,
@@ -86,12 +86,12 @@ pub fn udev(event_loop: &mut EventLoop<'static, BackendState>) -> BackendState {
         session,
         notifier,
         |event, mut ddata| {
-            let state = ddata.get::<BackendState>().unwrap();
+            let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);
         },
         |event, mut ddata| {
-            let state = ddata.get::<BackendState>().unwrap();
-            state.anodium.process_input_event(event);
+            let state = ddata.get::<Anodium>().unwrap();
+            state.process_input_event(event);
         },
     )
     .expect("Failed to initialize tty backend.");
@@ -117,18 +117,18 @@ pub fn auto() {
     }
 }
 
-fn run_loop(mut state: BackendState, mut event_loop: EventLoop<'static, BackendState>) {
+fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
-            if state.anodium.desktop_layout.borrow().output_map.is_empty()
-                || !state.anodium.running.load(Ordering::SeqCst)
+            if state.desktop_layout.borrow().output_map.is_empty()
+                || !state.running.load(Ordering::SeqCst)
             {
                 signal.stop();
             }
 
-            state.anodium.display.borrow_mut().flush_clients(&mut ());
-            state.anodium.update();
+            state.display.borrow_mut().flush_clients(&mut ());
+            state.update();
         })
         .unwrap();
 }
