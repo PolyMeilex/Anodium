@@ -25,7 +25,9 @@ imgui-smithay-renderer = {path="./imgui-smithay-renderer"}
 rhai = "1.0.2"
 
 [dependencies.smithay]
-git = "https://github.com/Smithay/smithay.git"
+# git = "https://github.com/Smithay/smithay.git"
+git = "https://github.com/PolyMeilex/smithay.git"
+branch="seat-ddata"
 default-features = false
 features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog" ]
 

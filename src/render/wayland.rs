@@ -232,11 +232,11 @@ impl Anodium {
         };
 
         // redraw the frame, in a simple but inneficient way
-        for workspace in self.desktop_layout.borrow().visible_workspaces() {
+        for workspace in self.desktop_layout.visible_workspaces() {
             workspace.with_windows_rev(&mut |window| render(window))
         }
 
-        if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
+        if let Some(window) = self.desktop_layout.grabed_window.as_ref() {
             render(window);
         }
 
@@ -252,7 +252,7 @@ impl Anodium {
     ) -> Result<(), SwapBuffersError> {
         let mut result = Ok(());
 
-        for output in self.desktop_layout.borrow().output_map.iter() {
+        for output in self.desktop_layout.output_map.iter() {
             output
                 .layer_map()
                 .with_layers_from_bottom_to_top(&layer, |layer_surface| {

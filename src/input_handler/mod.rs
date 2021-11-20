@@ -36,7 +36,6 @@ impl Anodium {
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output_size = self
                     .desktop_layout
-                    .borrow()
                     .output_map
                     .find_by_name(crate::backend::winit::OUTPUT_NAME)
                     .map(|o| o.size());
@@ -114,7 +113,6 @@ impl Anodium {
                 if !self.input_state.pointer.is_grabbed() {
                     let under = self
                         .desktop_layout
-                        .borrow()
                         .surface_under(self.input_state.pointer_location);
 
                     self.input_state
@@ -127,13 +125,13 @@ impl Anodium {
         };
         self.input_state
             .pointer
-            .button(button, state, serial, evt.time());
+            .clone()
+            .button(button, state, serial, evt.time(), self);
 
         {
             if evt.state() == input::ButtonState::Pressed {
                 let under = self
                     .desktop_layout
-                    .borrow()
                     .surface_under(self.input_state.pointer_location);
 
                 if self.input_state.modifiers_state.logo {
@@ -144,10 +142,8 @@ impl Anodium {
                         if pointer.has_grab(serial) {
                             let start_data = pointer.grab_start_data().unwrap();
 
-                            let mut desktop_layout = self.desktop_layout.borrow_mut();
-
                             if let Some(space) =
-                                desktop_layout.find_workspace_by_surface_mut(&surface)
+                                self.desktop_layout.find_workspace_by_surface_mut(&surface)
                             {
                                 if let Some(window) = space.find_window(&surface) {
                                     let toplevel = window.toplevel();
@@ -159,14 +155,13 @@ impl Anodium {
                                         &start_data,
                                     ) {
                                         if let Some(window) = space.unmap_toplevel(&toplevel) {
-                                            desktop_layout.grabed_window = Some(window);
+                                            self.desktop_layout.grabed_window = Some(window);
 
                                             let grab = MoveSurfaceGrab {
                                                 start_data,
                                                 toplevel,
                                                 initial_window_location: res
                                                     .initial_window_location,
-                                                desktop_layout: self.desktop_layout.clone(),
                                             };
                                             pointer.set_grab(grab, serial);
                                         }
@@ -180,9 +175,7 @@ impl Anodium {
         }
 
         if let Some(btn) = evt.button() {
-            self.desktop_layout
-                .borrow_mut()
-                .on_pointer_button(btn, evt.state());
+            self.desktop_layout.on_pointer_button(btn, evt.state());
         }
     }
 
@@ -221,7 +214,7 @@ impl Anodium {
             } else if source == wl_pointer::AxisSource::Finger {
                 frame = frame.stop(wl_pointer::Axis::VerticalScroll);
             }
-            self.input_state.pointer.axis(frame);
+            self.input_state.pointer.clone().axis(frame, self);
         }
     }
 
@@ -229,25 +222,27 @@ impl Anodium {
         let serial = SCOUNTER.next_serial();
 
         self.desktop_layout
-            .borrow_mut()
             .on_pointer_move(self.input_state.pointer_location);
 
         let under = self
             .desktop_layout
-            .borrow()
             .surface_under(self.input_state.pointer_location);
-        self.input_state
-            .pointer
-            .motion(self.input_state.pointer_location, under, serial, time);
+        self.input_state.pointer.clone().motion(
+            self.input_state.pointer_location,
+            under,
+            serial,
+            time,
+            self,
+        );
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {
-        if self.desktop_layout.borrow().output_map.is_empty() {
+        if self.desktop_layout.output_map.is_empty() {
             return pos;
         }
 
         let (pos_x, pos_y) = pos.into();
-        let output_map = &self.desktop_layout.borrow().output_map;
+        let output_map = &self.desktop_layout.output_map;
         let max_x = output_map.width();
         let clamped_x = pos_x.max(0.0).min(max_x as f64);
         let max_y = output_map.height(clamped_x as i32);
@@ -332,9 +327,7 @@ impl Anodium {
             // }
             // TODO:
             KeyAction::Workspace(num) => {
-                self.desktop_layout
-                    .borrow_mut()
-                    .switch_workspace(&format!("{}", num));
+                self.desktop_layout.switch_workspace(&format!("{}", num));
             }
             action => {
                 warn!("Key action {:?} unsupported on winit backend.", action);

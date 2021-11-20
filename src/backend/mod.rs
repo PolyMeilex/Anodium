@@ -121,9 +121,7 @@ fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
-            if state.desktop_layout.borrow().output_map.is_empty()
-                || !state.running.load(Ordering::SeqCst)
-            {
+            if state.desktop_layout.output_map.is_empty() || !state.running.load(Ordering::SeqCst) {
                 signal.stop();
             }
 

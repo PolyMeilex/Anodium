@@ -1,7 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
-
 use smithay::{
-    reexports::wayland_server::protocol::{wl_pointer::ButtonState, wl_surface},
+    reexports::wayland_server::{
+        protocol::{wl_pointer::ButtonState, wl_surface},
+        DispatchData,
+    },
     utils::{Logical, Point},
     wayland::{
         seat::{AxisFrame, GrabStartData, PointerGrab, PointerInnerHandle},
@@ -9,7 +10,7 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{DesktopLayout, WindowSurface};
+use crate::{desktop_layout::WindowSurface, state::Anodium};
 
 use super::{MoveAfterResizeState, SurfaceData};
 
@@ -18,8 +19,6 @@ pub struct MoveSurfaceGrab {
 
     pub toplevel: WindowSurface,
     pub initial_window_location: Point<i32, Logical>,
-
-    pub desktop_layout: Rc<RefCell<DesktopLayout>>,
 }
 
 impl PointerGrab for MoveSurfaceGrab {
@@ -30,10 +29,13 @@ impl PointerGrab for MoveSurfaceGrab {
         _focus: Option<(wl_surface::WlSurface, Point<i32, Logical>)>,
         _serial: Serial,
         _time: u32,
+        mut ddata: DispatchData,
     ) {
+        let anodium = ddata.get::<Anodium>().unwrap();
+
         let delta = location - self.start_data.location;
 
-        if let Some(window) = self.desktop_layout.borrow_mut().grabed_window.as_mut() {
+        if let Some(window) = anodium.desktop_layout.grabed_window.as_mut() {
             if let Some(surface) = window.toplevel().get_surface() {
                 // Check if there is MoveAfterResize in progress
                 let started = SurfaceData::with(surface, |data| {
@@ -81,7 +83,10 @@ impl PointerGrab for MoveSurfaceGrab {
         state: ButtonState,
         serial: Serial,
         time: u32,
+        mut ddata: DispatchData,
     ) {
+        let anodium = ddata.get::<Anodium>().unwrap();
+
         handle.button(button, state, serial, time);
         if handle.current_pressed().is_empty() {
             // TODO:
@@ -98,7 +103,7 @@ impl PointerGrab for MoveSurfaceGrab {
             // }
 
             {
-                let desktop_layout = &mut *self.desktop_layout.borrow_mut();
+                let desktop_layout = &mut anodium.desktop_layout;
 
                 let window = desktop_layout.grabed_window.take().unwrap();
 
@@ -126,7 +131,12 @@ impl PointerGrab for MoveSurfaceGrab {
         }
     }
 
-    fn axis(&mut self, handle: &mut PointerInnerHandle<'_>, details: AxisFrame) {
+    fn axis(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        details: AxisFrame,
+        _ddata: DispatchData,
+    ) {
         handle.axis(details)
     }
 

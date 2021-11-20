@@ -1,7 +1,10 @@
 use smithay::{
     reexports::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
-        wayland_server::protocol::{wl_pointer::ButtonState, wl_surface},
+        wayland_server::{
+            protocol::{wl_pointer::ButtonState, wl_surface},
+            DispatchData,
+        },
     },
     utils::{Logical, Point, Size},
     wayland::{
@@ -32,6 +35,7 @@ impl PointerGrab for ResizeSurfaceGrab {
         _focus: Option<(wl_surface::WlSurface, Point<i32, Logical>)>,
         serial: Serial,
         time: u32,
+        _ddata: DispatchData,
     ) {
         // It is impossible to get `min_size` and `max_size` of dead toplevel, so we return early.
         if !self.toplevel.alive() | self.toplevel.get_surface().is_none() {
@@ -111,6 +115,7 @@ impl PointerGrab for ResizeSurfaceGrab {
         state: ButtonState,
         serial: Serial,
         time: u32,
+        _ddata: DispatchData,
     ) {
         handle.button(button, state, serial, time);
         if handle.current_pressed().is_empty() {
@@ -150,7 +155,12 @@ impl PointerGrab for ResizeSurfaceGrab {
         }
     }
 
-    fn axis(&mut self, handle: &mut PointerInnerHandle<'_>, details: AxisFrame) {
+    fn axis(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        details: AxisFrame,
+        _ddata: DispatchData,
+    ) {
         handle.axis(details)
     }
 
