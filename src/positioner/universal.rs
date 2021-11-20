@@ -24,7 +24,6 @@ pub struct Universal {
 }
 
 impl Universal {
-    #[allow(unused)]
     pub fn new(pointer_position: Point<f64, Logical>, geometry: Rectangle<i32, Logical>) -> Self {
         Self {
             floating: Floating::new(pointer_position, geometry),
