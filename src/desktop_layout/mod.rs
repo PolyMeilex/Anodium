@@ -215,14 +215,7 @@ impl DesktopLayout {
         let positioner = Universal::new(Default::default(), Default::default());
 
         self.workspaces.insert(id, Box::new(positioner));
-
-        for output in self.output_map.iter() {
-            let active_workspace = output.active_workspace();
-
-            if let Some(workspace) = self.workspaces.get_mut(&active_workspace) {
-                workspace.set_geometry(output.usable_geometry());
-            }
-        }
+        self.update_workspaces_geometry();
     }
 
     pub fn update_output_mode_by_name<N: AsRef<str>>(&mut self, mode: Mode, name: N) {
