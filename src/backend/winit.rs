@@ -165,32 +165,35 @@ where
 
                     renderer
                         .render(|renderer, frame| {
-                            let mut frame = RenderFrame {
-                                transform: Transform::Normal,
-                                renderer,
-                                frame,
-                            };
-
-                            cb(
-                                BackendEvent::OutputRender {
-                                    frame: &mut frame,
-                                    output: &output,
-                                    pointer_image: None,
-                                },
-                                ddata.reborrow(),
-                            );
+                            let ui = imgui.frame();
 
                             {
-                                let ui = imgui.frame();
-                                draw_fps(&ui, 1.0, fps.avg());
-                                let draw_data = ui.render();
-                                frame
-                                    .renderer
-                                    .with_context(|_renderer, gles| {
-                                        imgui_pipeline.render(Transform::Normal, gles, draw_data);
-                                    })
-                                    .unwrap();
+                                let mut frame = RenderFrame {
+                                    transform: Transform::Normal,
+                                    renderer,
+                                    frame,
+                                    imgui: &ui,
+                                };
+
+                                cb(
+                                    BackendEvent::OutputRender {
+                                        frame: &mut frame,
+                                        output: &output,
+                                        pointer_image: None,
+                                    },
+                                    ddata.reborrow(),
+                                );
                             }
+
+                            draw_fps(&ui, 1.0, fps.avg());
+
+                            let draw_data = ui.render();
+
+                            renderer
+                                .with_context(|_renderer, gles| {
+                                    imgui_pipeline.render(Transform::Normal, gles, draw_data);
+                                })
+                                .unwrap();
                         })
                         .unwrap();
 

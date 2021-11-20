@@ -7,6 +7,7 @@ use smithay::backend::renderer::{
 pub struct RenderFrame<'a> {
     pub transform: Transform,
     pub frame: &'a mut Gles2Frame,
+    pub imgui: &'a imgui::Ui<'a>,
 
     pub renderer: &'a mut Gles2Renderer,
 }

@@ -757,31 +757,33 @@ fn render_output_surface(
             surface.mode.size,
             Transform::Flipped180, // Scanout is rotated
             |renderer, frame| {
-                let mut frame = RenderFrame {
-                    transform: Transform::Flipped180,
-                    renderer,
-                    frame,
-                };
-
-                cb(
-                    BackendEvent::OutputRender {
-                        frame: &mut frame,
-                        output,
-                        pointer_image: Some(pointer_image),
-                    },
-                    ddata,
-                );
+                let imgui = surface.imgui.take().unwrap();
+                let mut imgui = imgui.activate().unwrap();
+                let ui = imgui.frame();
 
                 {
-                    let imgui = surface.imgui.take().unwrap();
+                    let mut frame = RenderFrame {
+                        transform: Transform::Flipped180,
+                        renderer,
+                        frame,
+                        imgui: &ui,
+                    };
 
-                    let mut imgui = imgui.activate().unwrap();
-                    let ui = imgui.frame();
+                    cb(
+                        BackendEvent::OutputRender {
+                            frame: &mut frame,
+                            output,
+                            pointer_image: Some(pointer_image),
+                        },
+                        ddata,
+                    );
+                }
+
+                {
                     draw_fps(&ui, 1.0, surface.fps.avg());
                     let draw_data = ui.render();
 
-                    frame
-                        .renderer
+                    renderer
                         .with_context(|_renderer, gles| {
                             surface
                                 .imgui_pipeline

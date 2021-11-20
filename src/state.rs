@@ -332,24 +332,18 @@ impl Anodium {
         //     }
         // }
 
-        // #[cfg(feature = "debug")]
-        // if let Some(o) = self
-        //     .desktop_layout
-        //     .borrow()
-        //     .output_map
-        //     .find_by_position(output_geometry.loc)
-        // {
-        //     let space = o.active_workspace();
-        //     let ui = &frame.imgui_frame;
+        {
+            let space = output.active_workspace();
+            let ui = &frame.imgui;
 
-        //     imgui::Window::new(imgui::im_str!("Workspace"))
-        //         .size([100.0, 20.0], imgui::Condition::Always)
-        //         .position([0.0, 30.0], imgui::Condition::Always)
-        //         .title_bar(false)
-        //         .build(&ui, || {
-        //             ui.text(&format!("Workspace: {}", space));
-        //         });
-        // }
+            imgui::Window::new("Workspace")
+                .size([100.0, 20.0], imgui::Condition::Always)
+                .position([0.0, 30.0], imgui::Condition::Always)
+                .title_bar(false)
+                .build(&ui, || {
+                    ui.text(&format!("Workspace: {}", space));
+                });
+        }
 
         // Pointer Related:
         if output_geometry
