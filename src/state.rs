@@ -19,14 +19,11 @@ use smithay::{
     },
     utils::{Logical, Point},
     wayland::{
-        data_device::{
-            default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent,
-        },
+        data_device::{self, DataDeviceEvent},
         output::xdg::init_xdg_output_manager,
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
         shell::wlr_layer::Layer,
         shm::init_shm_global,
-        tablet_manager::{init_tablet_manager_global, TabletSeatTrait},
     },
 };
 
@@ -83,18 +80,12 @@ pub struct Anodium {
 }
 
 impl Anodium {
-    pub fn init(
-        display: Rc<RefCell<Display>>,
-        handle: LoopHandle<'static, Self>,
-        session: AnodiumSession,
-    ) -> Self {
-        let log = slog_scope::logger();
-
-        // init the wayland connection
+    /// init the wayland connection
+    fn init_wayland_connection(handle: &LoopHandle<'static, Self>, display: &Rc<RefCell<Display>>) {
         handle
             .insert_source(
                 Generic::from_fd(display.borrow().get_poll_fd(), Interest::READ, Mode::Level),
-                move |_, _, state: &mut Self| {
+                |_, _, state: &mut Self| {
                     let display = state.display.clone();
                     let mut display = display.borrow_mut();
                     match display.dispatch(std::time::Duration::from_millis(0), state) {
@@ -108,10 +99,110 @@ impl Anodium {
                 },
             )
             .expect("Failed to init the wayland event source.");
+    }
+
+    /// init the xwayland connection
+    #[cfg(feature = "xwayland")]
+    fn init_xwayland_connection(
+        handle: &LoopHandle<'static, Self>,
+        display: &Rc<RefCell<Display>>,
+    ) -> XWayland<Self> {
+        let (xwayland, channel) =
+            XWayland::new(handle.clone(), display.clone(), slog_scope::logger());
+
+        let ret = handle.insert_source(channel, {
+            let handle = handle.clone();
+            move |event, _, state| match event {
+                XWaylandEvent::Ready { connection, client } => state
+                    .shell_manager
+                    .xwayland_ready(&handle, connection, client),
+                XWaylandEvent::Exited => {
+                    error!("Xwayland crashed");
+                }
+            }
+        });
+        if let Err(e) = ret {
+            error!(
+                "Failed to insert the XWaylandSource into the event loop: {}",
+                e
+            );
+        }
+        xwayland
+    }
+
+    /// init data device
+    fn init_data_device(display: &Rc<RefCell<Display>>) -> Arc<Mutex<Option<WlSurface>>> {
+        let dnd_icon = Arc::new(Mutex::new(None));
+
+        data_device::init_data_device(
+            &mut display.borrow_mut(),
+            {
+                let dnd_icon = dnd_icon.clone();
+                move |event| match event {
+                    DataDeviceEvent::DnDStarted { icon, .. } => {
+                        *dnd_icon.lock().unwrap() = icon;
+                    }
+                    DataDeviceEvent::DnDDropped => {
+                        *dnd_icon.lock().unwrap() = None;
+                    }
+                    _ => {}
+                }
+            },
+            data_device::default_action_chooser,
+            slog_scope::logger(),
+        );
+
+        dnd_icon
+    }
+
+    /// init wayland seat, keyboard and pointer
+    fn init_seat(
+        display: &Rc<RefCell<Display>>,
+        session: &AnodiumSession,
+    ) -> (
+        Seat,
+        PointerHandle,
+        KeyboardHandle,
+        Arc<Mutex<CursorImageStatus>>,
+    ) {
+        let (mut seat, _) = Seat::new(
+            &mut display.borrow_mut(),
+            session.seat(),
+            slog_scope::logger(),
+        );
+
+        let cursor_status = Arc::new(Mutex::new(CursorImageStatus::Default));
+
+        let pointer = seat.add_pointer({
+            let cursor_status = cursor_status.clone();
+            move |new_status| *cursor_status.lock().unwrap() = new_status
+        });
+
+        let keyboard = seat
+            .add_keyboard(XkbConfig::default(), 200, 25, |seat, focus| {
+                data_device::set_data_device_focus(seat, focus.and_then(|s| s.as_ref().client()))
+            })
+            .expect("Failed to initialize the keyboard");
+
+        (seat, pointer, keyboard, cursor_status)
+    }
+
+    pub fn init(
+        display: Rc<RefCell<Display>>,
+        handle: LoopHandle<'static, Self>,
+        session: AnodiumSession,
+    ) -> Self {
+        let log = slog_scope::logger();
+
+        // init the wayland connection
+        Self::init_wayland_connection(&handle, &display);
 
         // Init the basic compositor globals
 
         init_shm_global(&mut display.borrow_mut(), vec![], log.clone());
+        init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
+
+        let dnd_icon = Self::init_data_device(&display);
 
         let shell_manager =
             ShellManager::init_shell(&mut display.borrow_mut(), |event, mut ddata| {
@@ -119,81 +210,10 @@ impl Anodium {
                 state.on_shell_event(event);
             });
 
-        // init_shell(display.clone(), log.clone());
-
-        init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
-
-        // init data device
-
-        let dnd_icon = Arc::new(Mutex::new(None));
-
-        let dnd_icon2 = dnd_icon.clone();
-        init_data_device(
-            &mut display.borrow_mut(),
-            move |event| match event {
-                DataDeviceEvent::DnDStarted { icon, .. } => {
-                    *dnd_icon2.lock().unwrap() = icon;
-                }
-                DataDeviceEvent::DnDDropped => {
-                    *dnd_icon2.lock().unwrap() = None;
-                }
-                _ => {}
-            },
-            default_action_chooser,
-            log.clone(),
-        );
-
-        // init input
-        let seat_name = session.seat();
-
-        let (mut seat, _) = Seat::new(&mut display.borrow_mut(), seat_name.clone(), log.clone());
-
-        let cursor_status = Arc::new(Mutex::new(CursorImageStatus::Default));
-
-        let cursor_status2 = cursor_status.clone();
-        let pointer = seat.add_pointer(move |new_status| {
-            // TODO: hide winit system cursor when relevant
-            *cursor_status2.lock().unwrap() = new_status
-        });
-
-        init_tablet_manager_global(&mut display.borrow_mut());
-
-        let cursor_status3 = cursor_status.clone();
-        seat.tablet_seat()
-            .on_cursor_surface(move |_tool, new_status| {
-                // TODO: tablet tools should have their own cursors
-                *cursor_status3.lock().unwrap() = new_status;
-            });
-
-        let keyboard = seat
-            .add_keyboard(XkbConfig::default(), 200, 25, |seat, focus| {
-                set_data_device_focus(seat, focus.and_then(|s| s.as_ref().client()))
-            })
-            .expect("Failed to initialize the keyboard");
+        let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, &session);
 
         #[cfg(feature = "xwayland")]
-        let xwayland = {
-            let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), log.clone());
-
-            let ret = handle.insert_source(channel, {
-                let handle = handle.clone();
-                move |event, _, state| match event {
-                    XWaylandEvent::Ready { connection, client } => state
-                        .shell_manager
-                        .xwayland_ready(&handle, connection, client),
-                    XWaylandEvent::Exited => {
-                        error!("Xwayland crashed");
-                    }
-                }
-            });
-            if let Err(e) = ret {
-                error!(
-                    "Failed to insert the XWaylandSource into the event loop: {}",
-                    e
-                );
-            }
-            xwayland
-        };
+        let xwayland = Self::init_xwayland_connection(&handle, &display);
 
         let config = ConfigVM::new().unwrap();
 
@@ -223,7 +243,7 @@ impl Anodium {
                 suppressed_keys: Vec::new(),
             },
 
-            seat_name,
+            seat_name: session.seat(),
             seat,
             session,
 
