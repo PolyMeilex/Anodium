@@ -183,19 +183,24 @@ impl DesktopLayout {
     }
 
     pub fn switch_workspace(&mut self, key: &str) {
-        for o in self.output_map.iter_mut() {
-            if o.geometry().to_f64().contains(self.pointer_location) {
-                if self.workspaces.get(key).is_none() {
-                    let positioner = Universal::new(Default::default(), Default::default());
-                    self.workspaces.insert(key.into(), Box::new(positioner));
-                }
-                o.set_active_workspace(key.into());
-                break;
-            }
-        }
+        let already_active = self.output_map.iter().any(|o| &o.active_workspace() == key);
 
-        self.active_workspace = Some(key.into());
-        self.update_workspaces_geometry();
+        // TODO: Move currsor to center of active one
+        if !already_active {
+            for o in self.output_map.iter_mut() {
+                if o.geometry().to_f64().contains(self.pointer_location) {
+                    if self.workspaces.get(key).is_none() {
+                        let positioner = Universal::new(Default::default(), Default::default());
+                        self.workspaces.insert(key.into(), Box::new(positioner));
+                    }
+                    o.set_active_workspace(key.into());
+                    break;
+                }
+            }
+
+            self.active_workspace = Some(key.into());
+            self.update_workspaces_geometry();
+        }
     }
 }
 
