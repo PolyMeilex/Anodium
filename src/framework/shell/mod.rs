@@ -80,6 +80,12 @@ pub enum ShellEvent {
         popup: PopupSurface,
         // positioner: PositionerState,
     },
+    PopupGrab {
+        popup: PopupSurface,
+        start_data: GrabStartData,
+        seat: Seat,
+        serial: Serial,
+    },
 
     //
     // Misc

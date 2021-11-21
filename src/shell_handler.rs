@@ -4,7 +4,11 @@ use smithay::{
     wayland::shell::wlr_layer::Layer,
 };
 
-use crate::{framework::shell::ShellEvent, grabs::MoveSurfaceGrab, state::Anodium};
+use crate::{
+    framework::shell::ShellEvent,
+    grabs::{MoveSurfaceGrab, PopupGrab},
+    state::Anodium,
+};
 
 impl Anodium {
     pub fn on_shell_event(&mut self, event: ShellEvent) {
@@ -66,6 +70,17 @@ impl Anodium {
             // Popup
             //
             ShellEvent::PopupCreated { .. } => {}
+            ShellEvent::PopupGrab {
+                popup,
+                start_data,
+                seat,
+                serial,
+            } => {
+                let pointer = seat.get_pointer().unwrap();
+
+                let grab = PopupGrab { start_data, popup };
+                pointer.set_grab(grab, serial);
+            }
 
             //
             // Wlr Layer Shell

@@ -15,6 +15,12 @@ pub enum PopupSurface {
 }
 
 impl PopupSurface {
+    pub fn dismiss(&self) {
+        match *self {
+            Self::Xdg(ref t) => t.send_popup_done(),
+        }
+    }
+
     pub fn alive(&self) -> bool {
         match *self {
             Self::Xdg(ref t) => t.alive(),

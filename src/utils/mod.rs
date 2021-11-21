@@ -5,7 +5,7 @@ use smithay::{
     utils::{Logical, Point, Rectangle},
     wayland::{
         compositor::{self, SubsurfaceCachedState, TraversalAction},
-        shell::xdg::ToplevelSurface,
+        shell::xdg::{self, ToplevelSurface},
     },
 };
 
@@ -32,6 +32,12 @@ impl AsWlSurface for WindowSurface {
 }
 
 impl AsWlSurface for ToplevelSurface {
+    fn as_surface(&self) -> Option<&WlSurface> {
+        self.get_surface()
+    }
+}
+
+impl AsWlSurface for xdg::PopupSurface {
     fn as_surface(&self) -> Option<&WlSurface> {
         self.get_surface()
     }

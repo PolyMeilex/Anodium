@@ -12,7 +12,7 @@ use smithay::{
 
 use super::super::surface_data::{MoveAfterResizeState, ResizeState, SurfaceData};
 
-use crate::{popup::PopupSurface, window::WindowSurface};
+use crate::{popup::PopupSurface, utils::AsWlSurface, window::WindowSurface};
 
 use super::ShellEvent;
 
@@ -119,8 +119,24 @@ impl super::Inner {
                 self.not_mapped_list
                     .insert_popup(PopupSurface::Xdg(surface));
             }
-            XdgRequest::Grab { .. } => {
-                error!("TODO: Popup Grab");
+            XdgRequest::Grab {
+                seat,
+                serial,
+                surface,
+            } => {
+                let seat = Seat::from_resource(&seat).unwrap();
+
+                if let Some(start_data) = check_grab(&seat, serial, &surface) {
+                    (self.cb)(
+                        ShellEvent::PopupGrab {
+                            popup: PopupSurface::Xdg(surface),
+                            start_data,
+                            seat,
+                            serial,
+                        },
+                        ddata,
+                    );
+                }
             }
             XdgRequest::RePosition { .. } => {
                 error!("TODO: Popup RePosition");
@@ -209,8 +225,8 @@ impl super::Inner {
     }
 }
 
-fn check_grab(seat: &Seat, serial: Serial, surface: &ToplevelSurface) -> Option<GrabStartData> {
-    let surface = surface.get_surface()?;
+fn check_grab<S: AsWlSurface>(seat: &Seat, serial: Serial, surface: &S) -> Option<GrabStartData> {
+    let surface = surface.as_surface()?;
     let pointer = seat.get_pointer()?;
 
     // Check that this surface has a click grab.
