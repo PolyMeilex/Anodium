@@ -5,7 +5,7 @@ use smithay::{
     wayland::{
         compositor,
         seat::{GrabStartData, Seat},
-        shell::xdg::{Configure, ToplevelSurface, XdgRequest, XdgToplevelSurfaceRoleAttributes},
+        shell::xdg::{Configure, XdgRequest, XdgToplevelSurfaceRoleAttributes},
         Serial,
     },
 };
