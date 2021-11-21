@@ -45,6 +45,10 @@ impl ShellWindowList {
         }
     }
 
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Window> {
+        self.windows.iter_mut()
+    }
+
     pub fn refresh(&mut self) {
         // self.windows.retain(|w| !w.animation().exited());
         self.windows.retain(|w| w.toplevel().alive());

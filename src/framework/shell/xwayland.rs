@@ -145,7 +145,7 @@ impl super::Inner {
         let x11surface = X11Surface::new(x11.conn.clone(), window, surface);
 
         self.not_mapped_list
-            .insert(WindowSurface::X11(x11surface), location);
+            .insert_window(WindowSurface::X11(x11surface), location);
     }
 }
 

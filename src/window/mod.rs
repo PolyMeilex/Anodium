@@ -1,6 +1,7 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::{
     reexports::wayland_server::protocol::wl_surface,
     utils::{Logical, Point, Rectangle},
@@ -15,6 +16,7 @@ use smithay::{
 use crate::{
     animations::enter_exit::EnterExitAnimation,
     framework::surface_data::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
+    popup::Popup,
     utils,
 };
 
@@ -38,6 +40,7 @@ impl Window {
                 toplevel,
 
                 animation: EnterExitAnimation::Enter(0.0),
+                popups: Vec::new(),
             })),
         };
         window.self_update();
@@ -46,7 +49,7 @@ impl Window {
 }
 
 #[derive(Debug)]
-struct Inner {
+pub struct Inner {
     location: Point<i32, Logical>,
     /// A bounding box over this window and its children.
     ///
@@ -56,9 +59,21 @@ struct Inner {
     toplevel: WindowSurface,
 
     animation: EnterExitAnimation,
+
+    popups: Vec<Popup>,
 }
 
 impl Inner {
+    pub fn add_popup(&mut self, popup: Popup) {
+        self.popups.push(popup);
+    }
+
+    pub fn find_popup_in_tree(&mut self, surface: &WlSurface) -> Option<&mut Popup> {
+        self.popups
+            .iter_mut()
+            .find_map(|popup| popup.find_popup_in_tree(surface))
+    }
+
     pub fn set_location(&mut self, location: Point<i32, Logical>) {
         self.location = location;
         self.toplevel.notify_move(location);
@@ -154,9 +169,17 @@ impl Inner {
             return None;
         }
 
+        for popup in self.popups.iter() {
+            let found = popup.matching(self.location + self.geometry().loc, point);
+            if found.is_some() {
+                return found;
+            }
+        }
+
         if !self.bbox_in_comp_space().to_f64().contains(point) {
             return None;
         }
+
         // need to check more carefully
         let found = RefCell::new(None);
         if let Some(wl_surface) = self.toplevel.get_surface() {
@@ -193,12 +216,19 @@ impl Inner {
                 },
             );
         }
+
         found.into_inner()
     }
 
     pub fn self_update(&mut self) {
         if let Some(surface) = self.toplevel.get_surface() {
             self.bbox = utils::surface_bounding_box(surface);
+        }
+
+        self.popups.retain(|popup| popup.popup_surface().alive());
+
+        for popup in self.popups.iter_mut() {
+            popup.self_update();
         }
     }
 
@@ -223,6 +253,10 @@ impl Inner {
         if let Some(surface) = self.toplevel.get_surface() {
             utils::surface_send_frame(surface, time)
         }
+
+        for popup in self.popups.iter() {
+            popup.send_frame(time);
+        }
     }
 
     pub fn update_animation(&mut self, delta: f64) {
@@ -240,6 +274,21 @@ impl Inner {
 }
 
 impl Window {
+    pub fn popups(&self) -> Ref<[Popup]> {
+        Ref::map(self.inner.borrow(), |p| p.popups.as_ref())
+    }
+    pub fn popups_mut(&self) -> RefMut<[Popup]> {
+        RefMut::map(self.inner.borrow_mut(), |p| p.popups.as_mut())
+    }
+
+    pub fn borrow_mut(&mut self) -> RefMut<Inner> {
+        self.inner.borrow_mut()
+    }
+
+    pub fn add_popup(&mut self, popup: Popup) {
+        self.inner.borrow_mut().add_popup(popup);
+    }
+
     pub fn location(&self) -> Point<i32, Logical> {
         self.inner.borrow().location
     }

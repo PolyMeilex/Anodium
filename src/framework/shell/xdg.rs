@@ -12,7 +12,7 @@ use smithay::{
 
 use super::super::surface_data::{MoveAfterResizeState, ResizeState, SurfaceData};
 
-use crate::window::WindowSurface;
+use crate::{popup::PopupSurface, window::WindowSurface};
 
 use super::ShellEvent;
 
@@ -24,7 +24,7 @@ impl super::Inner {
             //
             XdgRequest::NewToplevel { surface } => {
                 self.not_mapped_list
-                    .insert(WindowSurface::Xdg(surface), Default::default());
+                    .insert_window(WindowSurface::Xdg(surface), Default::default());
             }
 
             XdgRequest::Move {
@@ -115,8 +115,20 @@ impl super::Inner {
             //
             // Popup
             //
-            XdgRequest::NewPopup { .. } => {
-                error!("TODO: NewPopup");
+            XdgRequest::NewPopup {
+                surface,
+                positioner,
+            } => {
+                self.not_mapped_list
+                    .insert_popup(PopupSurface::Xdg(surface));
+
+                // (self.cb)(
+                //     ShellEvent::PopupCreated {
+                //         popup: surface,
+                //         positioner,
+                //     },
+                //     ddata,
+                // );
             }
             XdgRequest::Grab { .. } => {
                 error!("TODO: Popup Grab");

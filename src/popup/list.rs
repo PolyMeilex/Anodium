@@ -5,7 +5,7 @@ use smithay::{
     utils::{Logical, Point},
 };
 
-pub use super::{Popup, PopupKind};
+pub use super::{Popup, PopupSurface};
 use crate::window::WindowList;
 
 #[derive(Default)]
@@ -14,10 +14,11 @@ pub struct PopupList {
 }
 
 impl PopupList {
-    pub fn insert(&mut self, popup: PopupKind) {
+    pub fn insert(&mut self, popup: PopupSurface) {
         let popup = Popup {
             popup,
             bbox: Default::default(),
+            children: Vec::new(),
         };
         self.popups.push(popup);
     }
@@ -101,7 +102,7 @@ impl PopupList {
     }
 
     /// Finds the popup corresponding to the given `WlSurface`.
-    pub fn find(&self, surface: &WlSurface) -> Option<Popup> {
+    pub fn find(&self, surface: &WlSurface) -> Option<&Popup> {
         self.popups.iter().find_map(|p| {
             if p.popup
                 .get_surface()

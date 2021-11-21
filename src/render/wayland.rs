@@ -205,8 +205,37 @@ impl Anodium {
                     error!("{:?}", err);
                 }
                 // furthermore, draw its popups
-                // let toplevel_geometry_offset = window.geometry().loc;
+                let toplevel_geometry_offset = window.geometry().loc;
+                let mut initial_place = initial_place + toplevel_geometry_offset;
 
+                for popup in window.popups().iter() {
+                    info!("Popup: {:?}", popup);
+
+                    let location = popup.popup.location();
+                    let draw_location = initial_place + location;
+
+                    if let Some(wl_surface) = popup.popup.get_surface() {
+                        if let Err(err) =
+                            draw_surface_tree(frame, wl_surface, draw_location, output_scale)
+                        {
+                            error!("{:?}", err);
+                        }
+                    }
+                    initial_place = draw_location;
+
+                    for child in popup.children().iter() {
+                        let location = popup.popup.location();
+                        let draw_location = initial_place + location;
+
+                        if let Some(wl_surface) = child.popup_surface().get_surface() {
+                            if let Err(err) =
+                                draw_surface_tree(frame, wl_surface, draw_location, output_scale)
+                            {
+                                error!("{:?}", err);
+                            }
+                        }
+                    }
+                }
                 // TODO
                 // self.window_map.borrow().popups().with_child_popups(
                 //     &wl_surface,

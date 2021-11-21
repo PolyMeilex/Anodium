@@ -9,6 +9,9 @@ use crate::{framework::shell::ShellEvent, grabs::MoveSurfaceGrab, state::Anodium
 impl Anodium {
     pub fn on_shell_event(&mut self, event: ShellEvent) {
         match event {
+            //
+            // Toplevel
+            //
             ShellEvent::WindowCreated { window } => {
                 self.active_workspace().map_toplevel(window, true);
             }
@@ -59,6 +62,17 @@ impl Anodium {
                 }
             }
 
+            //
+            // Popup
+            //
+            ShellEvent::PopupCreated { popup } => {
+                let parent = popup.popup_surface().parent();
+                error!("Popup Parrent: {:?}", parent);
+            }
+
+            //
+            // Wlr Layer Shell
+            //
             ShellEvent::LayerCreated {
                 surface, output, ..
             } => {

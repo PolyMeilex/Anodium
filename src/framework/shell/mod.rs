@@ -1,4 +1,5 @@
 use smithay::reexports::calloop::LoopHandle;
+use smithay::reexports::wayland_protocols::xdg_shell::server::xdg_popup;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{Client, DispatchData, Display};
@@ -8,7 +9,7 @@ use smithay::wayland::seat::{GrabStartData, Seat};
 use smithay::wayland::shell::wlr_layer::{
     wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
 };
-use smithay::wayland::shell::xdg::xdg_shell_init;
+use smithay::wayland::shell::xdg::{xdg_shell_init, PopupSurface, PositionerState};
 use smithay::wayland::Serial;
 use std::cell::RefCell;
 use std::os::unix::net::UnixStream;
@@ -16,6 +17,7 @@ use std::rc::Rc;
 use std::sync::Mutex;
 
 use crate::output_map::LayerSurface;
+use crate::popup::Popup;
 use crate::state::Anodium;
 use crate::utils::LogResult;
 use crate::window::{Window, WindowSurface};
@@ -70,6 +72,14 @@ pub enum ShellEvent {
 
     WindowMinimize {
         toplevel: WindowSurface,
+    },
+
+    //
+    // Popup
+    //
+    PopupCreated {
+        popup: Popup,
+        // positioner: PositionerState,
     },
 
     //
@@ -170,10 +180,28 @@ impl Inner {
     }
 
     // Try to map surface
-    fn try_map_unmaped(&mut self, surface: &WlSurface, ddata: DispatchData) {
-        if let Some(window) = self.not_mapped_list.try_map(surface) {
+    fn try_map_unmaped(&mut self, surface: &WlSurface, mut ddata: DispatchData) {
+        if let Some(window) = self.not_mapped_list.try_window_map(surface) {
             self.windows.push(window.clone());
-            (self.cb)(ShellEvent::WindowCreated { window }, ddata);
+            (self.cb)(ShellEvent::WindowCreated { window }, ddata.reborrow());
+        }
+
+        if let Some(popup) = self.not_mapped_list.try_popup_map(surface) {
+            if let Some(parent) = popup.popup_surface().parent() {
+                if let Some(window) = self.windows.find_mut(&parent) {
+                    window.add_popup(popup);
+                } else {
+                    for window in self.windows.iter_mut() {
+                        let mut window = window.borrow_mut();
+                        if let Some(parent) = window.find_popup_in_tree(surface) {
+                            parent.add_child(popup);
+                            break;
+                        }
+                    }
+                }
+
+                // (self.cb)(ShellEvent::PopupCreated { popup }, ddata);
+            }
         }
     }
 
