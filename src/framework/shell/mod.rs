@@ -1,5 +1,4 @@
 use smithay::reexports::calloop::LoopHandle;
-use smithay::reexports::wayland_protocols::xdg_shell::server::xdg_popup;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{Client, DispatchData, Display};
@@ -9,7 +8,7 @@ use smithay::wayland::seat::{GrabStartData, Seat};
 use smithay::wayland::shell::wlr_layer::{
     wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
 };
-use smithay::wayland::shell::xdg::{xdg_shell_init, PopupSurface, PositionerState};
+use smithay::wayland::shell::xdg::xdg_shell_init;
 use smithay::wayland::Serial;
 use std::cell::RefCell;
 use std::os::unix::net::UnixStream;
@@ -17,7 +16,7 @@ use std::rc::Rc;
 use std::sync::Mutex;
 
 use crate::output_map::LayerSurface;
-use crate::popup::Popup;
+use crate::popup::PopupSurface;
 use crate::state::Anodium;
 use crate::utils::LogResult;
 use crate::window::{Window, WindowSurface};
@@ -78,7 +77,7 @@ pub enum ShellEvent {
     // Popup
     //
     PopupCreated {
-        popup: Popup,
+        popup: PopupSurface,
         // positioner: PositionerState,
     },
 
@@ -188,19 +187,32 @@ impl Inner {
 
         if let Some(popup) = self.not_mapped_list.try_popup_map(surface) {
             if let Some(parent) = popup.popup_surface().parent() {
+                let popup_surface = popup.popup_surface();
+
+                let mut added = false;
+
                 if let Some(window) = self.windows.find_mut(&parent) {
                     window.add_popup(popup);
+                    added = true;
                 } else {
                     for window in self.windows.iter_mut() {
                         let mut window = window.borrow_mut();
-                        if let Some(parent) = window.find_popup_in_tree(surface) {
+                        if let Some(parent) = window.find_popup_in_tree(&parent) {
                             parent.add_child(popup);
+                            added = true;
                             break;
                         }
                     }
                 }
 
-                // (self.cb)(ShellEvent::PopupCreated { popup }, ddata);
+                if added {
+                    (self.cb)(
+                        ShellEvent::PopupCreated {
+                            popup: popup_surface,
+                        },
+                        ddata,
+                    );
+                }
             }
         }
     }

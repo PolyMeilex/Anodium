@@ -115,20 +115,9 @@ impl super::Inner {
             //
             // Popup
             //
-            XdgRequest::NewPopup {
-                surface,
-                positioner,
-            } => {
+            XdgRequest::NewPopup { surface, .. } => {
                 self.not_mapped_list
                     .insert_popup(PopupSurface::Xdg(surface));
-
-                // (self.cb)(
-                //     ShellEvent::PopupCreated {
-                //         popup: surface,
-                //         positioner,
-                //     },
-                //     ddata,
-                // );
             }
             XdgRequest::Grab { .. } => {
                 error!("TODO: Popup Grab");

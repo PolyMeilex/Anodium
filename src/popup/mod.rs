@@ -13,7 +13,11 @@ use smithay::{
     },
 };
 
-use crate::{framework::surface_data::SurfaceData, utils};
+use crate::{
+    framework::surface_data::SurfaceData,
+    render::{self, renderer::RenderFrame},
+    utils,
+};
 
 mod list;
 pub use list::PopupList;
@@ -74,6 +78,13 @@ impl Popup {
     ) -> Option<(wl_surface::WlSurface, Point<i32, Logical>)> {
         if !self.popup.alive() {
             return None;
+        }
+
+        for child in self.children.iter() {
+            let res = child.matching(parent_location + self.popup.location(), point);
+            if res.is_some() {
+                return res;
+            }
         }
 
         let mut bbox = self.bbox;
@@ -143,5 +154,26 @@ impl Popup {
         })
         .unwrap()
         .unwrap_or(self.bbox)
+    }
+
+    pub fn render(
+        &self,
+        frame: &mut RenderFrame,
+        initial_location: Point<i32, Logical>,
+        output_scale: f64,
+    ) {
+        let render_location = initial_location + self.popup.location();
+
+        if let Some(wl_surface) = self.popup.get_surface() {
+            if let Err(err) =
+                render::draw_surface_tree(frame, wl_surface, render_location, output_scale)
+            {
+                error!("{:?}", err);
+            }
+        }
+
+        for child in self.children.iter() {
+            child.render(frame, render_location, output_scale);
+        }
     }
 }

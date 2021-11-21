@@ -71,7 +71,7 @@ pub fn draw_cursor(
     draw_surface_tree(frame, surface, location - delta, output_scale)
 }
 
-fn draw_surface_tree(
+pub fn draw_surface_tree(
     frame: &mut RenderFrame,
     root: &wl_surface::WlSurface,
     location: Point<i32, Logical>,
@@ -206,58 +206,12 @@ impl Anodium {
                 }
                 // furthermore, draw its popups
                 let toplevel_geometry_offset = window.geometry().loc;
-                let mut initial_place = initial_place + toplevel_geometry_offset;
+                let initial_location = initial_place + toplevel_geometry_offset;
 
+                let window = window.borrow();
                 for popup in window.popups().iter() {
-                    info!("Popup: {:?}", popup);
-
-                    let location = popup.popup.location();
-                    let draw_location = initial_place + location;
-
-                    if let Some(wl_surface) = popup.popup.get_surface() {
-                        if let Err(err) =
-                            draw_surface_tree(frame, wl_surface, draw_location, output_scale)
-                        {
-                            error!("{:?}", err);
-                        }
-                    }
-                    initial_place = draw_location;
-
-                    for child in popup.children().iter() {
-                        let location = popup.popup.location();
-                        let draw_location = initial_place + location;
-
-                        if let Some(wl_surface) = child.popup_surface().get_surface() {
-                            if let Err(err) =
-                                draw_surface_tree(frame, wl_surface, draw_location, output_scale)
-                            {
-                                error!("{:?}", err);
-                            }
-                        }
-                    }
+                    popup.render(frame, initial_location, output_scale);
                 }
-                // TODO
-                // self.window_map.borrow().popups().with_child_popups(
-                //     &wl_surface,
-                //     initial_place + toplevel_geometry_offset,
-                //     |popup, initial_place| {
-                //         let location = popup.popup.location();
-                //         let draw_location = *initial_place + location;
-                //         if let Some(wl_surface) = popup.popup.get_surface() {
-                //             if let Err(err) = draw_surface_tree(
-                //                 renderer,
-                //                 frame,
-                //                 &wl_surface,
-                //                 draw_location,
-                //                 output_scale,
-                //                 log,
-                //             ) {
-                //                 result = Err(err);
-                //             }
-                //         }
-                //         *initial_place = draw_location;
-                //     },
-                // );
             }
         };
 

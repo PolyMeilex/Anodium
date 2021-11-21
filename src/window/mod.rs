@@ -64,6 +64,10 @@ pub struct Inner {
 }
 
 impl Inner {
+    pub fn popups(&self) -> &[Popup] {
+        &self.popups
+    }
+
     pub fn add_popup(&mut self, popup: Popup) {
         self.popups.push(popup);
     }
@@ -274,11 +278,8 @@ impl Inner {
 }
 
 impl Window {
-    pub fn popups(&self) -> Ref<[Popup]> {
-        Ref::map(self.inner.borrow(), |p| p.popups.as_ref())
-    }
-    pub fn popups_mut(&self) -> RefMut<[Popup]> {
-        RefMut::map(self.inner.borrow_mut(), |p| p.popups.as_mut())
+    pub fn borrow(&self) -> Ref<Inner> {
+        self.inner.borrow()
     }
 
     pub fn borrow_mut(&mut self) -> RefMut<Inner> {

@@ -65,10 +65,7 @@ impl Anodium {
             //
             // Popup
             //
-            ShellEvent::PopupCreated { popup } => {
-                let parent = popup.popup_surface().parent();
-                error!("Popup Parrent: {:?}", parent);
-            }
+            ShellEvent::PopupCreated { .. } => {}
 
             //
             // Wlr Layer Shell
