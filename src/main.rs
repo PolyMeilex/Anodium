@@ -1,12 +1,7 @@
 #[macro_use]
 extern crate slog_scope;
 
-use slog::Drain;
-
-#[cfg(feature = "udev")]
-mod cursor;
 mod input_handler;
-mod state;
 
 mod framework;
 
@@ -20,13 +15,21 @@ mod positioner;
 
 mod config;
 
-mod iterators;
 mod output_map;
 
 mod popup;
 mod window;
 
+mod state;
+
+mod backend_handler;
+mod shell_handler;
+
 use state::Anodium;
+
+use slog::Drain;
+use smithay::reexports::calloop::EventLoop;
+use std::sync::atomic::Ordering;
 
 fn main() {
     // A logger facility, here we use the terminal here
@@ -38,5 +41,23 @@ fn main() {
     let _guard = slog_scope::set_global_logger(log.clone());
     slog_stdlog::init().expect("Could not setup log backend");
 
-    framework::backend::auto();
+    let mut event_loop = EventLoop::try_new().unwrap();
+
+    let anodium = framework::backend::auto(&mut event_loop);
+    let anodium = anodium.expect("Could not create a backend!");
+    run_loop(anodium, event_loop);
+}
+
+fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
+    let signal = event_loop.get_signal();
+    event_loop
+        .run(None, &mut state, |state| {
+            if state.output_map.is_empty() || !state.running.load(Ordering::SeqCst) {
+                signal.stop();
+            }
+
+            state.display.borrow_mut().flush_clients(&mut ());
+            state.update();
+        })
+        .unwrap();
 }

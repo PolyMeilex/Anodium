@@ -22,7 +22,7 @@ pub struct ConfigVM(Rc<RefCell<Inner>>);
 impl ConfigVM {
     pub fn new() -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
-        let ast = engine.compile(include_str!("../config.rhai"))?;
+        let ast = engine.compile(include_str!("../../config.rhai"))?;
         let scope = Scope::new();
 
         engine.register_fn("rev", |array: Array| {

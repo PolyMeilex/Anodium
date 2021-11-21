@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::output_map::{Output, OutputMap};
 use crate::positioner::Positioner;
 
-pub(super) struct VisibleWorkspaceIter<'a> {
+pub struct VisibleWorkspaceIter<'a> {
     outputs: std::slice::Iter<'a, Output>,
     workspaces: &'a HashMap<String, Box<dyn Positioner>>,
 }

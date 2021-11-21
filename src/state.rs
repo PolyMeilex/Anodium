@@ -33,14 +33,12 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
     config::ConfigVM,
-    framework::backend::{session::AnodiumSession, BackendEvent},
-    framework::shell::{ShellEvent, ShellManager},
-    grabs::MoveSurfaceGrab,
-    iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut},
+    framework::backend::session::AnodiumSession,
+    framework::shell::ShellManager,
     output_map::{Output, OutputMap},
     positioner::{universal::Universal, Positioner},
     render::{self, renderer::RenderFrame},
-    utils::AsWlSurface,
+    utils::{AsWlSurface, VisibleWorkspaceIter, VisibleWorkspaceIterMut},
     window::Window,
 };
 
@@ -64,7 +62,6 @@ pub struct Anodium {
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
     pub cursor_status: Arc<Mutex<CursorImageStatus>>,
-    pub pointer_image: crate::cursor::Cursor,
 
     pub input_state: InputState,
 
@@ -199,7 +196,7 @@ impl Anodium {
         (seat, pointer, keyboard, cursor_status)
     }
 
-    pub fn init(
+    pub fn new(
         display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
         session: AnodiumSession,
@@ -242,7 +239,6 @@ impl Anodium {
 
             dnd_icon,
             cursor_status,
-            pointer_image: crate::cursor::Cursor::load(&log),
 
             input_state: InputState {
                 pointer_location: (0.0, 0.0).into(),
@@ -430,174 +426,6 @@ impl Anodium {
         }
 
         Ok(())
-    }
-
-    fn on_shell_event(&mut self, event: ShellEvent) {
-        match event {
-            ShellEvent::WindowCreated { window } => {
-                self.active_workspace().map_toplevel(window, true);
-            }
-
-            ShellEvent::WindowMove {
-                toplevel,
-                start_data,
-                seat,
-                serial,
-            } => {
-                let pointer = seat.get_pointer().unwrap();
-
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    if let Some(res) = space.move_request(&toplevel, &seat, serial, &start_data) {
-                        if let Some(window) = space.unmap_toplevel(&toplevel) {
-                            self.grabed_window = Some(window);
-
-                            let grab = MoveSurfaceGrab {
-                                start_data,
-                                toplevel,
-                                initial_window_location: res.initial_window_location,
-                            };
-                            pointer.set_grab(grab, serial);
-                        }
-                    }
-                }
-            }
-            ShellEvent::WindowResize {
-                toplevel,
-                start_data,
-                seat,
-                edges,
-                serial,
-            } => {
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    space.resize_request(&toplevel, &seat, serial, start_data, edges);
-                }
-            }
-
-            ShellEvent::WindowMaximize { toplevel } => {
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    space.maximize_request(&toplevel);
-                }
-            }
-            ShellEvent::WindowUnMaximize { toplevel } => {
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    space.unmaximize_request(&toplevel);
-                }
-            }
-
-            ShellEvent::LayerCreated {
-                surface, output, ..
-            } => {
-                self.output_map.insert_layer(output, surface);
-                self.update_workspaces_geometry();
-            }
-            ShellEvent::LayerAckConfigure { .. } => {
-                self.output_map.arrange_layers();
-                self.update_workspaces_geometry();
-            }
-
-            ShellEvent::SurfaceCommit { surface } => {
-                let found = self
-                    .output_map
-                    .iter()
-                    .any(|o| o.layer_map().find(&surface).is_some());
-
-                if found {
-                    self.output_map.arrange_layers();
-                    self.update_workspaces_geometry();
-                }
-            }
-            _ => {}
-        }
-    }
-
-    pub fn handle_backend_event(&mut self, event: BackendEvent) {
-        match event {
-            BackendEvent::OutputCreated { mut output } => {
-                let id = self.workspaces.len() + 1;
-                let id = format!("{}", id);
-
-                if self.active_workspace.is_none() {
-                    self.active_workspace = Some(id.clone());
-                }
-
-                output.set_active_workspace(id.clone());
-                self.output_map.add(output);
-
-                let positioner = Universal::new(Default::default(), Default::default());
-
-                self.workspaces.insert(id, Box::new(positioner));
-                self.update_workspaces_geometry();
-            }
-            BackendEvent::OutputModeUpdate { output } => {
-                let space = self.workspaces.get_mut(&output.active_workspace()).unwrap();
-                space.set_geometry(output.usable_geometry());
-
-                self.output_map.rearrange();
-                self.update_workspaces_geometry();
-            }
-            BackendEvent::OutputRender {
-                frame,
-                output,
-                pointer_image,
-            } => {
-                self.render(frame, output, pointer_image).ok();
-            }
-            BackendEvent::SendFrames => {
-                let time = self.start_time.elapsed().as_millis() as u32;
-
-                for w in self.visible_workspaces() {
-                    w.send_frames(time);
-                }
-                self.output_map.send_frames(time);
-            }
-            BackendEvent::StartCompositor => {
-                self.start();
-            }
-            BackendEvent::CloseCompositor => {
-                self.running.store(false, Ordering::SeqCst);
-            }
-        }
-    }
-}
-
-impl Anodium {
-    pub fn surface_under(
-        &self,
-        point: Point<f64, Logical>,
-    ) -> Option<(WlSurface, Point<i32, Logical>)> {
-        // Layers above windows
-        for o in self.output_map.iter() {
-            let overlay = o.layer_map().get_surface_under(&Layer::Overlay, point);
-            if overlay.is_some() {
-                return overlay;
-            }
-            let top = o.layer_map().get_surface_under(&Layer::Top, point);
-            if top.is_some() {
-                return top;
-            }
-        }
-
-        // Windows
-        for w in self.visible_workspaces() {
-            let under = w.surface_under(point);
-            if under.is_some() {
-                return under;
-            }
-        }
-
-        // Layers below windows
-        for o in self.output_map.iter() {
-            let bottom = o.layer_map().get_surface_under(&Layer::Bottom, point);
-            if bottom.is_some() {
-                return bottom;
-            }
-            let background = o.layer_map().get_surface_under(&Layer::Background, point);
-            if background.is_some() {
-                return background;
-            }
-        }
-
-        None
     }
 }
 

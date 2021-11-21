@@ -51,7 +51,7 @@ use smithay::{
 };
 
 use super::{session::AnodiumSession, BackendEvent};
-use crate::{output_map::Output, render::renderer::RenderFrame, render::*};
+use crate::{framework, output_map::Output, render::renderer::RenderFrame, render::*};
 
 struct Inner {
     cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
@@ -59,7 +59,7 @@ struct Inner {
     display: Rc<RefCell<Display>>,
     primary_gpu: Option<PathBuf>,
     session: AnodiumSession,
-    pointer_image: crate::cursor::Cursor,
+    pointer_image: framework::cursor::Cursor,
     udev_devices: HashMap<dev_t, UdevDeviceData>,
 
     outputs: Vec<Output>,
@@ -115,7 +115,7 @@ where
         display: display.clone(),
         primary_gpu,
         session: session.clone(),
-        pointer_image: crate::cursor::Cursor::load(&log),
+        pointer_image: framework::cursor::Cursor::load(&log),
         udev_devices: Default::default(),
         outputs: Default::default(),
     }));

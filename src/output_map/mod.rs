@@ -95,6 +95,7 @@ impl OutputMap {
         self.find(|o| o.inner_output().owns(output))
     }
 
+    #[allow(dead_code)]
     pub fn find_by_name<N>(&self, name: N) -> Option<&Output>
     where
         N: AsRef<str>,

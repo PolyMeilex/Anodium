@@ -11,6 +11,10 @@ use smithay::{
 
 use crate::{framework::surface_data::SurfaceData, window::WindowSurface};
 
+mod iterators;
+
+pub use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};
+
 pub trait AsWlSurface {
     fn as_surface(&self) -> Option<&WlSurface>;
 }

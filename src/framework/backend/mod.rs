@@ -7,7 +7,6 @@ pub mod session;
 
 use smithay::backend::renderer::gles2::Gles2Texture;
 use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
-use std::sync::atomic::Ordering;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::framework::backend::session::AnodiumSession;
@@ -38,7 +37,7 @@ pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    let mut state = Anodium::init(
+    let mut state = Anodium::new(
         display.clone(),
         event_loop.handle(),
         AnodiumSession::new_winit(),
@@ -75,7 +74,7 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
      * Initialize the compositor
      */
 
-    let mut state = Anodium::init(display.clone(), event_loop.handle(), session.clone());
+    let mut state = Anodium::new(display.clone(), event_loop.handle(), session.clone());
 
     udev::run_udev(
         display,
@@ -97,36 +96,18 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     state
 }
 
-pub fn auto() {
-    let mut event_loop = EventLoop::try_new().unwrap();
-
+pub fn auto(event_loop: &mut EventLoop<'static, Anodium>) -> Option<Anodium> {
     if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
         #[cfg(feature = "winit")]
         {
-            let state = winit(&mut event_loop);
-            run_loop(state, event_loop)
+            return Some(winit(event_loop));
         }
     } else {
         #[cfg(feature = "udev")]
         {
-            let state = udev(&mut event_loop);
-            run_loop(state, event_loop)
+            return Some(udev(event_loop));
         }
     }
-}
-
-fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
-    let signal = event_loop.get_signal();
-    event_loop
-        .run(None, &mut state, |state| {
-            if state.output_map.is_empty() || !state.running.load(Ordering::SeqCst) {
-                signal.stop();
-            }
-
-            state.display.borrow_mut().flush_clients(&mut ());
-            state.update();
-        })
-        .unwrap();
 }
 
 pub trait Backend {
