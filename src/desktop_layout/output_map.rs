@@ -23,17 +23,15 @@ pub struct OutputMap {
     outputs: Vec<Output>,
 
     config: ConfigVM,
-    logger: slog::Logger,
 }
 
 impl OutputMap {
-    pub fn new(display: Rc<RefCell<Display>>, config: ConfigVM, logger: ::slog::Logger) -> Self {
+    pub fn new(display: Rc<RefCell<Display>>, config: ConfigVM) -> Self {
         Self {
             display,
             outputs: Vec::new(),
 
             config,
-            logger,
         }
     }
 
@@ -226,7 +224,7 @@ impl OutputMap {
         }
     }
 
-    pub(super) fn send_frames(&self, time: u32) {
+    pub fn send_frames(&self, time: u32) {
         for output in self.outputs.iter() {
             output.layer_map().send_frames(time);
         }

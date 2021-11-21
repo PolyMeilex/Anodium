@@ -35,7 +35,7 @@ impl PointerGrab for MoveSurfaceGrab {
 
         let delta = location - self.start_data.location;
 
-        if let Some(window) = anodium.desktop_layout.grabed_window.as_mut() {
+        if let Some(window) = anodium.grabed_window.as_mut() {
             if let Some(surface) = window.toplevel().get_surface() {
                 // Check if there is MoveAfterResize in progress
                 let started = SurfaceData::with(surface, |data| {
@@ -103,26 +103,22 @@ impl PointerGrab for MoveSurfaceGrab {
             // }
 
             {
-                let desktop_layout = &mut anodium.desktop_layout;
-
-                let window = desktop_layout.grabed_window.take().unwrap();
+                let window = anodium.grabed_window.take().unwrap();
 
                 let location = window.location() + window.geometry().loc;
 
-                if let Some(key) = desktop_layout
+                if let Some(key) = anodium
                     .output_map
                     .find_by_position(location)
                     .map(|o| o.active_workspace())
                 {
-                    desktop_layout
+                    anodium
                         .workspaces
                         .get_mut(&key)
                         .unwrap()
                         .map_toplevel(window, false);
                 } else {
-                    desktop_layout
-                        .active_workspace()
-                        .map_toplevel(window, false);
+                    anodium.active_workspace().map_toplevel(window, false);
                 }
             }
 

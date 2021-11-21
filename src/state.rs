@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::HashMap,
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -33,7 +34,8 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 use crate::{
     backend::{session::AnodiumSession, BackendEvent},
     config::ConfigVM,
-    desktop_layout::{DesktopLayout, Output},
+    desktop_layout::{Output, OutputMap, Window},
+    positioner::Positioner,
     render::{self, renderer::RenderFrame},
     shell::{
         move_surface_grab::MoveSurfaceGrab,
@@ -58,7 +60,6 @@ pub struct Anodium {
     pub display: Rc<RefCell<Display>>,
 
     pub shell_manager: ShellManager,
-    pub desktop_layout: DesktopLayout,
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
     pub cursor_status: Arc<Mutex<CursorImageStatus>>,
@@ -74,6 +75,12 @@ pub struct Anodium {
     last_update: Instant,
 
     pub config: ConfigVM,
+
+    // Desktop Layout
+    pub output_map: OutputMap,
+    pub workspaces: HashMap<String, Box<dyn Positioner>>,
+    pub active_workspace: Option<String>,
+    pub grabed_window: Option<Window>,
 
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
@@ -217,14 +224,15 @@ impl Anodium {
 
         let config = ConfigVM::new().unwrap();
 
+        let output_map = OutputMap::new(display.clone(), config.clone());
+
         Self {
             handle,
 
             running: Arc::new(AtomicBool::new(true)),
 
             shell_manager,
-            desktop_layout: DesktopLayout::new(display.clone(), config.clone(), log.clone()),
-
+            // desktop_layout: DesktopLayout::new(display.clone(), config.clone(), log.clone()),
             display,
 
             dnd_icon,
@@ -247,6 +255,11 @@ impl Anodium {
             last_update: Instant::now(),
 
             config,
+
+            output_map,
+            workspaces: Default::default(),
+            active_workspace: None,
+            grabed_window: Default::default(),
 
             #[cfg(feature = "xwayland")]
             xwayland,
@@ -283,7 +296,11 @@ impl Anodium {
 
         self.shell_manager.refresh();
 
-        self.desktop_layout.update(elapsed);
+        for (_, w) in self.workspaces.iter_mut() {
+            w.update(elapsed);
+        }
+
+        self.output_map.refresh();
 
         self.last_update = Instant::now();
     }
@@ -413,9 +430,7 @@ impl Anodium {
     fn on_shell_event(&mut self, event: ShellEvent) {
         match event {
             ShellEvent::WindowCreated { window } => {
-                self.desktop_layout
-                    .active_workspace()
-                    .map_toplevel(window, true);
+                self.active_workspace().map_toplevel(window, true);
             }
 
             ShellEvent::WindowMove {
@@ -426,10 +441,10 @@ impl Anodium {
             } => {
                 let pointer = seat.get_pointer().unwrap();
 
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
                     if let Some(res) = space.move_request(&toplevel, &seat, serial, &start_data) {
                         if let Some(window) = space.unmap_toplevel(&toplevel) {
-                            self.desktop_layout.grabed_window = Some(window);
+                            self.grabed_window = Some(window);
 
                             let grab = MoveSurfaceGrab {
                                 start_data,
@@ -448,18 +463,18 @@ impl Anodium {
                 edges,
                 serial,
             } => {
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
                     space.resize_request(&toplevel, &seat, serial, start_data, edges);
                 }
             }
 
             ShellEvent::WindowMaximize { toplevel } => {
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
                     space.maximize_request(&toplevel);
                 }
             }
             ShellEvent::WindowUnMaximize { toplevel } => {
-                if let Some(space) = self.desktop_layout.find_workspace_by_surface_mut(&toplevel) {
+                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
                     space.unmaximize_request(&toplevel);
                 }
             }
@@ -467,21 +482,20 @@ impl Anodium {
             ShellEvent::LayerCreated {
                 surface, output, ..
             } => {
-                self.desktop_layout.insert_layer(output, surface);
+                self.insert_wlr_layer(output, surface);
             }
             ShellEvent::LayerAckConfigure { .. } => {
-                self.desktop_layout.arrange_layers();
+                self.arrange_wlr_layers();
             }
 
             ShellEvent::SurfaceCommit { surface } => {
                 let found = self
-                    .desktop_layout
                     .output_map
                     .iter()
                     .any(|o| o.layer_map().find(&surface).is_some());
 
                 if found {
-                    self.desktop_layout.arrange_layers();
+                    self.arrange_wlr_layers();
                 }
             }
             _ => {}
@@ -491,11 +505,10 @@ impl Anodium {
     pub fn handle_backend_event(&mut self, event: BackendEvent) {
         match event {
             BackendEvent::OutputCreated { output } => {
-                self.desktop_layout.add_output(output);
+                self.add_output(output);
             }
             BackendEvent::OutputModeUpdate { output, mode } => {
-                self.desktop_layout
-                    .update_output_mode_by_name(mode, output.name());
+                self.update_output_mode_by_name(mode, output.name());
             }
             BackendEvent::OutputRender {
                 frame,
@@ -506,7 +519,11 @@ impl Anodium {
             }
             BackendEvent::SendFrames => {
                 let time = self.start_time.elapsed().as_millis() as u32;
-                self.desktop_layout.send_frames(time);
+
+                for w in self.visible_workspaces() {
+                    w.send_frames(time);
+                }
+                self.output_map.send_frames(time);
             }
             BackendEvent::StartCompositor => {
                 self.start();

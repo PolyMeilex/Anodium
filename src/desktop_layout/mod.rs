@@ -1,9 +1,4 @@
-use std::collections::HashMap;
-use std::{cell::RefCell, rc::Rc};
-
-use smithay::backend::input::{ButtonState, MouseButton};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
-use smithay::reexports::wayland_server::Display;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::output::Mode;
 use smithay::wayland::shell::wlr_layer::Layer;
@@ -14,10 +9,10 @@ pub use output_map::{Output, OutputMap};
 mod iterators;
 use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};
 
-use crate::config::ConfigVM;
 // use crate::positioner::floating::Floating as Universal;
 use crate::positioner::universal::Universal;
 use crate::positioner::Positioner;
+use crate::state::Anodium;
 use crate::utils::AsWlSurface;
 
 pub mod popup;
@@ -29,56 +24,7 @@ pub use window::{Window, WindowList, WindowSurface};
 mod layer_map;
 pub use layer_map::LayerSurface;
 
-#[derive(Debug)]
-pub struct DesktopLayout {
-    pub output_map: OutputMap,
-
-    pub workspaces: HashMap<String, Box<dyn Positioner>>,
-    active_workspace: Option<String>,
-
-    pub grabed_window: Option<Window>,
-
-    pointer_location: Point<f64, Logical>,
-}
-
-impl DesktopLayout {
-    pub fn new(display: Rc<RefCell<Display>>, config: ConfigVM, log: slog::Logger) -> Self {
-        Self {
-            output_map: OutputMap::new(display, config, log),
-
-            workspaces: Default::default(),
-            active_workspace: None,
-
-            grabed_window: Default::default(),
-            pointer_location: Default::default(),
-        }
-    }
-
-    pub fn on_pointer_move(&mut self, pos: Point<f64, Logical>) {
-        self.pointer_location = pos;
-
-        for (id, w) in self.workspaces.iter_mut() {
-            w.on_pointer_move(pos);
-
-            if w.geometry().contains(pos.to_i32_round()) {
-                self.active_workspace = Some(id.clone());
-            }
-        }
-    }
-
-    pub fn on_pointer_button(&mut self, button: MouseButton, state: ButtonState) {
-        for w in self.visible_workspaces_mut() {
-            w.on_pointer_button(button, state);
-        }
-    }
-
-    pub fn send_frames(&self, time: u32) {
-        for w in self.visible_workspaces() {
-            w.send_frames(time);
-        }
-        self.output_map.send_frames(time);
-    }
-
+impl Anodium {
     pub fn surface_under(
         &self,
         point: Point<f64, Logical>,
@@ -117,18 +63,10 @@ impl DesktopLayout {
 
         None
     }
-
-    pub fn update(&mut self, delta: f64) {
-        for (_, w) in self.workspaces.iter_mut() {
-            w.update(delta);
-        }
-
-        self.output_map.refresh();
-    }
 }
 
 // Workspaces
-impl DesktopLayout {
+impl Anodium {
     pub fn active_workspace(&mut self) -> &mut dyn Positioner {
         self.workspaces
             .get_mut(self.active_workspace.as_ref().unwrap())
@@ -185,10 +123,21 @@ impl DesktopLayout {
     pub fn switch_workspace(&mut self, key: &str) {
         let already_active = self.output_map.iter().any(|o| &o.active_workspace() == key);
 
-        // TODO: Move currsor to center of active one
-        if !already_active {
+        if already_active {
+            if let Some(workspace) = self.workspaces.get(key) {
+                let geometry = workspace.geometry();
+                let loc = geometry.loc;
+                let size = geometry.size;
+
+                self.input_state.pointer_location.x = (loc.x + size.w / 2) as f64;
+                self.input_state.pointer_location.y = (loc.y + size.h / 2) as f64;
+            }
+        } else {
             for o in self.output_map.iter_mut() {
-                if o.geometry().to_f64().contains(self.pointer_location) {
+                if o.geometry()
+                    .to_f64()
+                    .contains(self.input_state.pointer_location)
+                {
                     if self.workspaces.get(key).is_none() {
                         let positioner = Universal::new(Default::default(), Default::default());
                         self.workspaces.insert(key.into(), Box::new(positioner));
@@ -205,7 +154,7 @@ impl DesktopLayout {
 }
 
 // Outputs
-impl DesktopLayout {
+impl Anodium {
     pub fn add_output(&mut self, mut output: Output) {
         let id = self.workspaces.len() + 1;
         let id = format!("{}", id);
@@ -232,21 +181,12 @@ impl DesktopLayout {
         space.set_geometry(output.usable_geometry());
     }
 
-    pub fn retain_outputs<F>(&mut self, f: F)
-    where
-        F: FnMut(&Output) -> bool,
-    {
-        self.output_map.retain(f);
-    }
-}
-
-impl DesktopLayout {
-    pub fn arrange_layers(&mut self) {
+    pub fn arrange_wlr_layers(&mut self) {
         self.output_map.arrange_layers();
         self.update_workspaces_geometry();
     }
 
-    pub fn insert_layer(
+    pub fn insert_wlr_layer(
         &mut self,
         output: Option<smithay::reexports::wayland_server::protocol::wl_output::WlOutput>,
         layer: LayerSurface,
