@@ -5,8 +5,8 @@ use smithay::{
     utils::{Logical, Point},
 };
 
-use super::super::WindowList;
 pub use super::{Popup, PopupKind};
+use crate::window::WindowList;
 
 #[derive(Default)]
 pub struct PopupList {

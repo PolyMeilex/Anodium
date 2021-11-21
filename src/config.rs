@@ -7,8 +7,6 @@ mod output;
 use output::OutputConfig;
 use smithay::reexports::drm;
 
-use crate::desktop_layout;
-
 use self::output::Mode;
 
 #[derive(Debug)]
@@ -42,7 +40,7 @@ impl ConfigVM {
 
     pub fn arrange_outputs(
         &mut self,
-        outputs: &[desktop_layout::Output],
+        outputs: &[crate::output_map::Output],
     ) -> Result<Vec<OutputConfig>, Box<EvalAltResult>> {
         let inner = &mut *self.0.borrow_mut();
 

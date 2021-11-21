@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::{Output, OutputMap};
+use crate::output_map::{Output, OutputMap};
 use crate::positioner::Positioner;
 
 pub(super) struct VisibleWorkspaceIter<'a> {
@@ -33,7 +33,7 @@ impl<'a> Iterator for VisibleWorkspaceIter<'a> {
     }
 }
 
-pub(super) struct VisibleWorkspaceIterMut<'a> {
+pub struct VisibleWorkspaceIterMut<'a> {
     keys: std::collections::hash_set::IntoIter<String>,
     workspaces: &'a mut HashMap<String, Box<dyn Positioner>>,
 }

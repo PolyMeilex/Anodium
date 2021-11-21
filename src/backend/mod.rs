@@ -12,7 +12,7 @@ use std::sync::atomic::Ordering;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::backend::session::AnodiumSession;
-use crate::desktop_layout::Output;
+use crate::output_map::Output;
 use crate::render::renderer::RenderFrame;
 use crate::state::Anodium;
 

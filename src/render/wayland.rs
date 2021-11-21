@@ -23,9 +23,7 @@ use smithay::{
     },
 };
 
-use crate::{
-    desktop_layout::Window, render::renderer::RenderFrame, shell::SurfaceData, state::Anodium,
-};
+use crate::{render::renderer::RenderFrame, shell::SurfaceData, state::Anodium, window::Window};
 
 struct BufferTextures<T> {
     buffer: Option<wl_buffer::WlBuffer>,

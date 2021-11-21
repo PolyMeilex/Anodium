@@ -5,8 +5,8 @@ use smithay::{
 
 use super::{floating::Floating, tiling::Tiling, MoveResponse, Positioner};
 
-use crate::desktop_layout::{Window, WindowSurface};
 use crate::shell::surface_data::ResizeEdge;
+use crate::window::{Window, WindowSurface};
 
 #[allow(unused)]
 #[derive(Debug)]

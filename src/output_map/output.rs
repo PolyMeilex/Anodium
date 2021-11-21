@@ -8,7 +8,7 @@ use smithay::{
     wayland::output::{self, Mode, PhysicalProperties},
 };
 
-use super::super::layer_map::LayerMap;
+use super::layer_map::LayerMap;
 
 #[derive(Debug)]
 struct Inner {

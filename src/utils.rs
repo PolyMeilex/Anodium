@@ -9,7 +9,7 @@ use smithay::{
     },
 };
 
-use crate::{desktop_layout::WindowSurface, shell::SurfaceData};
+use crate::{shell::SurfaceData, window::WindowSurface};
 
 pub trait AsWlSurface {
     fn as_surface(&self) -> Option<&WlSurface>;

@@ -15,7 +15,7 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::WindowSurface;
+use crate::window::WindowSurface;
 
 use super::{ResizeEdge, ResizeState, SurfaceData};
 

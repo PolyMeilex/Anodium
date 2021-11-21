@@ -2,7 +2,7 @@ use smithay::{
     reexports::wayland_server::DispatchData, wayland::shell::wlr_layer::LayerShellRequest,
 };
 
-use crate::desktop_layout::LayerSurface;
+use crate::output_map::LayerSurface;
 
 use super::ShellEvent;
 

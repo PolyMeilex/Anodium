@@ -51,7 +51,7 @@ use smithay::{
 };
 
 use super::{session::AnodiumSession, BackendEvent};
-use crate::{desktop_layout::Output, render::renderer::RenderFrame, render::*};
+use crate::{output_map::Output, render::renderer::RenderFrame, render::*};
 
 struct Inner {
     cb: Box<dyn FnMut(BackendEvent, DispatchData)>,

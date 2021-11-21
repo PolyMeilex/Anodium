@@ -1,4 +1,4 @@
-use crate::{desktop_layout::Window, utils::AsWlSurface};
+use crate::{utils::AsWlSurface, window::Window};
 
 #[derive(Debug, Default)]
 pub struct ShellWindowList {

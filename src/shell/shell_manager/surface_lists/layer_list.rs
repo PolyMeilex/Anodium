@@ -1,4 +1,4 @@
-use crate::{desktop_layout::LayerSurface, utils::AsWlSurface};
+use crate::{output_map::LayerSurface, utils::AsWlSurface};
 
 #[derive(Debug, Default)]
 pub struct ShellLayerList {

@@ -8,8 +8,8 @@ use smithay::{
     },
 };
 
-use crate::desktop_layout::{Window, WindowSurface};
 use crate::shell::surface_data::ResizeEdge;
+use crate::window::{Window, WindowSurface};
 
 pub mod floating;
 pub mod tiling;

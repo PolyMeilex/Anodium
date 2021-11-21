@@ -11,7 +11,8 @@ use smithay::{
 
 use crate::config::ConfigVM;
 
-use super::layer_map::LayerSurface;
+mod layer_map;
+pub use layer_map::LayerSurface;
 
 mod output;
 pub use output::Output;

@@ -12,12 +12,12 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::{Window, WindowList, WindowSurface},
     shell::{
         resize_surface_grab::ResizeSurfaceGrab,
         surface_data::{ResizeData, ResizeEdge, ResizeState},
         MoveAfterResizeData, MoveAfterResizeState, SurfaceData,
     },
+    window::{Window, WindowList, WindowSurface},
 };
 
 use super::{MoveResponse, Positioner};

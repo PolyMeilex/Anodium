@@ -15,10 +15,15 @@ mod render;
 mod utils;
 
 mod animations;
-mod desktop_layout;
 mod positioner;
 
 mod config;
+
+mod iterators;
+mod output_map;
+
+mod popup;
+mod window;
 
 use state::Anodium;
 

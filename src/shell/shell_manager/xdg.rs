@@ -11,8 +11,8 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::WindowSurface,
     shell::{surface_data::ResizeState, MoveAfterResizeState, SurfaceData},
+    window::WindowSurface,
 };
 
 use super::ShellEvent;

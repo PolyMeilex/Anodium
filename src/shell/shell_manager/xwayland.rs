@@ -18,7 +18,7 @@ use x11rb::{
     },
 };
 
-use crate::desktop_layout::WindowSurface;
+use crate::window::WindowSurface;
 
 mod x11_state;
 use x11_state::X11State;

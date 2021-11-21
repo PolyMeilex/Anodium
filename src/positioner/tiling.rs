@@ -12,8 +12,8 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::{Window, WindowList, WindowSurface},
     shell::{MoveAfterResizeState, SurfaceData},
+    window::{Window, WindowList, WindowSurface},
 };
 
 use super::{MoveResponse, Positioner};

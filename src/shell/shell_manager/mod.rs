@@ -15,9 +15,10 @@ use std::os::unix::net::UnixStream;
 use std::rc::Rc;
 use std::sync::Mutex;
 
-use crate::desktop_layout::{LayerSurface, Window, WindowSurface};
+use crate::output_map::LayerSurface;
 use crate::state::Anodium;
 use crate::utils::LogResult;
+use crate::window::{Window, WindowSurface};
 
 use super::surface_data::{ResizeData, ResizeEdge, ResizeState};
 use super::{MoveAfterResizeState, SurfaceData};

@@ -8,7 +8,7 @@ use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 use crate::shell::SurfaceData;
 use crate::utils::AsWlSurface;
 
-use crate::desktop_layout::window::{Window, WindowSurface};
+use crate::window::{Window, WindowSurface};
 
 #[derive(Default)]
 pub struct NotMappedList {

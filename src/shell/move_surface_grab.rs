@@ -10,7 +10,7 @@ use smithay::{
     },
 };
 
-use crate::{desktop_layout::WindowSurface, state::Anodium};
+use crate::{state::Anodium, window::WindowSurface};
 
 use super::{MoveAfterResizeState, SurfaceData};
 
