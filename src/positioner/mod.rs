@@ -8,7 +8,7 @@ use smithay::{
     },
 };
 
-use crate::shell::surface_data::ResizeEdge;
+use crate::framework::surface_data::ResizeEdge;
 use crate::window::{Window, WindowSurface};
 
 pub mod floating;

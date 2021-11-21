@@ -6,10 +6,11 @@ use slog::Drain;
 #[cfg(feature = "udev")]
 mod cursor;
 mod input_handler;
-mod shell;
 mod state;
 
-mod backend;
+mod framework;
+
+mod grabs;
 
 mod render;
 mod utils;
@@ -37,5 +38,5 @@ fn main() {
     let _guard = slog_scope::set_global_logger(log.clone());
     slog_stdlog::init().expect("Could not setup log backend");
 
-    backend::auto();
+    framework::backend::auto();
 }

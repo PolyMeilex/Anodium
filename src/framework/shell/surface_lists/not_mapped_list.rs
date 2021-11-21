@@ -5,7 +5,7 @@ use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
-use crate::shell::SurfaceData;
+use super::super::SurfaceData;
 use crate::utils::AsWlSurface;
 
 use crate::window::{Window, WindowSurface};

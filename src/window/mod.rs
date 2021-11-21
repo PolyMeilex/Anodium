@@ -14,7 +14,7 @@ use smithay::{
 
 use crate::{
     animations::enter_exit::EnterExitAnimation,
-    shell::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
+    framework::surface_data::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
     utils,
 };
 

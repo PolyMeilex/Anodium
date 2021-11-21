@@ -1,7 +1,6 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
-use smithay::reexports::wayland_server::protocol::wl_output::Transform;
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
     utils::{Logical, Point, Rectangle, Size},
@@ -12,17 +11,45 @@ use super::layer_map::LayerMap;
 
 #[derive(Debug)]
 struct Inner {
-    pub(super) name: String,
-    pub(super) output: output::Output,
+    name: String,
+    output: output::Output,
     global: Option<Global<WlOutput>>,
-    pub(super) current_mode: Mode,
-    pub(super) scale: f64,
+    current_mode: Mode,
+    scale: f64,
     location: Point<i32, Logical>,
 
     active_workspace: String,
     userdata: UserDataMap,
 
-    pub(super) layer_map: LayerMap,
+    layer_map: LayerMap,
+}
+
+impl Inner {
+    pub fn update_mode(&mut self, mode: Mode) {
+        let scale = self.scale.round() as i32;
+
+        self.output.delete_mode(self.current_mode);
+        self.output
+            .change_current_state(Some(mode), None, Some(scale), None);
+        self.output.set_preferred(mode);
+
+        self.current_mode = mode;
+    }
+
+    pub fn update_scale(&mut self, scale: f64) {
+        if self.scale.round() as u32 != scale.round() as u32 {
+            let current_mode = self.current_mode;
+
+            self.scale = scale;
+
+            self.output.change_current_state(
+                Some(current_mode),
+                None,
+                Some(scale.round() as i32),
+                None,
+            );
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +106,10 @@ impl Output {
     }
     pub fn set_location(&mut self, location: Point<i32, Logical>) {
         self.inner.borrow_mut().location = location;
+        self.inner
+            .borrow()
+            .output
+            .change_current_state(None, None, None, Some(location));
     }
 
     pub fn userdata(&self) -> Ref<UserDataMap> {
@@ -124,14 +155,11 @@ impl Output {
         self.inner.borrow().scale
     }
 
-    pub fn set_scale(&self, scale: f64) {
-        self.inner.borrow_mut().scale = scale;
-    }
-
     pub fn name(&self) -> String {
         self.inner.borrow().name.clone()
     }
 
+    #[allow(unused)]
     pub fn current_mode(&self) -> Mode {
         self.inner.borrow().current_mode
     }
@@ -148,23 +176,12 @@ impl Output {
         Ref::map(self.inner.borrow(), |b| &b.output)
     }
 
-    pub fn change_current_state(
-        &self,
-        new_mode: Option<Mode>,
-        new_transform: Option<Transform>,
-        new_scale: Option<i32>,
-        new_location: Option<Point<i32, Logical>>,
-    ) {
-        self.inner.borrow().output.change_current_state(
-            new_mode,
-            new_transform,
-            new_scale,
-            new_location,
-        );
+    pub fn update_mode(&mut self, mode: Mode) {
+        self.inner.borrow_mut().update_mode(mode);
     }
 
-    pub fn set_current_mode(&mut self, mode: Mode) {
-        self.inner.borrow_mut().current_mode = mode;
+    pub fn update_scale(&mut self, scale: f64) {
+        self.inner.borrow_mut().update_scale(scale);
     }
 }
 

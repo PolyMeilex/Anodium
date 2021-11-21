@@ -13,7 +13,7 @@ use smithay::{
     },
 };
 
-use crate::{shell::SurfaceData, utils};
+use crate::{framework::surface_data::SurfaceData, utils};
 
 mod list;
 pub use list::PopupList;

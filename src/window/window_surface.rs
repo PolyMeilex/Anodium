@@ -7,7 +7,7 @@ use smithay::{
 };
 
 #[cfg(feature = "xwayland")]
-use crate::shell::shell_manager::X11Surface;
+use crate::framework::shell::X11Surface;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum WindowSurface {

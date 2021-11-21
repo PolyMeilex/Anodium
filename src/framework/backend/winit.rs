@@ -82,7 +82,7 @@ where
         refresh: 60_000,
     };
 
-    let output = Output::new(
+    let mut output = Output::new(
         OUTPUT_NAME,
         Default::default(),
         &mut *display.borrow_mut(),
@@ -142,14 +142,16 @@ where
                         io.display_size = [size.w as f32, size.h as f32];
                     }
 
+                    let mode = Mode {
+                        size,
+                        refresh: 60_000,
+                    };
+
+                    output.update_mode(mode);
+                    output.update_scale(scale_factor);
+
                     cb(
-                        BackendEvent::OutputModeUpdate {
-                            output: &output,
-                            mode: Mode {
-                                size,
-                                refresh: 60_000,
-                            },
-                        },
+                        BackendEvent::OutputModeUpdate { output: &output },
                         ddata.reborrow(),
                     );
                 }

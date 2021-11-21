@@ -17,7 +17,7 @@ use smithay::{
 
 use crate::window::WindowSurface;
 
-use super::{ResizeEdge, ResizeState, SurfaceData};
+use crate::framework::surface_data::{ResizeEdge, ResizeState, SurfaceData};
 
 pub struct ResizeSurfaceGrab {
     pub start_data: GrabStartData,

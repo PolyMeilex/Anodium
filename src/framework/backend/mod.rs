@@ -7,11 +7,10 @@ pub mod session;
 
 use smithay::backend::renderer::gles2::Gles2Texture;
 use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
-use smithay::wayland::output::Mode;
 use std::sync::atomic::Ordering;
 use std::{cell::RefCell, rc::Rc};
 
-use crate::backend::session::AnodiumSession;
+use crate::framework::backend::session::AnodiumSession;
 use crate::output_map::Output;
 use crate::render::renderer::RenderFrame;
 use crate::state::Anodium;
@@ -22,7 +21,6 @@ pub enum BackendEvent<'a, 'frame> {
     },
     OutputModeUpdate {
         output: &'a Output,
-        mode: Mode,
     },
     OutputRender {
         frame: &'a mut RenderFrame<'frame>,

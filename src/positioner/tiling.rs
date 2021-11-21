@@ -12,7 +12,7 @@ use smithay::{
 };
 
 use crate::{
-    shell::{MoveAfterResizeState, SurfaceData},
+    framework::surface_data::{MoveAfterResizeState, SurfaceData},
     window::{Window, WindowList, WindowSurface},
 };
 

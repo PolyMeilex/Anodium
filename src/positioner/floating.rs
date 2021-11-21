@@ -12,11 +12,10 @@ use smithay::{
 };
 
 use crate::{
-    shell::{
-        resize_surface_grab::ResizeSurfaceGrab,
-        surface_data::{ResizeData, ResizeEdge, ResizeState},
-        MoveAfterResizeData, MoveAfterResizeState, SurfaceData,
+    framework::surface_data::{
+        MoveAfterResizeData, MoveAfterResizeState, ResizeData, ResizeEdge, ResizeState, SurfaceData,
     },
+    grabs::ResizeSurfaceGrab,
     window::{Window, WindowList, WindowSurface},
 };
 

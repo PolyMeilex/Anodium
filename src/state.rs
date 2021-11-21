@@ -22,7 +22,6 @@ use smithay::{
     wayland::{
         data_device::{self, DataDeviceEvent},
         output::xdg::init_xdg_output_manager,
-        output::Mode,
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
         shell::wlr_layer::Layer,
         shm::init_shm_global,
@@ -33,16 +32,14 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
-    backend::{session::AnodiumSession, BackendEvent},
     config::ConfigVM,
+    framework::backend::{session::AnodiumSession, BackendEvent},
+    framework::shell::{ShellEvent, ShellManager},
+    grabs::MoveSurfaceGrab,
     iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut},
-    output_map::{LayerSurface, Output, OutputMap},
+    output_map::{Output, OutputMap},
     positioner::{universal::Universal, Positioner},
     render::{self, renderer::RenderFrame},
-    shell::{
-        move_surface_grab::MoveSurfaceGrab,
-        shell_manager::{ShellEvent, ShellManager},
-    },
     utils::AsWlSurface,
     window::Window,
 };
@@ -232,7 +229,7 @@ impl Anodium {
 
         let config = ConfigVM::new().unwrap();
 
-        let output_map = OutputMap::new(display.clone(), config.clone());
+        let output_map = OutputMap::new(config.clone());
 
         Self {
             handle,
@@ -490,10 +487,12 @@ impl Anodium {
             ShellEvent::LayerCreated {
                 surface, output, ..
             } => {
-                self.insert_wlr_layer(output, surface);
+                self.output_map.insert_layer(output, surface);
+                self.update_workspaces_geometry();
             }
             ShellEvent::LayerAckConfigure { .. } => {
-                self.arrange_wlr_layers();
+                self.output_map.arrange_layers();
+                self.update_workspaces_geometry();
             }
 
             ShellEvent::SurfaceCommit { surface } => {
@@ -503,7 +502,8 @@ impl Anodium {
                     .any(|o| o.layer_map().find(&surface).is_some());
 
                 if found {
-                    self.arrange_wlr_layers();
+                    self.output_map.arrange_layers();
+                    self.update_workspaces_geometry();
                 }
             }
             _ => {}
@@ -512,11 +512,28 @@ impl Anodium {
 
     pub fn handle_backend_event(&mut self, event: BackendEvent) {
         match event {
-            BackendEvent::OutputCreated { output } => {
-                self.add_output(output);
+            BackendEvent::OutputCreated { mut output } => {
+                let id = self.workspaces.len() + 1;
+                let id = format!("{}", id);
+
+                if self.active_workspace.is_none() {
+                    self.active_workspace = Some(id.clone());
+                }
+
+                output.set_active_workspace(id.clone());
+                self.output_map.add(output);
+
+                let positioner = Universal::new(Default::default(), Default::default());
+
+                self.workspaces.insert(id, Box::new(positioner));
+                self.update_workspaces_geometry();
             }
-            BackendEvent::OutputModeUpdate { output, mode } => {
-                self.update_output_mode_by_name(mode, output.name());
+            BackendEvent::OutputModeUpdate { output } => {
+                let space = self.workspaces.get_mut(&output.active_workspace()).unwrap();
+                space.set_geometry(output.usable_geometry());
+
+                self.output_map.rearrange();
+                self.update_workspaces_geometry();
             }
             BackendEvent::OutputRender {
                 frame,
@@ -669,48 +686,5 @@ impl Anodium {
             self.active_workspace = Some(key.into());
             self.update_workspaces_geometry();
         }
-    }
-}
-
-// Outputs
-impl Anodium {
-    pub fn add_output(&mut self, mut output: Output) {
-        let id = self.workspaces.len() + 1;
-        let id = format!("{}", id);
-
-        if self.active_workspace.is_none() {
-            self.active_workspace = Some(id.clone());
-        }
-
-        output.set_active_workspace(id.clone());
-        self.output_map.add(output);
-
-        let positioner = Universal::new(Default::default(), Default::default());
-
-        self.workspaces.insert(id, Box::new(positioner));
-        self.update_workspaces_geometry();
-    }
-
-    pub fn update_output_mode_by_name<N: AsRef<str>>(&mut self, mode: Mode, name: N) {
-        let name = name.as_ref();
-        self.output_map.update_by_name(Some(mode), None, name);
-
-        let output = self.output_map.find_by_name(name).unwrap();
-        let space = self.workspaces.get_mut(&output.active_workspace()).unwrap();
-        space.set_geometry(output.usable_geometry());
-    }
-
-    pub fn arrange_wlr_layers(&mut self) {
-        self.output_map.arrange_layers();
-        self.update_workspaces_geometry();
-    }
-
-    pub fn insert_wlr_layer(
-        &mut self,
-        output: Option<smithay::reexports::wayland_server::protocol::wl_output::WlOutput>,
-        layer: LayerSurface,
-    ) {
-        self.output_map.insert_layer(output, layer);
-        self.update_workspaces_geometry();
     }
 }

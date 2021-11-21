@@ -10,10 +10,9 @@ use smithay::{
     },
 };
 
-use crate::{
-    shell::{surface_data::ResizeState, MoveAfterResizeState, SurfaceData},
-    window::WindowSurface,
-};
+use super::super::surface_data::{MoveAfterResizeState, ResizeState, SurfaceData};
+
+use crate::window::WindowSurface;
 
 use super::ShellEvent;
 

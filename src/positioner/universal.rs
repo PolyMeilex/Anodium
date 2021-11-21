@@ -5,7 +5,7 @@ use smithay::{
 
 use super::{floating::Floating, tiling::Tiling, MoveResponse, Positioner};
 
-use crate::shell::surface_data::ResizeEdge;
+use crate::framework::surface_data::ResizeEdge;
 use crate::window::{Window, WindowSurface};
 
 #[allow(unused)]

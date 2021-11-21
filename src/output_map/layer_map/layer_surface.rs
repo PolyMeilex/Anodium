@@ -12,7 +12,7 @@ use smithay::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::{shell::SurfaceData, utils};
+use crate::{framework::surface_data::SurfaceData, utils};
 
 #[derive(Debug)]
 struct Inner {

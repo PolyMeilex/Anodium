@@ -1,12 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
-
 use smithay::{
-    reexports::wayland_server::{
-        protocol::wl_output::{self, WlOutput},
-        Display,
-    },
+    reexports::wayland_server::protocol::wl_output::{self, WlOutput},
     utils::{Logical, Point},
-    wayland::output::Mode,
 };
 
 use crate::config::ConfigVM;
@@ -20,29 +14,26 @@ pub use output::Output;
 #[derive(Debug)]
 
 pub struct OutputMap {
-    display: Rc<RefCell<Display>>,
     outputs: Vec<Output>,
 
     config: ConfigVM,
 }
 
 impl OutputMap {
-    pub fn new(display: Rc<RefCell<Display>>, config: ConfigVM) -> Self {
+    pub fn new(config: ConfigVM) -> Self {
         Self {
-            display,
             outputs: Vec::new(),
 
             config,
         }
     }
 
-    fn arrange(&mut self) {
+    pub fn rearrange(&mut self) {
         let configs = self.config.arrange_outputs(&self.outputs).unwrap();
 
         for config in configs {
             if let Some(output) = self.outputs.get_mut(config.id()) {
                 output.set_location(config.location());
-                output.change_current_state(None, None, None, Some(output.location()));
 
                 let geometry = output.geometry();
                 output.layer_map_mut().arange(geometry)
@@ -50,20 +41,13 @@ impl OutputMap {
         }
     }
 
-    pub fn add(&mut self, mut output: Output) -> &Output {
-        // Append the output to the end of the existing
-        // outputs by placing it after the current overall
-        // width
-        let location = (self.width(), 0);
-
-        output.set_location(location.into());
-
+    pub fn add(&mut self, output: Output) -> &Output {
         self.outputs.push(output);
 
         // We call arrange here albeit the output is only appended and
         // this would not affect windows, but arrange could re-organize
         // outputs from a configuration.
-        self.arrange();
+        self.rearrange();
 
         self.outputs.last().unwrap()
     }
@@ -73,7 +57,7 @@ impl OutputMap {
         F: FnMut(&Output) -> bool,
     {
         self.outputs.retain(f);
-        self.arrange();
+        self.rearrange();
     }
 
     pub fn width(&self) -> i32 {
@@ -97,11 +81,6 @@ impl OutputMap {
 
     pub fn is_empty(&self) -> bool {
         self.outputs.is_empty()
-    }
-
-    #[allow(dead_code)]
-    pub fn with_primary(&self) -> Option<&Output> {
-        self.outputs.get(0)
     }
 
     pub fn find<F>(&self, f: F) -> Option<&Output>
@@ -140,70 +119,22 @@ impl OutputMap {
         self.outputs.iter_mut()
     }
 
-    pub fn update<F>(&mut self, mode: Option<Mode>, scale: Option<f64>, mut f: F)
-    where
-        F: FnMut(&Output) -> bool,
-    {
-        let output = self.outputs.iter_mut().find(|o| f(&**o));
-
-        if let Some(output) = output {
-            if let Some(mode) = mode {
-                let scale = output.scale().round() as i32;
-                let current_mode = output.current_mode();
-
-                {
-                    let output = output.inner_output();
-                    output.delete_mode(current_mode);
-                    output.change_current_state(Some(mode), None, Some(scale), None);
-                    output.set_preferred(mode);
-                }
-                output.set_current_mode(mode);
-            }
-
-            if let Some(scale) = scale {
-                if output.scale().round() as u32 != scale.round() as u32 {
-                    let current_mode = output.current_mode();
-
-                    output.set_scale(scale);
-
-                    output.inner_output().change_current_state(
-                        Some(current_mode),
-                        None,
-                        Some(scale.round() as i32),
-                        None,
-                    );
-                }
-            }
-        }
-
-        self.arrange();
-    }
-
     pub fn refresh(&mut self) {
         for output in self.outputs.iter_mut() {
             output.layer_map_mut().refresh();
         }
     }
-
-    pub fn update_by_name<N: AsRef<str>>(
-        &mut self,
-        mode: Option<Mode>,
-        scale: Option<f64>,
-        name: N,
-    ) {
-        self.update(mode, scale, |o| o.name() == name.as_ref())
-    }
 }
 
 impl OutputMap {
-    pub(super) fn arrange_layers(&mut self) {
+    pub fn arrange_layers(&mut self) {
         for output in self.outputs.iter_mut() {
             let geometry = output.geometry();
             output.layer_map_mut().arange(geometry);
         }
     }
 
-    pub(super) fn insert_layer(&mut self, output: Option<WlOutput>, layer: LayerSurface) {
+    pub fn insert_layer(&mut self, output: Option<WlOutput>, layer: LayerSurface) {
         let output = output.and_then(|output| {
             self.outputs
                 .iter_mut()

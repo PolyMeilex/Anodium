@@ -20,8 +20,7 @@ use crate::state::Anodium;
 use crate::utils::LogResult;
 use crate::window::{Window, WindowSurface};
 
-use super::surface_data::{ResizeData, ResizeEdge, ResizeState};
-use super::{MoveAfterResizeState, SurfaceData};
+use super::surface_data::{MoveAfterResizeState, ResizeData, ResizeEdge, ResizeState, SurfaceData};
 
 mod surface_lists;
 use surface_lists::{NotMappedList, ShellLayerList, ShellWindowList};

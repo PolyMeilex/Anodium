@@ -12,7 +12,7 @@ use smithay::{
 
 use crate::{state::Anodium, window::WindowSurface};
 
-use super::{MoveAfterResizeState, SurfaceData};
+use crate::framework::surface_data::{MoveAfterResizeState, SurfaceData};
 
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,

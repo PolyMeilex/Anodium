@@ -3,7 +3,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::{shell::move_surface_grab::MoveSurfaceGrab, Anodium};
+use crate::{grabs::MoveSurfaceGrab, Anodium};
 
 use smithay::{
     backend::{
@@ -34,10 +34,7 @@ impl Anodium {
                 self.on_pointer_move(event.time());
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output_size = self
-                    .output_map
-                    .find_by_name(crate::backend::winit::OUTPUT_NAME)
-                    .map(|o| o.size());
+                let output_size = self.output_map.find_by_index(0).map(|o| o.size());
 
                 if let Some(output_size) = output_size {
                     self.input_state.pointer_location = event.position_transformed(output_size);
