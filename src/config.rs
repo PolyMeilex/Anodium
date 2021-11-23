@@ -1,19 +1,20 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, Scope, AST};
+use rhai::{Array, Dynamic, Engine, EvalAltResult, FuncArgs, ImmutableString, Scope, AST};
 
 pub mod keyboard;
 mod log;
 mod output;
+mod state;
 mod system;
 
 use output::OutputConfig;
 use smithay::reexports::drm;
 
-use crate::desktop_layout;
+use crate::desktop_layout::{self, DesktopLayout};
 
-use self::output::Mode;
+use self::{output::Mode, state::StateConfig};
 
 #[derive(Debug)]
 struct Inner {
@@ -23,7 +24,10 @@ struct Inner {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigVM(Rc<RefCell<Inner>>);
+pub struct ConfigVM {
+    inner: Rc<RefCell<Inner>>,
+    desktop_layout: Option<Rc<RefCell<DesktopLayout>>>,
+}
 
 impl ConfigVM {
     pub fn new() -> Result<ConfigVM, Box<EvalAltResult>> {
@@ -39,6 +43,7 @@ impl ConfigVM {
         keyboard::register(&mut engine);
         log::register(&mut engine);
         system::register(&mut engine);
+        state::register(&mut engine);
 
         let ast = engine.compile_file("config.rhai".into())?;
 
@@ -46,18 +51,17 @@ impl ConfigVM {
 
         engine.eval_ast_with_scope(&mut scope, &ast)?;
 
-        Ok(ConfigVM(Rc::new(RefCell::new(Inner {
-            engine,
-            ast,
-            scope,
-        }))))
+        Ok(ConfigVM {
+            inner: Rc::new(RefCell::new(Inner { engine, ast, scope })),
+            desktop_layout: None,
+        })
     }
 
     pub fn arrange_outputs(
         &mut self,
         outputs: &[desktop_layout::Output],
     ) -> Result<Vec<OutputConfig>, Box<EvalAltResult>> {
-        let inner = &mut *self.0.borrow_mut();
+        let inner = &mut *self.inner.borrow_mut();
 
         let outputs: Array = outputs
             .iter()
@@ -93,7 +97,7 @@ impl ConfigVM {
         output_name: &str,
         modes: &[drm::control::Mode],
     ) -> Result<usize, Box<EvalAltResult>> {
-        let inner = &mut *self.0.borrow_mut();
+        let inner = &mut *self.inner.borrow_mut();
 
         let modes: Array = modes
             .iter()
@@ -115,12 +119,37 @@ impl ConfigVM {
         Ok(id)
     }
 
-    pub fn execute_fn(&self, function: &str) {
-        let inner = &mut *self.0.borrow_mut();
-
+    pub fn execute_fn_with_state(&self, function: &str, state: StateConfig) {
+        let inner = &mut *self.inner.borrow_mut();
+        let mut state: Dynamic = state.into();
         inner
             .engine
-            .call_fn_dynamic(&mut inner.scope, &inner.ast, false, function, None, [])
+            .call_fn_dynamic(
+                &mut inner.scope,
+                &inner.ast,
+                false,
+                function.to_string(),
+                Some(&mut state),
+                [],
+            )
             .unwrap();
+
+        //let result: Dynamic = inner
+        //    .engine
+        //    .call_fn(&mut inner.scope, &inner.ast, function, (state,))
+        //    .unwrap();
+    }
+
+    //HACK: workaround currnect check and eg problem betwenn DesktopLayout and ConfigVM
+    pub fn set_desktop_layout(&mut self, desktop_layout: Rc<RefCell<DesktopLayout>>) {
+        self.desktop_layout = Some(desktop_layout);
+    }
+
+    //HACK: workaround currnect check and eg problem betwenn DesktopLayout and ConfigVM
+    pub fn get_desktop_layout(&self) -> Rc<RefCell<DesktopLayout>> {
+        self.desktop_layout
+            .as_ref()
+            .expect("desktop layout not set in configvm")
+            .clone()
     }
 }

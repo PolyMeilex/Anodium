@@ -16,6 +16,10 @@ keyboard::register(|| {
 }, "Control_L", ["t"]);
 
 
+keyboard::register(|| {
+    this.test();
+}, "Control_L", ["y"]);
+
 fn arrange_outputs(outputs) {
     let output_x = 0;
 

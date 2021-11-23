@@ -36,7 +36,7 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 use crate::{
     backend::{session::AnodiumSession, udev},
     config::ConfigVM,
-    desktop_layout::{DesktopLayout, Output},
+    desktop_layout::{self, DesktopLayout, Output},
     render::{self, renderer::RenderFrame},
     shell::init_shell,
     shell::not_mapped_list::NotMappedList,
@@ -323,19 +323,22 @@ impl BackendState {
             }
             xwayland
         };
+        let mut config = ConfigVM::new().unwrap();
 
-        let config = ConfigVM::new().unwrap();
+        let desktop_layout = Rc::new(RefCell::new(DesktopLayout::new(
+            display.clone(),
+            config.clone(),
+            log.clone(),
+        )));
+
+        config.set_desktop_layout(desktop_layout.clone());
 
         BackendState {
             handle,
             cursor_status,
             anodium: Anodium {
                 running: Arc::new(AtomicBool::new(true)),
-                desktop_layout: Rc::new(RefCell::new(DesktopLayout::new(
-                    display.clone(),
-                    config.clone(),
-                    log.clone(),
-                ))),
+                desktop_layout: desktop_layout.clone(),
 
                 display,
                 not_mapped_list: Default::default(),
