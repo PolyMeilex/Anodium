@@ -248,6 +248,7 @@ impl Anodium {
                 keyboard,
                 modifiers_state: Default::default(),
                 suppressed_keys: Vec::new(),
+                pressed_keys: HashSet::new(),
             },
 
             seat_name: session.seat(),

@@ -86,7 +86,7 @@ impl Callback {
 
     pub fn execute(&self, config: &ConfigVM, keys_pressed: &HashSet<u32>) -> bool {
         if self.keys.iter().all(|item| keys_pressed.contains(item)) {
-            let state = StateConfig::new(config.get_desktop_layout());
+            let state = StateConfig::new();
             config.execute_fn_with_state(&self.callback, state);
             true
         } else {

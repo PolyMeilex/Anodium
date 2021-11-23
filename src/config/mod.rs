@@ -13,6 +13,7 @@ use output::OutputConfig;
 use smithay::reexports::drm;
 
 use self::output::Mode;
+use self::state::StateConfig;
 
 #[derive(Debug)]
 struct Inner {
@@ -24,7 +25,6 @@ struct Inner {
 #[derive(Debug, Clone)]
 pub struct ConfigVM {
     inner: Rc<RefCell<Inner>>,
-    desktop_layout: Option<Rc<RefCell<DesktopLayout>>>,
 }
 
 impl ConfigVM {
@@ -51,7 +51,6 @@ impl ConfigVM {
 
         Ok(ConfigVM {
             inner: Rc::new(RefCell::new(Inner { engine, ast, scope })),
-            desktop_layout: None,
         })
     }
 
@@ -131,23 +130,5 @@ impl ConfigVM {
                 [],
             )
             .unwrap();
-
-        //let result: Dynamic = inner
-        //    .engine
-        //    .call_fn(&mut inner.scope, &inner.ast, function, (state,))
-        //    .unwrap();
-    }
-
-    //HACK: workaround currnect check and eg problem betwenn DesktopLayout and ConfigVM
-    pub fn set_desktop_layout(&mut self, desktop_layout: Rc<RefCell<DesktopLayout>>) {
-        self.desktop_layout = Some(desktop_layout);
-    }
-
-    //HACK: workaround currnect check and eg problem betwenn DesktopLayout and ConfigVM
-    pub fn get_desktop_layout(&self) -> Rc<RefCell<DesktopLayout>> {
-        self.desktop_layout
-            .as_ref()
-            .expect("desktop layout not set in configvm")
-            .clone()
     }
 }

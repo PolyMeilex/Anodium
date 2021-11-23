@@ -4,14 +4,12 @@ use std::rc::Rc;
 use rhai::plugin::*;
 use rhai::{Dynamic, EvalAltResult};
 
-use crate::desktop_layout::DesktopLayout;
-
 #[derive(Debug, Clone)]
-pub struct StateConfig(Rc<RefCell<DesktopLayout>>);
+pub struct StateConfig();
 
 impl StateConfig {
-    pub fn new(state: Rc<RefCell<DesktopLayout>>) -> Self {
-        Self(state)
+    pub fn new() -> Self {
+        Self()
     }
 }
 
