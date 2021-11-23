@@ -75,9 +75,9 @@ dependencies = [
 
 [[package]]
 name = "arc-swap"
-version = "1.4.0"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6df5aef5c5830360ce5218cecb8f018af3438af5686ae945094affc86fdec63"
+checksum = "c5d78ce20460b82d3fa150275ed9d55e21064fc7951177baacf86a145c4a4b1f"
 
 [[package]]
 name = "atty"
@@ -482,7 +482,7 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac1b7517328c04c2aa68422fc60a41b92208182142ed04a25879c26c8f878794"
 dependencies = [
- "libloading 0.7.1",
+ "libloading 0.7.2",
 ]
 
 [[package]]
@@ -749,9 +749,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.107"
+version = "0.2.108"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219"
+checksum = "8521a1b57e76b1ec69af7599e75e38e7b7fad6610f037db8c79b127201b5d119"
 
 [[package]]
 name = "libloading"
@@ -765,9 +765,9 @@ dependencies = [
 
 [[package]]
 name = "libloading"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0cf036d15402bea3c5d4de17b3fce76b3e4a56ebc1f577be0e7a72f7c607cf0"
+checksum = "afe203d669ec979b7128619bae5a63b7b42e9203c1b29146079ee05e2f604b52"
 dependencies = [
  "cfg-if 1.0.0",
  "winapi",
@@ -933,9 +933,9 @@ dependencies = [
 
 [[package]]
 name = "ndk-sys"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c44922cb3dbb1c70b5e5f443d63b64363a898564d739ba5198e3a9138442868d"
+checksum = "e1bcdd74c20ad5d95aacd60ef9ba40fdf77f767051040541df557b7a9b2a2121"
 
 [[package]]
 name = "nix"
@@ -1240,9 +1240,9 @@ dependencies = [
 
 [[package]]
 name = "rhai"
-version = "1.1.2"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b9394df571d413a865159d9e73df2e16e270c112bddc15538944c076469760a"
+checksum = "34a7f1c7849b6fdf23942f1f05889fef168a7ed43eff34e9040d607f898e1ad8"
 dependencies = [
  "ahash",
  "instant",
@@ -1254,9 +1254,9 @@ dependencies = [
 
 [[package]]
 name = "rhai_codegen"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2a81e59b9782e8b85052aaed305d71dfcdec1bfa53e774c19ac1085307cbf39"
+checksum = "b14fd9df9de7895cb7e79ba593a9d8eb00a769178476480c26703b97b500a726"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1383,7 +1383,7 @@ dependencies = [
 [[package]]
 name = "smithay"
 version = "0.3.0"
-source = "git+https://github.com/PolyMeilex/smithay.git?branch=seat-ddata#85d1d5edeb13dec6de0ac0c2b88b6fde2ac2a48f"
+source = "git+https://github.com/PolyMeilex/smithay.git?branch=seat-ddata#267beba8087ffba274a267d5821cda7a11131fa7"
 dependencies = [
  "appendlist",
  "bitflags",
@@ -1398,7 +1398,7 @@ dependencies = [
  "input",
  "lazy_static",
  "libc",
- "libloading 0.7.1",
+ "libloading 0.7.2",
  "libseat",
  "nix 0.22.0",
  "rand",
