@@ -40,16 +40,20 @@ impl Floating {
 
 impl Positioner for Floating {
     fn map_toplevel(&mut self, mut window: Window, mut reposition: bool) {
-        if let WindowSurface::Xdg(toplevel) = window.toplevel() {
-            if let Some(state) = toplevel.current_state() {
-                if state.states.contains(xdg_toplevel::State::Maximized)
-                    || state.states.contains(xdg_toplevel::State::Fullscreen)
-                {
-                    reposition = false;
+        match window.toplevel() {
+            WindowSurface::Xdg(toplevel) => {
+                if let Some(state) = toplevel.current_state() {
+                    if state.states.contains(xdg_toplevel::State::Maximized)
+                        || state.states.contains(xdg_toplevel::State::Fullscreen)
+                    {
+                        reposition = false;
+                    }
                 }
             }
-        } else if let WindowSurface::X11(_) = window.toplevel() {
-            reposition = false;
+            #[cfg(feature = "xwayland")]
+            WindowSurface::X11(_) => {
+                reposition = false;
+            }
         }
 
         if reposition {
