@@ -10,6 +10,8 @@ memoffset = "0.6.4"
 cgmath = "0.18.0"
 
 [dependencies.smithay]
-git = "https://github.com/Smithay/smithay.git"
+# git = "https://github.com/Smithay/smithay.git"
+git = "https://github.com/PolyMeilex/smithay.git"
+branch="seat-ddata"
 default-features = false
 features = [ "use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend", "slog-stdlog"]

@@ -24,7 +24,8 @@ use smithay::{
 };
 
 use crate::{
-    desktop_layout::Window, render::renderer::RenderFrame, shell::SurfaceData, state::Anodium,
+    framework::surface_data::SurfaceData, render::renderer::RenderFrame, state::Anodium,
+    window::Window,
 };
 
 struct BufferTextures<T> {
@@ -70,7 +71,7 @@ pub fn draw_cursor(
     draw_surface_tree(frame, surface, location - delta, output_scale)
 }
 
-fn draw_surface_tree(
+pub fn draw_surface_tree(
     frame: &mut RenderFrame,
     root: &wl_surface::WlSurface,
     location: Point<i32, Logical>,
@@ -192,7 +193,7 @@ impl Anodium {
             let mut initial_place = window.render_location();
 
             // skip windows that do not overlap with a given output
-            if !output_rect.overlaps(window.bbox()) {
+            if !output_rect.overlaps(window.bbox_in_comp_space()) {
                 return;
             }
             initial_place.x -= output_rect.loc.x;
@@ -204,39 +205,22 @@ impl Anodium {
                     error!("{:?}", err);
                 }
                 // furthermore, draw its popups
-                // let toplevel_geometry_offset = window.geometry().loc;
+                let toplevel_geometry_offset = window.geometry().loc;
+                let initial_location = initial_place + toplevel_geometry_offset;
 
-                // TODO
-                // self.window_map.borrow().popups().with_child_popups(
-                //     &wl_surface,
-                //     initial_place + toplevel_geometry_offset,
-                //     |popup, initial_place| {
-                //         let location = popup.popup.location();
-                //         let draw_location = *initial_place + location;
-                //         if let Some(wl_surface) = popup.popup.get_surface() {
-                //             if let Err(err) = draw_surface_tree(
-                //                 renderer,
-                //                 frame,
-                //                 &wl_surface,
-                //                 draw_location,
-                //                 output_scale,
-                //                 log,
-                //             ) {
-                //                 result = Err(err);
-                //             }
-                //         }
-                //         *initial_place = draw_location;
-                //     },
-                // );
+                let window = window.borrow();
+                for popup in window.popups().iter() {
+                    popup.render(frame, initial_location, output_scale);
+                }
             }
         };
 
         // redraw the frame, in a simple but inneficient way
-        for workspace in self.desktop_layout.borrow().visible_workspaces() {
+        for workspace in self.visible_workspaces() {
             workspace.with_windows_rev(&mut |window| render(window))
         }
 
-        if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
+        if let Some(window) = self.grabed_window.as_ref() {
             render(window);
         }
 
@@ -252,19 +236,19 @@ impl Anodium {
     ) -> Result<(), SwapBuffersError> {
         let mut result = Ok(());
 
-        for output in self.desktop_layout.borrow().output_map.iter() {
+        for output in self.output_map.iter() {
             output
                 .layer_map()
                 .with_layers_from_bottom_to_top(&layer, |layer_surface| {
                     // skip layers that do not overlap with a given output
-                    if !output_rect.overlaps(layer_surface.bbox) {
+                    if !output_rect.overlaps(layer_surface.bbox()) {
                         return;
                     }
 
-                    let mut initial_place: Point<i32, Logical> = layer_surface.location;
+                    let mut initial_place: Point<i32, Logical> = layer_surface.location();
                     initial_place.x -= output_rect.loc.x;
 
-                    if let Some(wl_surface) = layer_surface.surface.get_surface() {
+                    if let Some(wl_surface) = layer_surface.surface().get_surface() {
                         // this surface is a root of a subsurface tree that needs to be drawn
                         if let Err(err) =
                             draw_surface_tree(frame, wl_surface, initial_place, output_scale)

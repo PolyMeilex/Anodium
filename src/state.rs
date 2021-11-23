@@ -11,22 +11,21 @@ use std::{
 };
 
 use smithay::{
-    backend::{renderer::Frame, session::Session},
-    nix::libc::dev_t,
+    backend::{
+        renderer::{gles2::Gles2Texture, Frame, Transform},
+        session::Session,
+    },
     reexports::{
-        calloop::{generic::Generic, Interest, LoopHandle, Mode, PostAction},
+        calloop::{self, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point, Rectangle},
+    utils::{Logical, Point},
     wayland::{
-        data_device::{
-            default_action_chooser, init_data_device, set_data_device_focus, DataDeviceEvent,
-        },
-        output::{xdg::init_xdg_output_manager, PhysicalProperties},
+        data_device::{self, DataDeviceEvent},
+        output::xdg::init_xdg_output_manager,
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
         shell::wlr_layer::Layer,
         shm::init_shm_global,
-        tablet_manager::{init_tablet_manager_global, TabletSeatTrait},
     },
 };
 
@@ -34,12 +33,14 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
-    backend::{session::AnodiumSession, udev},
     config::ConfigVM,
-    desktop_layout::{self, DesktopLayout, Output},
+    framework::backend::session::AnodiumSession,
+    framework::shell::ShellManager,
+    output_map::{Output, OutputMap},
+    positioner::{universal::Universal, Positioner},
     render::{self, renderer::RenderFrame},
-    shell::init_shell,
-    shell::not_mapped_list::NotMappedList,
+    utils::{AsWlSurface, VisibleWorkspaceIter, VisibleWorkspaceIterMut},
+    window::Window,
 };
 
 pub struct InputState {
@@ -54,14 +55,15 @@ pub struct InputState {
 }
 
 pub struct Anodium {
+    pub handle: LoopHandle<'static, Self>,
+
     pub running: Arc<AtomicBool>,
     pub display: Rc<RefCell<Display>>,
 
-    pub not_mapped_list: Rc<RefCell<NotMappedList>>,
-
-    pub desktop_layout: Rc<RefCell<DesktopLayout>>,
+    pub shell_manager: ShellManager,
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
+    pub cursor_status: Arc<Mutex<CursorImageStatus>>,
 
     pub input_state: InputState,
 
@@ -73,16 +75,235 @@ pub struct Anodium {
     last_update: Instant,
 
     pub config: ConfigVM,
-    pub log: slog::Logger,
+
+    // Desktop Layout
+    pub output_map: OutputMap,
+    pub workspaces: HashMap<String, Box<dyn Positioner>>,
+    pub active_workspace: Option<String>,
+    pub grabed_window: Option<Window>,
+
+    #[cfg(feature = "xwayland")]
+    pub xwayland: XWayland<Self>,
+}
+
+impl Anodium {
+    /// init the wayland connection
+    fn init_wayland_connection(handle: &LoopHandle<'static, Self>, display: &Rc<RefCell<Display>>) {
+        handle
+            .insert_source(
+                Generic::from_fd(
+                    display.borrow().get_poll_fd(),
+                    Interest::READ,
+                    calloop::Mode::Level,
+                ),
+                |_, _, state: &mut Self| {
+                    let display = state.display.clone();
+                    let mut display = display.borrow_mut();
+                    match display.dispatch(std::time::Duration::from_millis(0), state) {
+                        Ok(_) => Ok(PostAction::Continue),
+                        Err(e) => {
+                            error!("I/O error on the Wayland display: {}", e);
+                            state.running.store(false, Ordering::SeqCst);
+                            Err(e)
+                        }
+                    }
+                },
+            )
+            .expect("Failed to init the wayland event source.");
+    }
+
+    /// init the xwayland connection
+    #[cfg(feature = "xwayland")]
+    fn init_xwayland_connection(
+        handle: &LoopHandle<'static, Self>,
+        display: &Rc<RefCell<Display>>,
+    ) -> XWayland<Self> {
+        let (xwayland, channel) =
+            XWayland::new(handle.clone(), display.clone(), slog_scope::logger());
+
+        let ret = handle.insert_source(channel, {
+            let handle = handle.clone();
+            move |event, _, state| match event {
+                XWaylandEvent::Ready { connection, client } => state
+                    .shell_manager
+                    .xwayland_ready(&handle, connection, client),
+                XWaylandEvent::Exited => {
+                    error!("Xwayland crashed");
+                }
+            }
+        });
+        if let Err(e) = ret {
+            error!(
+                "Failed to insert the XWaylandSource into the event loop: {}",
+                e
+            );
+        }
+        xwayland
+    }
+
+    /// init data device
+    fn init_data_device(display: &Rc<RefCell<Display>>) -> Arc<Mutex<Option<WlSurface>>> {
+        let dnd_icon = Arc::new(Mutex::new(None));
+
+        data_device::init_data_device(
+            &mut display.borrow_mut(),
+            {
+                let dnd_icon = dnd_icon.clone();
+                move |event| match event {
+                    DataDeviceEvent::DnDStarted { icon, .. } => {
+                        *dnd_icon.lock().unwrap() = icon;
+                    }
+                    DataDeviceEvent::DnDDropped => {
+                        *dnd_icon.lock().unwrap() = None;
+                    }
+                    _ => {}
+                }
+            },
+            data_device::default_action_chooser,
+            slog_scope::logger(),
+        );
+
+        dnd_icon
+    }
+
+    /// init wayland seat, keyboard and pointer
+    fn init_seat(
+        display: &Rc<RefCell<Display>>,
+        session: &AnodiumSession,
+    ) -> (
+        Seat,
+        PointerHandle,
+        KeyboardHandle,
+        Arc<Mutex<CursorImageStatus>>,
+    ) {
+        let (mut seat, _) = Seat::new(
+            &mut display.borrow_mut(),
+            session.seat(),
+            slog_scope::logger(),
+        );
+
+        let cursor_status = Arc::new(Mutex::new(CursorImageStatus::Default));
+
+        let pointer = seat.add_pointer({
+            let cursor_status = cursor_status.clone();
+            move |new_status| *cursor_status.lock().unwrap() = new_status
+        });
+
+        let keyboard = seat
+            .add_keyboard(XkbConfig::default(), 200, 25, |seat, focus| {
+                data_device::set_data_device_focus(seat, focus.and_then(|s| s.as_ref().client()))
+            })
+            .expect("Failed to initialize the keyboard");
+
+        (seat, pointer, keyboard, cursor_status)
+    }
+
+    pub fn new(
+        display: Rc<RefCell<Display>>,
+        handle: LoopHandle<'static, Self>,
+        session: AnodiumSession,
+    ) -> Self {
+        let log = slog_scope::logger();
+
+        // init the wayland connection
+        Self::init_wayland_connection(&handle, &display);
+
+        // Init the basic compositor globals
+
+        init_shm_global(&mut display.borrow_mut(), vec![], log.clone());
+        init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
+
+        let dnd_icon = Self::init_data_device(&display);
+
+        let shell_manager =
+            ShellManager::init_shell(&mut display.borrow_mut(), |event, mut ddata| {
+                let state = ddata.get::<Anodium>().unwrap();
+                state.on_shell_event(event);
+            });
+
+        let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, &session);
+
+        #[cfg(feature = "xwayland")]
+        let xwayland = Self::init_xwayland_connection(&handle, &display);
+
+        let config = ConfigVM::new().unwrap();
+
+        let output_map = OutputMap::new(config.clone());
+
+        Self {
+            handle,
+
+            running: Arc::new(AtomicBool::new(true)),
+
+            shell_manager,
+            // desktop_layout: DesktopLayout::new(display.clone(), config.clone(), log.clone()),
+            display,
+
+            dnd_icon,
+            cursor_status,
+
+            input_state: InputState {
+                pointer_location: (0.0, 0.0).into(),
+                pointer,
+                keyboard,
+                modifiers_state: Default::default(),
+                suppressed_keys: Vec::new(),
+            },
+
+            seat_name: session.seat(),
+            seat,
+            session,
+
+            start_time: Instant::now(),
+            last_update: Instant::now(),
+
+            config,
+
+            output_map,
+            workspaces: Default::default(),
+            active_workspace: None,
+            grabed_window: Default::default(),
+
+            #[cfg(feature = "xwayland")]
+            xwayland,
+        }
+    }
+
+    pub fn start(&mut self) {
+        let socket_name = self
+            .display
+            .borrow_mut()
+            .add_socket_auto()
+            .unwrap()
+            .into_string()
+            .unwrap();
+
+        info!("Listening on wayland socket"; "name" => socket_name.clone());
+        ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
+
+        #[cfg(feature = "xwayland")]
+        {
+            use crate::utils::LogResult;
+
+            self.xwayland
+                .start()
+                .log_err("Failed to start XWayland:")
+                .ok();
+        }
+    }
 }
 
 impl Anodium {
     pub fn update(&mut self) {
         let elapsed = self.last_update.elapsed().as_secs_f64();
 
-        // anodium.maximize_animation.update(elapsed);
+        self.shell_manager.refresh();
 
-        self.desktop_layout.borrow_mut().update(elapsed);
+        for (_, w) in self.workspaces.iter_mut() {
+            w.update(elapsed);
+        }
+
+        self.output_map.refresh();
 
         self.last_update = Instant::now();
     }
@@ -90,8 +311,11 @@ impl Anodium {
     pub fn render(
         &mut self,
         frame: &mut RenderFrame,
-        (output_geometry, output_scale): (Rectangle<i32, Logical>, f64),
+        output: &Output,
+        pointer_image: Option<&Gles2Texture>,
     ) -> Result<(), smithay::backend::SwapBuffersError> {
+        let (output_geometry, output_scale) = (output.geometry(), output.scale());
+
         frame.clear([0.1, 0.1, 0.1, 1.0])?;
 
         // Layers bellow windows
@@ -124,24 +348,18 @@ impl Anodium {
         //     }
         // }
 
-        // #[cfg(feature = "debug")]
-        // if let Some(o) = self
-        //     .desktop_layout
-        //     .borrow()
-        //     .output_map
-        //     .find_by_position(output_geometry.loc)
-        // {
-        //     let space = o.active_workspace();
-        //     let ui = &frame.imgui_frame;
+        {
+            let space = output.active_workspace();
+            let ui = &frame.imgui;
 
-        //     imgui::Window::new(imgui::im_str!("Workspace"))
-        //         .size([100.0, 20.0], imgui::Condition::Always)
-        //         .position([0.0, 30.0], imgui::Condition::Always)
-        //         .title_bar(false)
-        //         .build(&ui, || {
-        //             ui.text(&format!("Workspace: {}", space));
-        //         });
-        // }
+            imgui::Window::new("Workspace")
+                .size([100.0, 20.0], imgui::Condition::Always)
+                .position([0.0, 30.0], imgui::Condition::Always)
+                .title_bar(false)
+                .build(&ui, || {
+                    ui.text(&format!("Workspace: {}", space));
+                });
+        }
 
         // Pointer Related:
         if output_geometry
@@ -165,212 +383,138 @@ impl Anodium {
                     }
                 }
             }
+
+            // set cursor
+            {
+                let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
+                let relative_ptr_location =
+                    Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
+                // draw the cursor as relevant
+                {
+                    let mut cursor_status = self.cursor_status.lock().unwrap();
+                    // reset the cursor if the surface is no longer alive
+                    let mut reset = false;
+                    if let CursorImageStatus::Image(ref surface) = *cursor_status {
+                        reset = !surface.as_ref().is_alive();
+                    }
+                    if reset {
+                        *cursor_status = CursorImageStatus::Default;
+                    }
+
+                    if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
+                        render::draw_cursor(
+                            frame,
+                            wl_surface,
+                            relative_ptr_location,
+                            output_scale,
+                        )?;
+                    } else {
+                        if let Some(pointer_image) = pointer_image {
+                            frame.render_texture_at(
+                                pointer_image,
+                                relative_ptr_location
+                                    .to_f64()
+                                    .to_physical(output_scale as f64)
+                                    .to_i32_round(),
+                                1,
+                                output_scale as f64,
+                                Transform::Normal,
+                                1.0,
+                            )?;
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())
     }
-
-    pub fn add_output<N, CB>(
-        &mut self,
-        name: N,
-        physical: PhysicalProperties,
-        mode: smithay::wayland::output::Mode,
-        after: CB,
-    ) where
-        N: AsRef<str>,
-        CB: FnOnce(&Output),
-    {
-        self.desktop_layout
-            .borrow_mut()
-            .add_output(name, physical, mode, after);
-    }
-
-    pub fn retain_outputs<F>(&mut self, f: F)
-    where
-        F: FnMut(&Output) -> bool,
-    {
-        self.desktop_layout.borrow_mut().retain_outputs(f);
-    }
-
-    pub fn send_frames(&self, time: u32) {
-        self.desktop_layout.borrow().send_frames(time);
-    }
 }
 
-pub struct BackendState {
-    pub handle: LoopHandle<'static, Self>,
-    pub cursor_status: Arc<Mutex<CursorImageStatus>>,
-
-    pub anodium: Anodium,
-
-    #[cfg(feature = "xwayland")]
-    pub xwayland: XWayland<Self>,
-
-    // Backend
-    pub primary_gpu: Option<PathBuf>,
-    pub udev_devices: HashMap<dev_t, udev::UdevDeviceData>,
-    pub pointer_image: crate::cursor::Cursor,
-
-    pub log: slog::Logger,
-}
-
-impl BackendState {
-    pub fn init(
-        display: Rc<RefCell<Display>>,
-        handle: LoopHandle<'static, Self>,
-        session: AnodiumSession,
-        log: slog::Logger,
-    ) -> Self {
-        // init the wayland connection
-        handle
-            .insert_source(
-                Generic::from_fd(display.borrow().get_poll_fd(), Interest::READ, Mode::Level),
-                move |_, _, state: &mut Self| {
-                    let display = state.anodium.display.clone();
-                    let mut display = display.borrow_mut();
-                    match display.dispatch(std::time::Duration::from_millis(0), state) {
-                        Ok(_) => Ok(PostAction::Continue),
-                        Err(e) => {
-                            error!("I/O error on the Wayland display: {}", e);
-                            state.anodium.running.store(false, Ordering::SeqCst);
-                            Err(e)
-                        }
-                    }
-                },
-            )
-            .expect("Failed to init the wayland event source.");
-
-        // Init the basic compositor globals
-
-        init_shm_global(&mut display.borrow_mut(), vec![], log.clone());
-
-        init_shell(display.clone(), log.clone());
-
-        init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
-
-        let socket_name = display
-            .borrow_mut()
-            .add_socket_auto()
+// Workspaces
+impl Anodium {
+    pub fn active_workspace(&mut self) -> &mut dyn Positioner {
+        self.workspaces
+            .get_mut(self.active_workspace.as_ref().unwrap())
             .unwrap()
-            .into_string()
-            .unwrap();
+            .as_mut()
+    }
 
-        info!( "Listening on wayland socket"; "name" => socket_name.clone());
-        ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
+    pub fn visible_workspaces(&self) -> impl Iterator<Item = &dyn Positioner> {
+        VisibleWorkspaceIter::new(&self.output_map, &self.workspaces)
+    }
 
-        // init data device
+    pub fn visible_workspaces_mut(&mut self) -> impl Iterator<Item = &mut dyn Positioner> {
+        VisibleWorkspaceIterMut::new(&self.output_map, &mut self.workspaces)
+    }
 
-        let dnd_icon = Arc::new(Mutex::new(None));
-
-        let dnd_icon2 = dnd_icon.clone();
-        init_data_device(
-            &mut display.borrow_mut(),
-            move |event| match event {
-                DataDeviceEvent::DnDStarted { icon, .. } => {
-                    *dnd_icon2.lock().unwrap() = icon;
+    #[allow(dead_code)]
+    pub fn find_workspace_by_surface<S: AsWlSurface>(
+        &self,
+        surface: &S,
+    ) -> Option<&dyn Positioner> {
+        for w in self.visible_workspaces() {
+            if let Some(surface) = surface.as_surface() {
+                if w.find_window(surface).is_some() {
+                    return Some(w);
                 }
-                DataDeviceEvent::DnDDropped => {
-                    *dnd_icon2.lock().unwrap() = None;
-                }
-                _ => {}
-            },
-            default_action_chooser,
-            log.clone(),
-        );
-
-        // init input
-        let seat_name = session.seat();
-
-        let (mut seat, _) = Seat::new(&mut display.borrow_mut(), seat_name.clone(), log.clone());
-
-        let cursor_status = Arc::new(Mutex::new(CursorImageStatus::Default));
-
-        let cursor_status2 = cursor_status.clone();
-        let pointer = seat.add_pointer(move |new_status| {
-            // TODO: hide winit system cursor when relevant
-            *cursor_status2.lock().unwrap() = new_status
-        });
-
-        init_tablet_manager_global(&mut display.borrow_mut());
-
-        let cursor_status3 = cursor_status.clone();
-        seat.tablet_seat()
-            .on_cursor_surface(move |_tool, new_status| {
-                // TODO: tablet tools should have their own cursors
-                *cursor_status3.lock().unwrap() = new_status;
-            });
-
-        let keyboard = seat
-            .add_keyboard(XkbConfig::default(), 200, 25, |seat, focus| {
-                set_data_device_focus(seat, focus.and_then(|s| s.as_ref().client()))
-            })
-            .expect("Failed to initialize the keyboard");
-
-        #[cfg(feature = "xwayland")]
-        let xwayland = {
-            let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), log.clone());
-            let ret = handle.insert_source(channel, |event, _, state| match event {
-                XWaylandEvent::Ready { connection, client } => {
-                    state.xwayland_ready(connection, client)
-                }
-                XWaylandEvent::Exited => state.xwayland_exited(),
-            });
-            if let Err(e) = ret {
-                error!(
-                    "Failed to insert the XWaylandSource into the event loop: {}",
-                    e
-                );
             }
-            xwayland
-        };
-        let mut config = ConfigVM::new().unwrap();
+        }
+        None
+    }
 
-        let desktop_layout = Rc::new(RefCell::new(DesktopLayout::new(
-            display.clone(),
-            config.clone(),
-            log.clone(),
-        )));
+    pub fn find_workspace_by_surface_mut<S: AsWlSurface>(
+        &mut self,
+        surface: &S,
+    ) -> Option<&mut dyn Positioner> {
+        for w in self.visible_workspaces_mut() {
+            if let Some(surface) = surface.as_surface() {
+                if w.find_window(surface).is_some() {
+                    return Some(w);
+                }
+            }
+        }
+        None
+    }
 
-        config.set_desktop_layout(desktop_layout.clone());
+    pub fn update_workspaces_geometry(&mut self) {
+        for output in self.output_map.iter() {
+            let key = output.active_workspace();
+            if let Some(w) = self.workspaces.get_mut(&key) {
+                w.set_geometry(output.usable_geometry());
+            }
+        }
+    }
 
-        BackendState {
-            handle,
-            cursor_status,
-            anodium: Anodium {
-                running: Arc::new(AtomicBool::new(true)),
-                desktop_layout: desktop_layout.clone(),
+    pub fn switch_workspace(&mut self, key: &str) {
+        let already_active = self.output_map.iter().any(|o| &o.active_workspace() == key);
 
-                display,
-                not_mapped_list: Default::default(),
+        if already_active {
+            if let Some(workspace) = self.workspaces.get(key) {
+                let geometry = workspace.geometry();
+                let loc = geometry.loc;
+                let size = geometry.size;
 
-                dnd_icon,
+                self.input_state.pointer_location.x = (loc.x + size.w / 2) as f64;
+                self.input_state.pointer_location.y = (loc.y + size.h / 2) as f64;
+            }
+        } else {
+            for o in self.output_map.iter_mut() {
+                if o.geometry()
+                    .to_f64()
+                    .contains(self.input_state.pointer_location)
+                {
+                    if self.workspaces.get(key).is_none() {
+                        let positioner = Universal::new(Default::default(), Default::default());
+                        self.workspaces.insert(key.into(), Box::new(positioner));
+                    }
+                    o.set_active_workspace(key.into());
+                    break;
+                }
+            }
 
-                input_state: InputState {
-                    pointer_location: (0.0, 0.0).into(),
-                    pointer,
-                    keyboard,
-                    modifiers_state: Default::default(),
-                    suppressed_keys: Vec::new(),
-                    pressed_keys: HashSet::new(),
-                },
-
-                seat_name,
-                seat,
-                session,
-
-                start_time: Instant::now(),
-                last_update: Instant::now(),
-
-                config,
-                log: log.clone(),
-            },
-            log: log.clone(),
-            #[cfg(feature = "xwayland")]
-            xwayland,
-
-            primary_gpu: None,
-            udev_devices: Default::default(),
-            pointer_image: crate::cursor::Cursor::load(&log),
+            self.active_workspace = Some(key.into());
+            self.update_workspaces_geometry();
         }
     }
 }

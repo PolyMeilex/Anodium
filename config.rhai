@@ -21,18 +21,23 @@ keyboard::register(|| {
 }, "Control_L", ["y"]);
 
 fn arrange_outputs(outputs) {
-    let output_x = 0;
+    // let output_x = 0;
 
-    outputs.reverse();
+    // outputs.reverse();
 
-    outputs.map(|output| {
-        output.x = output_x;
-        output.y = 0;
+    // Update of rhai broke array maps, so we have to wait for a fix XD
+    // outputs.map(|output| {
+        // let x = output.x;
 
-        output_x += output.w;
+        // output.x = output_x;
+        // output.y = 0;
 
-        output
-    })
+        // output_x += output.w;
+
+    //     output
+    // });
+    
+    outputs
 }
 
 

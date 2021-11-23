@@ -5,7 +5,8 @@ use smithay::{
 
 use super::{floating::Floating, tiling::Tiling, MoveResponse, Positioner};
 
-use crate::desktop_layout::{Toplevel, Window};
+use crate::framework::surface_data::ResizeEdge;
+use crate::window::{Window, WindowSurface};
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -23,7 +24,6 @@ pub struct Universal {
 }
 
 impl Universal {
-    #[allow(unused)]
     pub fn new(pointer_position: Point<f64, Logical>, geometry: Rectangle<i32, Logical>) -> Self {
         Self {
             floating: Floating::new(pointer_position, geometry),
@@ -41,7 +41,7 @@ impl Positioner for Universal {
         }
     }
 
-    fn unmap_toplevel(&mut self, toplevel: &Toplevel) -> Option<Window> {
+    fn unmap_toplevel(&mut self, toplevel: &WindowSurface) -> Option<Window> {
         if let Some(win) = self.floating.unmap_toplevel(toplevel) {
             Some(win)
         } else {
@@ -51,7 +51,7 @@ impl Positioner for Universal {
 
     fn move_request(
         &mut self,
-        toplevel: &Toplevel,
+        toplevel: &WindowSurface,
         seat: &smithay::wayland::seat::Seat,
         serial: smithay::wayland::Serial,
         start_data: &smithay::wayland::seat::GrabStartData,
@@ -68,11 +68,11 @@ impl Positioner for Universal {
 
     fn resize_request(
         &mut self,
-        toplevel: &Toplevel,
+        toplevel: &WindowSurface,
         seat: &smithay::wayland::seat::Seat,
         serial: smithay::wayland::Serial,
         start_data: smithay::wayland::seat::GrabStartData,
-        edges: smithay::reexports::wayland_protocols::xdg_shell::server::xdg_toplevel::ResizeEdge,
+        edges: ResizeEdge,
     ) {
         self.floating
             .resize_request(toplevel, seat, serial, start_data.clone(), edges);
@@ -80,12 +80,12 @@ impl Positioner for Universal {
             .resize_request(toplevel, seat, serial, start_data, edges);
     }
 
-    fn maximize_request(&mut self, toplevel: &Toplevel) {
+    fn maximize_request(&mut self, toplevel: &WindowSurface) {
         self.floating.maximize_request(toplevel);
         self.tiling.maximize_request(toplevel);
     }
 
-    fn unmaximize_request(&mut self, toplevel: &Toplevel) {
+    fn unmaximize_request(&mut self, toplevel: &WindowSurface) {
         self.floating.unmaximize_request(toplevel);
         self.tiling.unmaximize_request(toplevel);
     }
