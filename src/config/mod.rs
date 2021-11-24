@@ -1,13 +1,19 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rhai::{Array, Dynamic, Engine, EvalAltResult, ImmutableString, Scope, AST};
+use rhai::{Array, Dynamic, Engine, EvalAltResult, FuncArgs, ImmutableString, Scope, AST};
 
+pub mod keyboard;
+mod log;
 mod output;
+mod state;
+mod system;
+
 use output::OutputConfig;
 use smithay::reexports::drm;
 
 use self::output::Mode;
+use self::state::StateConfig;
 
 #[derive(Debug)]
 struct Inner {
@@ -17,13 +23,14 @@ struct Inner {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigVM(Rc<RefCell<Inner>>);
+pub struct ConfigVM {
+    inner: Rc<RefCell<Inner>>,
+}
 
 impl ConfigVM {
     pub fn new() -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
-        let ast = engine.compile(include_str!("../../config.rhai"))?;
-        let scope = Scope::new();
+        let mut scope = Scope::new();
 
         engine.register_fn("rev", |array: Array| {
             array.into_iter().rev().collect::<Array>()
@@ -31,18 +38,27 @@ impl ConfigVM {
 
         output::register(&mut engine);
 
-        Ok(ConfigVM(Rc::new(RefCell::new(Inner {
-            engine,
-            ast,
-            scope,
-        }))))
+        keyboard::register(&mut engine);
+        log::register(&mut engine);
+        system::register(&mut engine);
+        state::register(&mut engine);
+
+        let ast = engine.compile_file("config.rhai".into())?;
+
+        keyboard::callbacks_clear();
+
+        engine.eval_ast_with_scope(&mut scope, &ast)?;
+
+        Ok(ConfigVM {
+            inner: Rc::new(RefCell::new(Inner { engine, ast, scope })),
+        })
     }
 
     pub fn arrange_outputs(
         &mut self,
         outputs: &[crate::output_map::Output],
     ) -> Result<Vec<OutputConfig>, Box<EvalAltResult>> {
-        let inner = &mut *self.0.borrow_mut();
+        let inner = &mut *self.inner.borrow_mut();
 
         let outputs: Array = outputs
             .iter()
@@ -78,7 +94,7 @@ impl ConfigVM {
         output_name: &str,
         modes: &[drm::control::Mode],
     ) -> Result<usize, Box<EvalAltResult>> {
-        let inner = &mut *self.0.borrow_mut();
+        let inner = &mut *self.inner.borrow_mut();
 
         let modes: Array = modes
             .iter()
@@ -98,5 +114,21 @@ impl ConfigVM {
         let mode: Option<Mode> = result.try_cast();
         let id = mode.map(|m| m.id).unwrap_or(0);
         Ok(id)
+    }
+
+    pub fn execute_fn_with_state(&self, function: &str, state: StateConfig) {
+        let inner = &mut *self.inner.borrow_mut();
+        let mut state: Dynamic = state.into();
+        inner
+            .engine
+            .call_fn_dynamic(
+                &mut inner.scope,
+                &inner.ast,
+                false,
+                function.to_string(),
+                Some(&mut state),
+                [],
+            )
+            .unwrap();
     }
 }

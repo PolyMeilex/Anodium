@@ -1,3 +1,24 @@
+print("config init!!!");
+
+log::info("initalizing!!!");
+
+keyboard::register(|| {
+    log::info("key called P");
+}, "Super_L", ["p"]);
+
+keyboard::register(|| {
+    log::info("key called H");
+}, "Super_L", ["h"]);
+
+keyboard::register(|| {
+    log::info("starting weston terminal");
+    system::exec("weston-terminal");
+}, "Control_L", ["t"]);
+
+
+keyboard::register(|| {
+    this.test();
+}, "Control_L", ["y"]);
 
 fn arrange_outputs(outputs) {
     let output_x = 0;

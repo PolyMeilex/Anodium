@@ -24,6 +24,8 @@ imgui = "0.8.0"
 imgui-smithay-renderer = {path="./imgui-smithay-renderer"}
 rhai = "1.2.1"
 
+lazy_static = "1.4.0"
+
 [dependencies.smithay]
 # git = "https://github.com/Smithay/smithay.git"
 git = "https://github.com/PolyMeilex/smithay.git"
@@ -39,7 +41,7 @@ features = [ "composite" ]
 
 [features]
 default = ["udev","winit", "xwayland"]
-# default = ["udev","winit"]
+#default = ["udev","winit"]
 winit = [ "smithay/backend_winit" ]
 udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_libseat", "input", "image", "xcursor" ]
 

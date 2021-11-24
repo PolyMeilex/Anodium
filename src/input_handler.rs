@@ -3,7 +3,7 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::{grabs::MoveSurfaceGrab, Anodium};
+use crate::{config, grabs::MoveSurfaceGrab, Anodium};
 
 use smithay::{
     backend::{
@@ -56,17 +56,27 @@ impl Anodium {
 
         let modifiers_state = &mut self.input_state.modifiers_state;
         let suppressed_keys = &mut self.input_state.suppressed_keys;
+        let pressed_keys = &mut self.input_state.pressed_keys;
+        let configvm = self.config.clone();
+
         self.input_state
             .keyboard
             .input(keycode, state, serial, time, |modifiers, handle| {
                 let keysym = handle.modified_sym();
 
+                if let KeyState::Pressed = state {
+                    pressed_keys.insert(keysym);
+                } else {
+                    pressed_keys.remove(&keysym);
+                }
+
+                let keysym_desc = ::xkbcommon::xkb::keysym_get_name(keysym);
+
                 debug!( "keysym";
                     "state" => format!("{:?}", state),
                     "mods" => format!("{:?}", modifiers),
-                    "keysym" => ::xkbcommon::xkb::keysym_get_name(keysym)
+                    "keysym" => &keysym_desc
                 );
-
                 *modifiers_state = *modifiers;
 
                 // If the key is pressed and triggered a action
@@ -74,11 +84,22 @@ impl Anodium {
                 // Additionally add the key to the suppressed keys
                 // so that we can decide on a release if the key
                 // should be forwarded to the client or not.
+
                 if let KeyState::Pressed = state {
-                    let action = process_keyboard_shortcut(*modifiers, keysym);
+                    let mut action = process_keyboard_shortcut(*modifiers, keysym);
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);
+                    } else {
+                        if config::keyboard::key_action(
+                            &configvm,
+                            &keysym_desc,
+                            state,
+                            pressed_keys,
+                        ) {
+                            suppressed_keys.push(keysym);
+                            action = None;
+                        }
                     }
 
                     action
@@ -259,8 +280,6 @@ enum KeyAction {
     Quit,
     /// Trigger a vt-switch
     VtSwitch(i32),
-    /// run a command
-    Run(process::Command),
     /// Switch the current screen
     Workspace(usize),
     MoveToWorkspace(usize),
@@ -276,17 +295,6 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
         Some(KeyAction::VtSwitch(
             (keysym - xkb::KEY_XF86Switch_VT_1 + 1) as i32,
         ))
-    } else if modifiers.logo && keysym == xkb::KEY_Return {
-        // run terminal
-        // KeyAction::Run("yavt".into())
-        Some(KeyAction::Run(Command::new("alacritty")))
-        // KeyAction::Run("weston-terminal".into())
-    } else if modifiers.logo && keysym == xkb::KEY_d {
-        let mut c = Command::new("rofi");
-        c.arg("-show");
-        c.arg("combi");
-
-        Some(KeyAction::Run(c))
     } else if modifiers.logo && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
         Some(KeyAction::Workspace((keysym - xkb::KEY_1) as usize + 1))
     } else if modifiers.logo && modifiers.shift && keysym >= xkb::KEY_1 && keysym <= xkb::KEY_9 {
@@ -307,15 +315,6 @@ impl Anodium {
             KeyAction::VtSwitch(vt) => {
                 info!("Trying to switch to vt {}", vt);
                 self.session.change_vt(vt).ok();
-            }
-            KeyAction::Run(mut cmd) => {
-                info!("Starting program");
-                if let Err(e) = cmd.spawn() {
-                    error!(
-                        "Failed to start program";
-                        "err" => format!("{:?}", e)
-                    );
-                }
             }
             // KeyAction::MoveToWorkspace(num) => {
             // let mut window_map = self.window_map.borrow_mut();
