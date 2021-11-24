@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate slog_scope;
 
+mod event_handler;
 mod input_handler;
 
 mod framework;
@@ -29,7 +30,7 @@ use state::Anodium;
 
 use slog::Drain;
 use smithay::reexports::calloop::{
-    channel::{channel, Channel, Sender},
+    channel::{channel, Channel, Event, Sender},
     EventLoop,
 };
 use std::sync::atomic::Ordering;
@@ -51,8 +52,10 @@ fn main() {
     let (sender, reciver): (Sender<ConfigEvent>, Channel<ConfigEvent>) = channel();
     event_loop
         .handle()
-        .insert_source(reciver, |event, _metadata, shared_data| {
-            println!("got event: {:?}", event);
+        .insert_source(reciver, |event, _metadata, state: &mut Anodium| {
+            if let Event::Msg(event) = event {
+                state.process_config_event(event);
+            }
         })
         .unwrap();
 

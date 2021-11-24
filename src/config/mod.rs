@@ -120,7 +120,7 @@ impl ConfigVM {
 
     pub fn execute_fn_with_state(&self, function: &str) {
         let inner = &mut *self.inner.borrow_mut();
-        let event_loop = inner.scope.get_value::<EventLoop>("event_loop").unwrap();
+        let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
 
         inner
             .engine

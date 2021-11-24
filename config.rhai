@@ -19,9 +19,16 @@ keyboard::register(|| {
 keyboard::register(|| {
     //event_loop.wtf2();
     //wtf2(event_loop);
-    this.test();
+    this.focused_close();
 
 }, "Control_L", ["y"]);
+
+keyboard::register(|| {
+    //event_loop.wtf2();
+    //wtf2(event_loop);
+    this.focused_maximize();
+
+}, "Control_L", ["w"]);
 
 fn arrange_outputs(outputs) {
     let output_x = 0;
