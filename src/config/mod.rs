@@ -3,17 +3,19 @@ use std::rc::Rc;
 
 use rhai::{Array, Dynamic, Engine, EvalAltResult, FuncArgs, ImmutableString, Scope, AST};
 
+pub mod eventloop;
 pub mod keyboard;
 mod log;
 mod output;
-mod state;
 mod system;
 
 use output::OutputConfig;
-use smithay::reexports::drm;
+use smithay::reexports::{calloop::channel::Sender, drm};
 
-use self::output::Mode;
-use self::state::StateConfig;
+use self::{
+    eventloop::{ConfigEvent, EventLoop},
+    output::Mode,
+};
 
 #[derive(Debug)]
 struct Inner {
@@ -28,7 +30,7 @@ pub struct ConfigVM {
 }
 
 impl ConfigVM {
-    pub fn new() -> Result<ConfigVM, Box<EvalAltResult>> {
+    pub fn new(event_sender: Sender<ConfigEvent>) -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
         let mut scope = Scope::new();
 
@@ -41,7 +43,7 @@ impl ConfigVM {
         keyboard::register(&mut engine);
         log::register(&mut engine);
         system::register(&mut engine);
-        state::register(&mut engine);
+        eventloop::register(&mut scope, &mut engine, event_sender);
 
         let ast = engine.compile_file("config.rhai".into())?;
 
@@ -116,9 +118,10 @@ impl ConfigVM {
         Ok(id)
     }
 
-    pub fn execute_fn_with_state(&self, function: &str, state: StateConfig) {
+    pub fn execute_fn_with_state(&self, function: &str) {
         let inner = &mut *self.inner.borrow_mut();
-        let mut state: Dynamic = state.into();
+        let event_loop = inner.scope.get_value::<EventLoop>("event_loop").unwrap();
+
         inner
             .engine
             .call_fn_dynamic(
@@ -126,7 +129,7 @@ impl ConfigVM {
                 &inner.ast,
                 false,
                 function.to_string(),
-                Some(&mut state),
+                Some(&mut event_loop.into()),
                 [],
             )
             .unwrap();

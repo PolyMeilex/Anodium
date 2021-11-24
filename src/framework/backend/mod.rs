@@ -6,9 +6,13 @@ pub mod winit;
 pub mod session;
 
 use smithay::backend::renderer::gles2::Gles2Texture;
-use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
+use smithay::reexports::{
+    calloop::{channel::Sender, EventLoop},
+    wayland_server::Display,
+};
 use std::{cell::RefCell, rc::Rc};
 
+use crate::config::eventloop::ConfigEvent;
 use crate::framework::backend::session::AnodiumSession;
 use crate::output_map::Output;
 use crate::render::renderer::RenderFrame;
@@ -33,7 +37,10 @@ pub enum BackendEvent<'a, 'frame> {
 }
 
 #[cfg(feature = "winit")]
-pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
+pub fn winit(
+    event_loop: &mut EventLoop<'static, Anodium>,
+    event_sender: Sender<ConfigEvent>,
+) -> Anodium {
     info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -41,6 +48,7 @@ pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
         display.clone(),
         event_loop.handle(),
         AnodiumSession::new_winit(),
+        event_sender,
     );
 
     winit::run_winit(
@@ -64,7 +72,10 @@ pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
 }
 
 #[cfg(feature = "udev")]
-pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
+pub fn udev(
+    event_loop: &mut EventLoop<'static, Anodium>,
+    event_sender: Sender<ConfigEvent>,
+) -> Anodium {
     info!("Starting Anodium on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -74,7 +85,12 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
      * Initialize the compositor
      */
 
-    let mut state = Anodium::new(display.clone(), event_loop.handle(), session.clone());
+    let mut state = Anodium::new(
+        display.clone(),
+        event_loop.handle(),
+        session.clone(),
+        event_sender,
+    );
 
     udev::run_udev(
         display,
@@ -96,16 +112,19 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     state
 }
 
-pub fn auto(event_loop: &mut EventLoop<'static, Anodium>) -> Option<Anodium> {
+pub fn auto(
+    event_loop: &mut EventLoop<'static, Anodium>,
+    event_sender: Sender<ConfigEvent>,
+) -> Option<Anodium> {
     if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
         #[cfg(feature = "winit")]
         {
-            return Some(winit(event_loop));
+            return Some(winit(event_loop, event_sender));
         }
     } else {
         #[cfg(feature = "udev")]
         {
-            return Some(udev(event_loop));
+            return Some(udev(event_loop, event_sender));
         }
     }
 }

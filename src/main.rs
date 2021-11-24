@@ -28,8 +28,13 @@ mod shell_handler;
 use state::Anodium;
 
 use slog::Drain;
-use smithay::reexports::calloop::EventLoop;
+use smithay::reexports::calloop::{
+    channel::{channel, Channel, Sender},
+    EventLoop,
+};
 use std::sync::atomic::Ordering;
+
+use crate::config::eventloop::ConfigEvent;
 
 fn main() {
     // A logger facility, here we use the terminal here
@@ -43,7 +48,15 @@ fn main() {
 
     let mut event_loop = EventLoop::try_new().unwrap();
 
-    let anodium = framework::backend::auto(&mut event_loop);
+    let (sender, reciver): (Sender<ConfigEvent>, Channel<ConfigEvent>) = channel();
+    event_loop
+        .handle()
+        .insert_source(reciver, |event, _metadata, shared_data| {
+            println!("got event: {:?}", event);
+        })
+        .unwrap();
+
+    let anodium = framework::backend::auto(&mut event_loop, sender);
     let anodium = anodium.expect("Could not create a backend!");
     run_loop(anodium, event_loop);
 }

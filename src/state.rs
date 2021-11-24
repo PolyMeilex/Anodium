@@ -16,7 +16,7 @@ use smithay::{
         session::Session,
     },
     reexports::{
-        calloop::{self, generic::Generic, Interest, LoopHandle, PostAction},
+        calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
     utils::{Logical, Point},
@@ -33,7 +33,7 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
-    config::ConfigVM,
+    config::{eventloop::ConfigEvent, ConfigVM},
     framework::backend::session::AnodiumSession,
     framework::shell::ShellManager,
     output_map::{Output, OutputMap},
@@ -202,6 +202,7 @@ impl Anodium {
         display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
         session: AnodiumSession,
+        event_sender: Sender<ConfigEvent>,
     ) -> Self {
         let log = slog_scope::logger();
 
@@ -226,7 +227,7 @@ impl Anodium {
         #[cfg(feature = "xwayland")]
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
-        let config = ConfigVM::new().unwrap();
+        let config = ConfigVM::new(event_sender).unwrap();
 
         let output_map = OutputMap::new(config.clone());
 

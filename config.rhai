@@ -17,7 +17,10 @@ keyboard::register(|| {
 
 
 keyboard::register(|| {
+    //event_loop.wtf2();
+    //wtf2(event_loop);
     this.test();
+
 }, "Control_L", ["y"]);
 
 fn arrange_outputs(outputs) {

@@ -11,7 +11,6 @@ use lazy_static::lazy_static;
 use smithay::backend::input::KeyState;
 use xkbcommon::xkb;
 
-use super::state::StateConfig;
 use super::ConfigVM;
 
 lazy_static! {
@@ -86,8 +85,7 @@ impl Callback {
 
     pub fn execute(&self, config: &ConfigVM, keys_pressed: &HashSet<u32>) -> bool {
         if self.keys.iter().all(|item| keys_pressed.contains(item)) {
-            let state = StateConfig::new();
-            config.execute_fn_with_state(&self.callback, state);
+            config.execute_fn_with_state(&self.callback);
             true
         } else {
             false
