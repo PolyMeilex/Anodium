@@ -11,6 +11,7 @@ impl Anodium {
                 if let Some((surface, _)) = under {
                     if let Some(space) = self.find_workspace_by_surface_mut(&surface) {
                         if let Some(window) = space.find_window(&surface) {
+                            let window = window.clone();
                             space.maximize_request(&window.toplevel());
                         }
                     }
