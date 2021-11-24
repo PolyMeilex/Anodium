@@ -86,7 +86,7 @@ impl Anodium {
                 // should be forwarded to the client or not.
 
                 if let KeyState::Pressed = state {
-                    let mut action = process_keyboard_shortcut(*modifiers, keysym);
+                    let action = process_keyboard_shortcut(*modifiers, keysym);
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);
@@ -98,7 +98,7 @@ impl Anodium {
                             pressed_keys,
                         ) {
                             suppressed_keys.push(keysym);
-                            action = None;
+                            return FilterResult::Intercept(KeyAction::None);
                         }
                     }
 
