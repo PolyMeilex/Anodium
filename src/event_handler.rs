@@ -17,6 +17,7 @@ impl Anodium {
                     }
                 }
             }
+            ConfigEvent::SwitchWorkspace(workspace) => self.switch_workspace(&workspace),
         }
     }
 }

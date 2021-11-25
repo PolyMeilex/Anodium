@@ -3,10 +3,11 @@ use rhai::{Dynamic, EvalAltResult};
 
 use smithay::reexports::calloop::channel::Sender;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub enum ConfigEvent {
     CloseFocused,
     MaximizeFocused,
+    SwitchWorkspace(String),
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +36,13 @@ pub mod event_loop_module {
 
     pub fn focused_maximize(event_loop: &mut EventLoop) {
         event_loop.0.send(ConfigEvent::MaximizeFocused).unwrap();
+    }
+
+    pub fn switch_workspace(event_loop: &mut EventLoop, workspace: String) {
+        event_loop
+            .0
+            .send(ConfigEvent::SwitchWorkspace(workspace))
+            .unwrap();
     }
 }
 
