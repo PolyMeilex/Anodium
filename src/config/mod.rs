@@ -118,7 +118,7 @@ impl ConfigVM {
         Ok(id)
     }
 
-    pub fn execute_fn_with_state(&self, function: &str) {
+    pub fn execute_fn_with_state(&self, function: &str, args: &mut [Dynamic]) {
         let inner = &mut *self.inner.borrow_mut();
         let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
 
@@ -130,7 +130,7 @@ impl ConfigVM {
                 false,
                 function.to_string(),
                 Some(&mut event_loop.into()),
-                [],
+                args,
             )
             .unwrap();
     }

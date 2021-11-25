@@ -1,6 +1,5 @@
 use crate::config::eventloop::ConfigEvent;
-use crate::positioner::Positioner;
-use crate::{window, Anodium};
+use crate::Anodium;
 
 impl Anodium {
     pub fn process_config_event(&mut self, event: ConfigEvent) {
