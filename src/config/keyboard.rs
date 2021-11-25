@@ -60,7 +60,10 @@ impl Callbacks {
                 if keys_pressed.contains(key) {
                     for callback in callbacks {
                         if let Some(capture) = &callback.capture {
-                            if capture.is_captured(current_key) {
+                            if capture.is_captured(current_key)
+                                && current_key != *key
+                                && !callback.keys.contains(&current_key)
+                            {
                                 if callback.execute(config, keys_pressed, Some(current_key)) {
                                     executed = true;
                                     break;
@@ -98,7 +101,7 @@ impl Capture {
     pub fn is_captured(&self, key: u32) -> bool {
         match self {
             Self::Letters => (xkb::KEY_a..=xkb::KEY_z).contains(&key),
-            Self::Numbers => (xkb::KEY_0..=xkb::KEY_0).contains(&key),
+            Self::Numbers => (xkb::KEY_0..=xkb::KEY_9).contains(&key),
         }
     }
 }

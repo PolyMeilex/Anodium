@@ -30,6 +30,22 @@ keyboard::register(|| {
 
 }, "Control_L", ["w"]);
 
+
+keyboard::register_capture(|x| {
+    //event_loop.wtf2();
+    //wtf2(event_loop);
+    log::info(x);
+    this.switch_workspace(x);
+
+}, "Control_L", ["s"], KeyCapture::Numbers());
+
+keyboard::register_capture(|x| {
+    //event_loop.wtf2();
+    //wtf2(event_loop);
+    log::info(x);
+
+}, "Control_L", ["l"], KeyCapture::Letters());
+
 fn arrange_outputs(outputs) {
     let output_x = 0;
 
