@@ -1,7 +1,4 @@
-use std::{
-    process::{self, Command},
-    sync::atomic::Ordering,
-};
+use std::sync::atomic::Ordering;
 
 use crate::{config, grabs::MoveSurfaceGrab, Anodium};
 
