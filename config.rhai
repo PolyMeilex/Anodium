@@ -15,6 +15,10 @@ keyboard::register(|| {
     system::exec("weston-terminal");
 }, "Control_L", ["t"]);
 
+keyboard::register(|| {
+    system::exec("alacritty");
+}, "Super_L", ["return"]);
+
 
 keyboard::register(|| {
     this.test();
