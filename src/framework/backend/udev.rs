@@ -749,7 +749,7 @@ fn render_output_surface(
         return Ok(());
     };
 
-    let dmabuf = surface.surface.next_buffer()?;
+    let (dmabuf, _age) = surface.surface.next_buffer()?;
     renderer.bind(dmabuf)?;
     // and draw to our buffer
     match renderer
@@ -814,7 +814,7 @@ fn initial_render(
     surface: &mut RenderSurface,
     renderer: &mut Gles2Renderer,
 ) -> Result<(), SwapBuffersError> {
-    let dmabuf = surface.next_buffer()?;
+    let (dmabuf, _age) = surface.next_buffer()?;
     renderer.bind(dmabuf)?;
     // Does not matter if we render an empty frame
     renderer
