@@ -1,7 +1,4 @@
-use std::{
-    process::{self, Command},
-    sync::atomic::Ordering,
-};
+use std::sync::atomic::Ordering;
 
 use crate::{config, grabs::MoveSurfaceGrab, Anodium};
 
@@ -86,7 +83,7 @@ impl Anodium {
                 // should be forwarded to the client or not.
 
                 if let KeyState::Pressed = state {
-                    let action = process_keyboard_shortcut(*modifiers, keysym);
+                    let mut action = process_keyboard_shortcut(*modifiers, keysym);
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);
