@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="anodium_unstable_v1">
+    <copyright>Copyright © 2021 Bartłomiej Maryńczak</copyright>
+
+    <interface name="anodium_workspace" version="1">
+        <description summary="compositor output region"></description>
+
+        <event name="name">
+            <description summary="Name of">Name of</description>
+        </event>
+    </interface>
+
+    <interface name="anodium_output" version="1">
+        <description summary="output region"></description>
+
+        <event name="workspace">
+            <description summary="a workspace has been created"></description>
+            <arg name="workspace" type="new_id" interface="anodium_workspace" />
+        </event>
+
+        <event name="name">
+            <description summary="name of output">Name of output</description>
+        </event>
+    </interface>
+
+    <interface name="anodium_workspace_manager" version="1">
+        <description summary=""></description>
+
+        <event name="output">
+            <description summary="a output has been created"></description>
+            <arg name="output" type="new_id" interface="anodium_output" />
+        </event>
+    </interface>
+</protocol>
