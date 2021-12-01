@@ -25,6 +25,8 @@ mod state;
 mod backend_handler;
 mod shell_handler;
 
+mod ipc;
+
 use state::Anodium;
 
 use slog::Drain;
@@ -42,6 +44,8 @@ fn main() {
     slog_stdlog::init().expect("Could not setup log backend");
 
     let mut event_loop = EventLoop::try_new().unwrap();
+
+    ipc::ipc_listener(event_loop.handle());
 
     let anodium = framework::backend::auto(&mut event_loop);
     let anodium = anodium.expect("Could not create a backend!");
