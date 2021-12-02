@@ -7,6 +7,7 @@
 
         <event name="name">
             <description summary="Name of">Name of</description>
+            <arg name="name" type="string" />
         </event>
     </interface>
 
@@ -20,6 +21,7 @@
 
         <event name="name">
             <description summary="name of output">Name of output</description>
+            <arg name="name" type="string" />
         </event>
     </interface>
 

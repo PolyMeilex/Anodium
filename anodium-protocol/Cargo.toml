@@ -11,5 +11,18 @@ wayland-server="0.29.1"
 wayland-client="0.29.1"
 wayland-commons="0.29.1"
 
-[dev-dependencies]
-calloop="0.9.1"
+calloop={ version="0.9.1", optional=true }
+glib ={ version="0.14.8", optional=true }
+
+[features]
+default=["calloop-adapter", "glib-adapter"]
+calloop-adapter=["calloop"]
+glib-adapter=["glib"]
+
+[[example]]
+name="calloop_client"
+required-features = ["calloop-adapter"]
+
+[[example]]
+name="glib_client"
+required-features = ["glib-adapter"]

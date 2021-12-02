@@ -1,7 +1,7 @@
 use std::{cell::RefCell, error::Error, ops::Deref, rc::Rc, time::Duration};
 
 use anodium_protocol::server::{
-    self, anodium_output::AnodiumOutput, anodium_workspace::AnodiumWorkspace,
+    anodium_output::AnodiumOutput, anodium_workspace::AnodiumWorkspace,
     anodium_workspace_manager::AnodiumWorkspaceManager,
 };
 
@@ -35,25 +35,46 @@ fn insert_wayland_source(
     Ok(())
 }
 
+thread_local! {
+    pub static FOO: RefCell<Vec<AnodiumWorkspace>> = Default::default();
+}
+
 fn init(display: &mut Display) {
     let global: Global<AnodiumWorkspaceManager> = display.create_global(
         1,
         Filter::new(|(res, _): (Main<AnodiumWorkspaceManager>, _), _, _| {
             println!("New Global");
 
-            res.quick_assign(|res, _, _| {
+            res.quick_assign(|_res, _, _| {
                 println!("Assign");
             });
 
             let client = res.as_ref().client().unwrap();
-            let output: Main<AnodiumOutput> = client.create_resource(1).unwrap();
 
-            output.quick_assign(|res, _, _| {
-                //
-                // output.name();
-            });
+            let output: Main<AnodiumOutput> = client.create_resource(1).unwrap();
+            output.quick_assign(|_res, _, _| {});
 
             res.output(output.deref());
+
+            {
+                let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
+                workspace.quick_assign(|_res, _, _| {});
+
+                output.workspace(&workspace);
+                workspace.name("Web".into());
+            }
+
+            {
+                let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
+                workspace.quick_assign(|_res, _, _| {});
+
+                output.workspace(&workspace);
+                workspace.name("Mes".into());
+
+                FOO.with(|data| {
+                    data.borrow_mut().push(workspace.deref().clone());
+                });
+            }
         }),
     );
 
@@ -77,6 +98,29 @@ fn main() {
     init(&mut display);
 
     let display = Rc::new(RefCell::new(display));
+
+    let timer = calloop::timer::Timer::new().unwrap();
+    let handle = timer.handle();
+
+    event_loop
+        .handle()
+        .insert_source(timer, {
+            let handle = handle.clone();
+            move |_, _, _| {
+                FOO.with(|data| {
+                    let data = data.borrow();
+
+                    for ws in data.iter() {
+                        ws.name("New".into());
+                    }
+                });
+
+                handle.add_timeout(Duration::from_secs(1), ());
+            }
+        })
+        .unwrap();
+
+    handle.add_timeout(Duration::from_secs(1), ());
 
     event_loop
         .run(None, &mut State { display }, |state| {
