@@ -80,6 +80,7 @@ pub struct Anodium {
     pub workspaces: HashMap<String, Box<dyn Positioner>>,
     pub active_workspace: Option<String>,
     pub grabed_window: Option<Window>,
+    pub focused_window: Option<Window>,
 
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
@@ -264,6 +265,7 @@ impl Anodium {
             workspaces: Default::default(),
             active_workspace: None,
             grabed_window: Default::default(),
+            focused_window: Default::default(),
 
             #[cfg(feature = "xwayland")]
             xwayland,
@@ -515,6 +517,7 @@ impl Anodium {
             }
 
             self.active_workspace = Some(key.into());
+            self.focused_window = None;
             self.update_workspaces_geometry();
         }
     }

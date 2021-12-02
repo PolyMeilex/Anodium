@@ -10,7 +10,9 @@ use smithay::{
         },
         session::Session,
     },
-    reexports::wayland_server::protocol::wl_pointer,
+    reexports::{
+        wayland_server::protocol::wl_pointer, winit::platform::unix::x11::ffi::NoEventMask,
+    },
     utils::{Logical, Point},
     wayland::{
         seat::{keysyms as xkb, AxisFrame, FilterResult, Keysym, ModifiersState},
@@ -121,10 +123,16 @@ impl Anodium {
                 // change the keyboard focus unless the pointer is grabbed
                 if !self.input_state.pointer.is_grabbed() {
                     let under = self.surface_under(self.input_state.pointer_location);
-
-                    self.input_state
-                        .keyboard
-                        .set_focus(under.as_ref().map(|&(ref s, _)| s), serial);
+                    let surface = under.as_ref().map(|&(ref s, _)| s);
+                    self.focused_window = None;
+                    if let Some(surface) = surface {
+                        if let Some(space) = self.find_workspace_by_surface_mut(surface) {
+                            if let Some(window) = space.find_window(surface) {
+                                self.focused_window = Some(window.clone());
+                            }
+                        }
+                    }
+                    self.input_state.keyboard.set_focus(surface, serial);
                 }
                 wl_pointer::ButtonState::Pressed
             }
