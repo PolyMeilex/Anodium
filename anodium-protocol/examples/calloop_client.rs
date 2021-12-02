@@ -18,7 +18,8 @@ fn main() {
                 println!("Output Name: {:?}", name);
             }
         })
-    });
+    })
+    .unwrap();
 
     ev.run(None, &mut (), |_| {}).unwrap();
 }

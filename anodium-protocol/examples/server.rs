@@ -1,15 +1,13 @@
-use std::{cell::RefCell, error::Error, ops::Deref, rc::Rc, time::Duration};
+use std::{cell::RefCell, error::Error, rc::Rc, time::Duration};
 
-use anodium_protocol::server::{
-    anodium_output::AnodiumOutput, anodium_workspace::AnodiumWorkspace,
-    anodium_workspace_manager::AnodiumWorkspaceManager,
-};
+use anodium_protocol::server::AnodiumProtocol;
 
 use calloop::{EventLoop, LoopHandle};
-use wayland_server::{Display, Filter, Global, Main};
+use wayland_server::Display;
 
 struct State {
     display: Rc<RefCell<Display>>,
+    anodium_protocol: AnodiumProtocol,
 }
 
 fn insert_wayland_source(
@@ -35,55 +33,6 @@ fn insert_wayland_source(
     Ok(())
 }
 
-thread_local! {
-    pub static FOO: RefCell<Vec<AnodiumWorkspace>> = Default::default();
-}
-
-fn init(display: &mut Display) {
-    let global: Global<AnodiumWorkspaceManager> = display.create_global(
-        1,
-        Filter::new(|(res, _): (Main<AnodiumWorkspaceManager>, _), _, _| {
-            println!("New Global");
-
-            res.quick_assign(|_res, _, _| {
-                println!("Assign");
-            });
-
-            let client = res.as_ref().client().unwrap();
-
-            for id in 0..2 {
-                let output: Main<AnodiumOutput> = client.create_resource(1).unwrap();
-                output.quick_assign(|_res, _, _| {});
-
-                res.output(output.deref());
-                output.name(format!("HDMI-A-{}", id));
-
-                {
-                    let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
-                    workspace.quick_assign(|_res, _, _| {});
-
-                    output.workspace(&workspace);
-                    workspace.name("Web".into());
-                }
-
-                {
-                    let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
-                    workspace.quick_assign(|_res, _, _| {});
-
-                    output.workspace(&workspace);
-                    workspace.name("Mes".into());
-
-                    FOO.with(|data| {
-                        data.borrow_mut().push(workspace.deref().clone());
-                    });
-                }
-            }
-        }),
-    );
-
-    std::mem::forget(global);
-}
-
 fn main() {
     let mut display = Display::new();
     let socket_name = "wayland-0";
@@ -98,7 +47,10 @@ fn main() {
 
     insert_wayland_source(event_loop.handle(), &display).unwrap();
 
-    init(&mut display);
+    let mut anodium_protocol = AnodiumProtocol::init(&mut display);
+
+    let mut out1 = anodium_protocol.new_output();
+    out1.set_name("HDMI-1");
 
     let display = Rc::new(RefCell::new(display));
 
@@ -109,14 +61,9 @@ fn main() {
         .handle()
         .insert_source(timer, {
             let handle = handle.clone();
-            move |count, _, _| {
-                FOO.with(|data| {
-                    let data = data.borrow();
-
-                    for ws in data.iter() {
-                        ws.name(format!("{}", count));
-                    }
-                });
+            move |count, _, state| {
+                let mut output = state.anodium_protocol.new_output();
+                output.set_name(format!("HDMI-{}", count));
 
                 handle.add_timeout(Duration::from_secs(1), count + 1);
             }
@@ -126,8 +73,15 @@ fn main() {
     handle.add_timeout(Duration::from_secs(1), 0);
 
     event_loop
-        .run(None, &mut State { display }, |state| {
-            state.display.clone().borrow_mut().flush_clients(state);
-        })
+        .run(
+            None,
+            &mut State {
+                display,
+                anodium_protocol,
+            },
+            |state| {
+                state.display.clone().borrow_mut().flush_clients(state);
+            },
+        )
         .unwrap();
 }
