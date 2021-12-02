@@ -23,6 +23,11 @@ pub mod calloop;
 pub mod glib;
 
 #[derive(Debug)]
+pub enum AnodiumWorkspaceEvent {
+    Name(String),
+}
+
+#[derive(Debug)]
 pub struct AnodiumWorkspace {
     res: Main<anodium_workspace::AnodiumWorkspace>,
 }
@@ -34,9 +39,13 @@ impl AnodiumWorkspace {
 
     pub fn init<F>(self, cb: F)
     where
-        F: Fn(anodium_workspace::Event, DispatchData) + 'static,
+        F: Fn(AnodiumWorkspaceEvent, DispatchData) + 'static,
     {
         self.res.quick_assign(move |_workspace, event, ddata| {
+            let event = match event {
+                anodium_workspace::Event::Name { name } => AnodiumWorkspaceEvent::Name(name),
+            };
+
             cb(event, ddata);
         });
     }

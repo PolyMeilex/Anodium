@@ -51,29 +51,32 @@ fn init(display: &mut Display) {
 
             let client = res.as_ref().client().unwrap();
 
-            let output: Main<AnodiumOutput> = client.create_resource(1).unwrap();
-            output.quick_assign(|_res, _, _| {});
+            for id in 0..2 {
+                let output: Main<AnodiumOutput> = client.create_resource(1).unwrap();
+                output.quick_assign(|_res, _, _| {});
 
-            res.output(output.deref());
+                res.output(output.deref());
+                output.name(format!("HDMI-A-{}", id));
 
-            {
-                let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
-                workspace.quick_assign(|_res, _, _| {});
+                {
+                    let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
+                    workspace.quick_assign(|_res, _, _| {});
 
-                output.workspace(&workspace);
-                workspace.name("Web".into());
-            }
+                    output.workspace(&workspace);
+                    workspace.name("Web".into());
+                }
 
-            {
-                let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
-                workspace.quick_assign(|_res, _, _| {});
+                {
+                    let workspace: Main<AnodiumWorkspace> = client.create_resource(1).unwrap();
+                    workspace.quick_assign(|_res, _, _| {});
 
-                output.workspace(&workspace);
-                workspace.name("Mes".into());
+                    output.workspace(&workspace);
+                    workspace.name("Mes".into());
 
-                FOO.with(|data| {
-                    data.borrow_mut().push(workspace.deref().clone());
-                });
+                    FOO.with(|data| {
+                        data.borrow_mut().push(workspace.deref().clone());
+                    });
+                }
             }
         }),
     );
@@ -106,21 +109,21 @@ fn main() {
         .handle()
         .insert_source(timer, {
             let handle = handle.clone();
-            move |_, _, _| {
+            move |count, _, _| {
                 FOO.with(|data| {
                     let data = data.borrow();
 
                     for ws in data.iter() {
-                        ws.name("New".into());
+                        ws.name(format!("{}", count));
                     }
                 });
 
-                handle.add_timeout(Duration::from_secs(1), ());
+                handle.add_timeout(Duration::from_secs(1), count + 1);
             }
         })
         .unwrap();
 
-    handle.add_timeout(Duration::from_secs(1), ());
+    handle.add_timeout(Duration::from_secs(1), 0);
 
     event_loop
         .run(None, &mut State { display }, |state| {
