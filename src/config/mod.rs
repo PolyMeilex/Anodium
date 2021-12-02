@@ -1,7 +1,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rhai::{Array, Dynamic, Engine, EvalAltResult, FuncArgs, ImmutableString, Scope, AST};
+use rhai::{
+    Array, Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, ImmutableString, Imports, Module,
+    NativeCallContext, Position, Scope, AST,
+};
 
 pub mod eventloop;
 pub mod keyboard;
@@ -16,6 +19,44 @@ use self::{
     eventloop::{ConfigEvent, EventLoop},
     output::Mode,
 };
+
+#[derive(Debug, Clone)]
+pub struct NativeCallContextWraper {
+    fn_name: String,
+    position: Position,
+    source: Option<String>,
+    imports: Option<Imports>,
+    lib: Box<[Module]>,
+}
+
+impl NativeCallContextWraper {
+    pub fn new(context: NativeCallContext) -> Self {
+        let fn_name = context.fn_name().to_owned();
+        let position = context.position();
+        let mut source = None;
+        if let Some(source_copy) = context.source() {
+            source = Some(source_copy.to_owned());
+        }
+
+        let mut imports = None;
+        if let Some(imports_copy) = context.imports() {
+            imports = Some(imports_copy.clone());
+        }
+
+        let mut lib = Vec::with_capacity(context.namespaces().len());
+        for namespace in context.namespaces().iter() {
+            lib.push(namespace.clone().clone());
+        }
+
+        Self {
+            fn_name,
+            position,
+            source,
+            imports,
+            lib: lib.into_boxed_slice(),
+        }
+    }
+}
 
 #[derive(Debug)]
 struct Inner {
@@ -118,20 +159,73 @@ impl ConfigVM {
         Ok(id)
     }
 
-    pub fn execute_fn_with_state(&self, function: &str, args: &mut [Dynamic]) {
+    pub fn execute_fnptr_with_state(
+        &self,
+        function: FnPtr,
+        contexted_wraped: NativeCallContextWraper,
+        args: &mut [Dynamic],
+    ) -> Dynamic {
         let inner = &mut *self.inner.borrow_mut();
         let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
+        //let fnptr = inner.ast.iter_fn_def();
 
+        let lib = contexted_wraped
+            .lib
+            .iter()
+            .map(|x| x)
+            .collect::<Vec<&Module>>();
+        let context = NativeCallContext::new_with_all_fields(
+            &inner.engine,
+            &contexted_wraped.fn_name,
+            contexted_wraped.source.as_ref().map(|x| &x[..]),
+            &contexted_wraped.imports.as_ref().unwrap(),
+            &lib[..],
+            contexted_wraped.position,
+        );
+
+        info!("context: {:?}", context);
+        function
+            .call_dynamic(&context, Some(&mut event_loop.into()), args)
+            .unwrap()
+    }
+
+    pub fn execute_fn_with_state(&self, function: &str, args: &mut [Dynamic]) -> Dynamic {
+        let inner = &mut *self.inner.borrow_mut();
+        //let fnptr = inner.ast.iter_fn_def();
+        let function_metadata = inner
+            .ast
+            .iter_functions()
+            .find(|x| x.name == function)
+            .unwrap();
+
+        let curried_arguments = function_metadata.params;
+        info!("curried_arguments: {:?}", curried_arguments);
+        let mut args = Vec::with_capacity(curried_arguments.len());
+        for curried in curried_arguments {
+            let dynamic: Dynamic = inner.scope.get_value(curried).unwrap();
+            let dynamic = dynamic.into_shared();
+            inner.scope.push(curried.to_string(), dynamic.clone());
+            args.push(dynamic);
+        }
+
+        let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
         inner
             .engine
-            .call_fn_dynamic(
+            .call_fn_raw(
                 &mut inner.scope,
                 &inner.ast,
                 false,
-                function.to_string(),
+                true,
+                function,
                 Some(&mut event_loop.into()),
                 args,
             )
-            .unwrap();
+            .unwrap()
+    }
+
+    pub fn insert_event(&self, event: ConfigEvent) {
+        let inner = &mut *self.inner.borrow_mut();
+        let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
+        event_loop.0.send(event).unwrap();
     }
 }
