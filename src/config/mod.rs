@@ -121,10 +121,23 @@ impl ConfigVM {
             })
             .collect();
 
-        let result: Array =
-            inner
-                .engine
-                .call_fn(&mut inner.scope, &inner.ast, "arrange_outputs", (outputs,))?;
+        let result: Array = inner
+            .engine
+            .call_fn_raw(
+                &mut inner.scope,
+                &inner.ast,
+                false,
+                true,
+                "arrange_outputs",
+                None,
+                &mut [outputs.into()],
+            )?
+            .try_cast()
+            .ok_or(EvalAltResult::ErrorMismatchOutputType(
+                "".to_owned(),
+                "".to_owned(),
+                Position::NONE,
+            ))?;
 
         Ok(result
             .into_iter()
@@ -147,11 +160,14 @@ impl ConfigVM {
 
         let output_name: ImmutableString = output_name.into();
 
-        let result: Dynamic = inner.engine.call_fn(
+        let result: Dynamic = inner.engine.call_fn_raw(
             &mut inner.scope,
             &inner.ast,
+            false,
+            true,
             "configure_output",
-            (output_name, modes),
+            None,
+            &mut [output_name.into(), modes.into()],
         )?;
 
         let mode: Option<Mode> = result.try_cast();
