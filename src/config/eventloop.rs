@@ -44,28 +44,6 @@ pub mod event_loop_module {
     pub fn focused_unmaximize(event_loop: &mut EventLoop) {
         event_loop.0.send(ConfigEvent::UnmaximizeFocused).unwrap();
     }
-
-    pub fn switch_workspace(event_loop: &mut EventLoop, workspace: String) {
-        event_loop
-            .0
-            .send(ConfigEvent::SwitchWorkspace(workspace))
-            .unwrap();
-    }
-
-    pub fn add_timeout(
-        context: NativeCallContext,
-        event_loop: &mut EventLoop,
-        fnptr: FnPtr,
-        milis: i64,
-    ) {
-        if milis >= 0 {
-            let callback = FnCallback::new(fnptr, context);
-            event_loop
-                .0
-                .send(ConfigEvent::Timeout(callback, milis as u64))
-                .unwrap();
-        }
-    }
 }
 
 pub fn register(scope: &mut Scope, engine: &mut Engine, event_sender: Sender<ConfigEvent>) {

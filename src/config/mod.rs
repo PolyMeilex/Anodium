@@ -13,6 +13,8 @@ pub mod keyboard;
 mod log;
 mod output;
 mod system;
+mod windows;
+mod workspace;
 
 use output::OutputConfig;
 use smithay::backend::input::KeyState;
@@ -88,9 +90,11 @@ impl ConfigVM {
         keyboard::register(&mut scope, &mut engine);
         log::register(&mut engine);
         system::register(&mut engine);
-        eventloop::register(&mut scope, &mut engine, event_sender);
+        workspace::register(&mut engine);
+        windows::register(&mut engine);
+        eventloop::register(&mut scope, &mut engine, event_sender.clone());
 
-        let anodize = anodize::register(&mut scope, &mut engine);
+        let anodize = anodize::register(&mut scope, &mut engine, event_sender);
 
         let ast = engine.compile_file("config.rhai".into())?;
 

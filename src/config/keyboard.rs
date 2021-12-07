@@ -1,7 +1,8 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use rhai::plugin::*;
 use rhai::Scope;
@@ -28,24 +29,24 @@ impl Keyboard {
 
 #[derive(Debug, Clone)]
 pub struct Callbacks {
-    callbacks: Arc<Mutex<HashMap<u32, Vec<Callback>>>>,
+    callbacks: Rc<RefCell<HashMap<u32, Vec<Callback>>>>,
 }
 
 impl Callbacks {
     pub fn new() -> Self {
         Self {
-            callbacks: Arc::new(Mutex::new(HashMap::new())),
+            callbacks: Default::default(),
         }
     }
 
     pub fn clear(&self) {
-        self.callbacks.lock().unwrap().clear();
+        self.callbacks.borrow_mut().clear();
     }
 
     pub fn insert(&self, key: &str, callback: Callback) {
         let key = xkb::keysym_from_name(key, xkb::KEYSYM_CASE_INSENSITIVE);
 
-        let mut callbacks = self.callbacks.lock().unwrap();
+        let mut callbacks = self.callbacks.borrow_mut();
 
         if let Some(callbacks) = callbacks.get_mut(&key) {
             callbacks.push(callback);
@@ -59,13 +60,13 @@ impl Callbacks {
         &self,
         config: &ConfigVM,
         current_key: u32,
-        state: KeyState,
+        _state: KeyState,
         keys_pressed: &HashSet<u32>,
     ) -> bool {
         let mut executed = false;
 
         if keys_pressed.len() > 0 {
-            let callbacks = self.callbacks.lock().unwrap();
+            let callbacks = self.callbacks.borrow();
             for (key, callbacks) in callbacks.iter() {
                 if keys_pressed.contains(key) {
                     for callback in callbacks {

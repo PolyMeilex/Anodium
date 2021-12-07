@@ -28,7 +28,7 @@ anodize.keyboard.callbacks.register(|| {
 
 anodize.keyboard.callbacks.register_capture(|x| {
     log::info(x);
-    this.switch_workspace(x);
+    anodize.workspace.select(x);
 
 }, "Control_L", ["s"], KeyCapture::Numbers());
 
@@ -39,7 +39,7 @@ anodize.keyboard.callbacks.register_capture(|x| {
 
 anodize.keyboard.callbacks.register(|| {
     let j = 0;
-    _event_loop.add_timeout(|| {
+    anodize.system.add_timeout(|| {
         log::info("rhai timeout keyboard");
         j = j + 1;
         print(j);
@@ -59,7 +59,8 @@ anodize.keyboard.callbacks.register(|| {
 }, "Control_L", ["i"]);
 
 let x = 0;
-_event_loop.add_timeout(|| {
+anodize.system.add_timeout(|| {
+    log::info("anodize timeout");
     return false;
 }, 500);
 
