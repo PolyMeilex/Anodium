@@ -1,30 +1,40 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use rhai::plugin::*;
+use rhai::Scope;
 
 use rhai::FnPtr;
-
-use lazy_static::lazy_static;
 use smithay::backend::input::KeyState;
 use xkbcommon::xkb;
 
 use super::ConfigVM;
+use super::FnCallback;
 
-lazy_static! {
-    static ref CALLBACKS: Callbacks = Callbacks::new();
+#[derive(Debug, Clone)]
+pub struct Keyboard {
+    pub callbacks: Callbacks,
 }
 
-struct Callbacks {
-    callbacks: Mutex<HashMap<u32, Vec<Callback>>>,
+impl Keyboard {
+    pub fn new() -> Self {
+        Self {
+            callbacks: Callbacks::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Callbacks {
+    callbacks: Arc<Mutex<HashMap<u32, Vec<Callback>>>>,
 }
 
 impl Callbacks {
     pub fn new() -> Self {
         Self {
-            callbacks: Mutex::new(HashMap::new()),
+            callbacks: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -84,10 +94,10 @@ impl Callbacks {
     }
 }
 
-#[derive(Debug)]
-struct Callback {
+#[derive(Debug, Clone)]
+pub struct Callback {
     keys: Vec<u32>,
-    callback: String,
+    fncallback: FnCallback,
     capture: Option<Capture>,
 }
 
@@ -142,9 +152,9 @@ mod capture {
 }
 
 impl Callback {
-    pub fn new(callback: String, keys: Vec<u32>, capture: Option<Capture>) -> Self {
+    pub fn new(fncallback: FnCallback, keys: Vec<u32>, capture: Option<Capture>) -> Self {
         Self {
-            callback,
+            fncallback,
             keys,
             capture,
         }
@@ -159,9 +169,12 @@ impl Callback {
         if self.keys.iter().all(|item| keys_pressed.contains(item)) {
             if let Some(captured) = captured {
                 let captured = ::xkbcommon::xkb::keysym_get_name(captured);
-                config.execute_fn_with_state(&self.callback, &mut [rhai::Dynamic::from(captured)]);
+                config.execute_callback(
+                    self.fncallback.clone(),
+                    &mut [rhai::Dynamic::from(captured)],
+                );
             } else {
-                config.execute_fn_with_state(&self.callback, &mut []);
+                config.execute_callback(self.fncallback.clone(), &mut []);
             }
             true
         } else {
@@ -171,50 +184,63 @@ impl Callback {
 }
 
 #[export_module]
-pub mod exports {
-    pub fn register(callback: FnPtr, key: &str, keys: rhai::Array) {
-        let callback = callback.fn_name().to_string();
+pub mod keyboard {
+    #[rhai_fn(get = "callbacks", pure, global)]
+    pub fn get_callbacks(keyboard: &mut Keyboard) -> Callbacks {
+        keyboard.callbacks.clone()
+    }
+}
+
+#[export_module]
+pub mod callbacks {
+    #[rhai_fn(global)]
+    pub fn register(
+        context: NativeCallContext,
+        callbacks: &mut Callbacks,
+        fnptr: FnPtr,
+        key: &str,
+        keys: rhai::Array,
+    ) {
+        let callback = FnCallback::new(fnptr, context);
 
         let keys_parsed: Vec<u32> = keys
             .iter()
             .map(|k| xkb::keysym_from_name(&format!("{}", k), xkb::KEYSYM_CASE_INSENSITIVE))
             .collect();
         let callback = Callback::new(callback, keys_parsed, None);
-
-        CALLBACKS.insert(key, callback);
+        callbacks.insert(key, callback);
     }
 
-    pub fn register_capture(callback: FnPtr, key: &str, keys: rhai::Array, capture: Capture) {
-        let callback = callback.fn_name().to_string();
+    #[rhai_fn(global)]
+    pub fn register_capture(
+        context: NativeCallContext,
+        callbacks: &mut Callbacks,
+        fnptr: FnPtr,
+        key: &str,
+        keys: rhai::Array,
+        capture: Capture,
+    ) {
+        let callback = FnCallback::new(fnptr, context);
 
         let keys_parsed: Vec<u32> = keys
             .iter()
             .map(|k| xkb::keysym_from_name(&format!("{}", k), xkb::KEYSYM_CASE_INSENSITIVE))
             .collect();
         let callback = Callback::new(callback, keys_parsed, Some(capture));
-
-        CALLBACKS.insert(key, callback);
+        callbacks.insert(key, callback);
     }
 }
 
-pub fn register(engine: &mut Engine) {
-    let exports_module = exported_module!(exports);
+pub fn register(scope: &mut Scope, engine: &mut Engine) {
     let capture_module = exported_module!(capture);
+
+    let keyboard_module = exported_module!(keyboard);
+    let callbacks_module = exported_module!(callbacks);
     engine
-        .register_static_module("keyboard", exports_module.into())
         .register_static_module("KeyCapture", capture_module.into())
-        .register_type_with_name::<Capture>("KeyCapture");
-}
-
-pub fn key_action(
-    config: &ConfigVM,
-    key: u32,
-    state: KeyState,
-    keys_pressed: &HashSet<u32>,
-) -> bool {
-    CALLBACKS.key_action(config, key, state, keys_pressed)
-}
-
-pub fn callbacks_clear() {
-    CALLBACKS.clear();
+        .register_static_module("keyboard", keyboard_module.into())
+        .register_static_module("callbacks", callbacks_module.into())
+        .register_type::<Capture>()
+        .register_type::<Keyboard>()
+        .register_type::<Callbacks>();
 }

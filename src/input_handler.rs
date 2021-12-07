@@ -90,7 +90,7 @@ impl Anodium {
                     if action.is_some() {
                         suppressed_keys.push(keysym);
                     } else {
-                        if config::keyboard::key_action(&configvm, keysym, state, pressed_keys) {
+                        if configvm.key_action(keysym, state, pressed_keys) {
                             suppressed_keys.push(keysym);
                             return FilterResult::Intercept(KeyAction::None);
                         }

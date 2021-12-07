@@ -1,11 +1,13 @@
-use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
+use std::{cell::RefCell, convert::TryInto};
 
 use rhai::{
-    Array, Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, ImmutableString, Imports, Module,
+    Array, Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, ImmutableString, Module,
     NativeCallContext, Position, Scope, AST,
 };
 
+mod anodize;
 pub mod eventloop;
 pub mod keyboard;
 mod log;
@@ -13,48 +15,49 @@ mod output;
 mod system;
 
 use output::OutputConfig;
+use smithay::backend::input::KeyState;
 use smithay::reexports::{calloop::channel::Sender, drm};
 
+use self::anodize::Anodize;
 use self::{
     eventloop::{ConfigEvent, EventLoop},
     output::Mode,
 };
 
 #[derive(Debug, Clone)]
-pub struct NativeCallContextWraper {
+pub struct FnCallback {
+    fn_ptr: FnPtr,
     fn_name: String,
-    position: Position,
-    source: Option<String>,
-    imports: Option<Imports>,
     lib: Box<[Module]>,
 }
 
-impl NativeCallContextWraper {
-    pub fn new(context: NativeCallContext) -> Self {
-        let fn_name = context.fn_name().to_owned();
-        let position = context.position();
-        let mut source = None;
-        if let Some(source_copy) = context.source() {
-            source = Some(source_copy.to_owned());
-        }
+unsafe impl Sync for FnCallback {}
+unsafe impl Send for FnCallback {}
 
-        let mut imports = None;
-        if let Some(imports_copy) = context.imports() {
-            imports = Some(imports_copy.clone());
-        }
-
-        let mut lib = Vec::with_capacity(context.namespaces().len());
-        for namespace in context.namespaces().iter() {
-            lib.push(namespace.clone().clone());
-        }
-
+impl FnCallback {
+    pub fn new(fn_ptr: FnPtr, context: NativeCallContext) -> Self {
         Self {
-            fn_name,
-            position,
-            source,
-            imports,
-            lib: lib.into_boxed_slice(),
+            fn_ptr,
+            fn_name: context.fn_name().to_owned(),
+            lib: context
+                .iter_namespaces()
+                .map(|x| x.clone().clone())
+                .collect::<Vec<Module>>()
+                .into_boxed_slice(),
         }
+    }
+
+    pub fn call(
+        &self,
+        engine: &Engine,
+        this_ptr: Option<&mut Dynamic>,
+        args: &mut [Dynamic],
+    ) -> Dynamic {
+        let lib = self.lib.iter().map(|x| x).collect::<Vec<&Module>>();
+
+        let context = NativeCallContext::new(engine, &self.fn_name, &lib[..]);
+
+        self.fn_ptr.call_dynamic(&context, this_ptr, args).unwrap()
     }
 }
 
@@ -68,6 +71,7 @@ struct Inner {
 #[derive(Debug, Clone)]
 pub struct ConfigVM {
     inner: Rc<RefCell<Inner>>,
+    pub anodize: Anodize,
 }
 
 impl ConfigVM {
@@ -81,19 +85,20 @@ impl ConfigVM {
 
         output::register(&mut engine);
 
-        keyboard::register(&mut engine);
+        keyboard::register(&mut scope, &mut engine);
         log::register(&mut engine);
         system::register(&mut engine);
         eventloop::register(&mut scope, &mut engine, event_sender);
 
-        let ast = engine.compile_file("config.rhai".into())?;
+        let anodize = anodize::register(&mut scope, &mut engine);
 
-        keyboard::callbacks_clear();
+        let ast = engine.compile_file("config.rhai".into())?;
 
         engine.eval_ast_with_scope(&mut scope, &ast)?;
 
         Ok(ConfigVM {
             inner: Rc::new(RefCell::new(Inner { engine, ast, scope })),
+            anodize,
         })
     }
 
@@ -175,34 +180,10 @@ impl ConfigVM {
         Ok(id)
     }
 
-    pub fn execute_fnptr_with_state(
-        &self,
-        function: FnPtr,
-        contexted_wraped: NativeCallContextWraper,
-        args: &mut [Dynamic],
-    ) -> Dynamic {
+    pub fn execute_callback(&self, callback: FnCallback, args: &mut [Dynamic]) -> Dynamic {
         let inner = &mut *self.inner.borrow_mut();
         let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
-        //let fnptr = inner.ast.iter_fn_def();
-
-        let lib = contexted_wraped
-            .lib
-            .iter()
-            .map(|x| x)
-            .collect::<Vec<&Module>>();
-        let context = NativeCallContext::new_with_all_fields(
-            &inner.engine,
-            &contexted_wraped.fn_name,
-            contexted_wraped.source.as_ref().map(|x| &x[..]),
-            &contexted_wraped.imports.as_ref().unwrap(),
-            &lib[..],
-            contexted_wraped.position,
-        );
-
-        info!("context: {:?}", context);
-        function
-            .call_dynamic(&context, Some(&mut event_loop.into()), args)
-            .unwrap()
+        callback.call(&inner.engine, Some(&mut event_loop.into()), args)
     }
 
     pub fn execute_fn_with_state(&self, function: &str, args: &mut [Dynamic]) -> Dynamic {
@@ -243,5 +224,12 @@ impl ConfigVM {
         let inner = &mut *self.inner.borrow_mut();
         let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
         event_loop.0.send(event).unwrap();
+    }
+
+    pub fn key_action(&self, key: u32, state: KeyState, keys_pressed: &HashSet<u32>) -> bool {
+        self.anodize
+            .keyboard
+            .callbacks
+            .key_action(self, key, state, keys_pressed)
     }
 }

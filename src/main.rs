@@ -38,14 +38,16 @@ use std::sync::atomic::Ordering;
 use crate::config::eventloop::ConfigEvent;
 
 fn main() {
+    std::env::set_var("RUST_LOG", "debug,smithay=error");
     // A logger facility, here we use the terminal here
     let log = slog::Logger::root(
         slog_async::Async::default(slog_term::term_full().fuse()).fuse(),
         //std::sync::Mutex::new(slog_term::term_full().fuse()).fuse(),
         slog::o!(),
     );
-    let _guard = slog_scope::set_global_logger(log.clone());
-    slog_stdlog::init().expect("Could not setup log backend");
+
+    let _guard = slog_envlogger::init().expect("Could not setup log backend");
+    //slog_stdlog::init().expect("Could not setup log backend");
 
     let mut event_loop = EventLoop::try_new().unwrap();
 

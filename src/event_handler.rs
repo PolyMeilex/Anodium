@@ -20,40 +20,27 @@ impl Anodium {
                 }
             }
             ConfigEvent::SwitchWorkspace(workspace) => self.switch_workspace(&workspace),
-            ConfigEvent::Timeout(fnptr, context_wrapped, callback, millis) => {
+            ConfigEvent::Timeout(callback, millis) => {
                 let source = Timer::new().expect("Failed to create timer event source!");
                 let timer_handle = source.handle();
-                timer_handle.add_timeout(
-                    Duration::from_millis(millis),
-                    (fnptr, context_wrapped, callback),
-                );
+                timer_handle.add_timeout(Duration::from_millis(millis), (callback, millis));
 
                 self.handle
-                    .insert_source(
-                        source,
-                        move |(fnptr, context_wrapped, event), _metadata, shared_data| {
-                            info!("timer executed");
-
-                            let fpnptr_clone = fnptr.clone();
-                            let context_wrapped_clone = context_wrapped.clone();
-
-                            if let Ok(result) = shared_data
-                                .config
-                                .execute_fnptr_with_state(fnptr, context_wrapped, &mut [])
-                                .as_bool()
-                            {
-                                //rescheduling doesn't work when the callbacks references any outside variables
-                                if result {
-                                    shared_data.config.insert_event(ConfigEvent::Timeout(
-                                        fpnptr_clone,
-                                        context_wrapped_clone,
-                                        event,
-                                        millis,
-                                    ));
-                                }
+                    .insert_source(source, move |(callback, millis), _metadata, shared_data| {
+                        let callback_cloned = callback.clone();
+                        if let Ok(result) = shared_data
+                            .config
+                            .execute_callback(callback, &mut [])
+                            .as_bool()
+                        {
+                            //rescheduling doesn't work when the callbacks references any outside variables
+                            if result {
+                                shared_data
+                                    .config
+                                    .insert_event(ConfigEvent::Timeout(callback_cloned, millis));
                             }
-                        },
-                    )
+                        }
+                    })
                     .unwrap();
             }
         }

@@ -2,49 +2,78 @@ print("config init!!!");
 
 log::info("initalizing!!!");
 
-keyboard::register(|| {
+anodize.keyboard.callbacks.register(|| {
     log::info("key called P");
 }, "Super_L", ["p"]);
 
-keyboard::register(|| {
+anodize.keyboard.callbacks.register(|| {
     log::info("key called H");
 }, "Super_L", ["h"]);
 
-keyboard::register(|| {
+anodize.keyboard.callbacks.register(|| {
     log::info("starting weston terminal");
-    system::exec("weston-terminal");
+    anodize.system.exec("weston-terminal");
 }, "Control_L", ["t"]);
 
 
-keyboard::register(|| {
-    //event_loop.wtf2();
-    //wtf2(event_loop);
+anodize.keyboard.callbacks.register(|| {
     this.focused_close();
 
 }, "Control_L", ["y"]);
 
-keyboard::register(|| {
-    //event_loop.wtf2();
-    //wtf2(event_loop);
+anodize.keyboard.callbacks.register(|| {
     this.focused_maximize();
-
 }, "Control_L", ["w"]);
 
 
-keyboard::register_capture(|x| {
-    //event_loop.wtf2();
-    //wtf2(event_loop);
+anodize.keyboard.callbacks.register_capture(|x| {
     log::info(x);
     this.switch_workspace(x);
 
 }, "Control_L", ["s"], KeyCapture::Numbers());
 
-keyboard::register_capture(|x| {
-    //event_loop.wtf2();
-    //wtf2(event_loop);
+anodize.keyboard.callbacks.register_capture(|x| {
     log::info(x);
-
 }, "Control_L", ["l"], KeyCapture::Letters());
+
+
+anodize.keyboard.callbacks.register(|| {
+    let j = 0;
+    _event_loop.add_timeout(|| {
+        log::info("rhai timeout keyboard");
+        j = j + 1;
+        print(j);
+        if j > 20 {
+            return false
+        }
+        return true;
+    }, 20);
+
+}, "Control_L", ["k"]);
+
+let i = 0;
+anodize.keyboard.callbacks.register(|| {
+    i = 1 + i;
+    print(i);
+
+}, "Control_L", ["i"]);
+
+let x = 0;
+_event_loop.add_timeout(|| {
+    return false;
+}, 500);
+
+let c = 0;
+anodize.keyboard.callbacks.register(|| {
+    c = c + 1;
+    print(c);
+}, "Control_L", ["b"]);
+
+
+anodize.keyboard.callbacks.register(|| {
+    log::info("anodize");
+}, "Control_L", ["g"]);
+
 
 fn arrange_outputs(outputs) {
     let output_x = 0;
