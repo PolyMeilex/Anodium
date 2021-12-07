@@ -33,9 +33,6 @@ pub struct FnCallback {
     lib: Box<[Module]>,
 }
 
-unsafe impl Sync for FnCallback {}
-unsafe impl Send for FnCallback {}
-
 impl FnCallback {
     pub fn new(fn_ptr: FnPtr, context: NativeCallContext) -> Self {
         Self {
