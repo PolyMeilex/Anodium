@@ -1,48 +1,54 @@
-print("config init!!!");
-
-log::info("initalizing!!!");
+anodize.log.info("initalizing!!!");
 
 anodize.keyboard.callbacks.register(|| {
-    log::info("key called P");
+    anodize.log.info("key called P");
 }, "Super_L", ["p"]);
 
 anodize.keyboard.callbacks.register(|| {
-    log::info("key called H");
+    anodize.log.info("key called H");
 }, "Super_L", ["h"]);
 
 anodize.keyboard.callbacks.register(|| {
-    log::info("starting weston terminal");
+    anodize.log.info("starting weston terminal");
     anodize.system.exec("weston-terminal");
 }, "Control_L", ["t"]);
 
 
 anodize.keyboard.callbacks.register(|| {
-    this.focused_close();
-
+    if anodize.windows.focused != () {
+        anodize.windows.focused.close()
+    }
 }, "Control_L", ["y"]);
 
 anodize.keyboard.callbacks.register(|| {
-    this.focused_maximize();
+    if anodize.windows.focused != () {
+        anodize.windows.focused.maximize();
+    }
 }, "Control_L", ["w"]);
 
+anodize.keyboard.callbacks.register(|| {
+    if anodize.windows.focused != () {
+        anodize.windows.focused.unmaximize()
+    }
+}, "Control_L", ["u"]);
+
 
 anodize.keyboard.callbacks.register_capture(|x| {
-    log::info(x);
+    anodize.log.info(x);
     anodize.workspace.select(x);
 
-}, "Control_L", ["s"], KeyCapture::Numbers());
+}, "Control_L", ["s"], keyboard::numbers());
 
 anodize.keyboard.callbacks.register_capture(|x| {
-    log::info(x);
-}, "Control_L", ["l"], KeyCapture::Letters());
+    anodize.log.info(x);
+}, "Control_L", ["l"], keyboard::letters());
 
 
 anodize.keyboard.callbacks.register(|| {
     let j = 0;
     anodize.system.add_timeout(|| {
-        log::info("rhai timeout keyboard");
+        anodize.log.info("rhai timeout keyboard " + j.to_string());
         j = j + 1;
-        print(j);
         if j > 20 {
             return false
         }
@@ -51,28 +57,21 @@ anodize.keyboard.callbacks.register(|| {
 
 }, "Control_L", ["k"]);
 
-let i = 0;
-anodize.keyboard.callbacks.register(|| {
-    i = 1 + i;
-    print(i);
 
-}, "Control_L", ["i"]);
-
-let x = 0;
 anodize.system.add_timeout(|| {
-    log::info("anodize timeout");
+    anodize.log.info("anodize timeout");
     return false;
 }, 500);
 
-let c = 0;
+let b = 0;
 anodize.keyboard.callbacks.register(|| {
-    c = c + 1;
-    print(c);
+    b = b + 1;
+    anodize.log.info("rhai b pressed " + b.to_string());
 }, "Control_L", ["b"]);
 
 
 anodize.keyboard.callbacks.register(|| {
-    log::info("anodize");
+    anodize.log.info("anodize");
 }, "Control_L", ["g"]);
 
 

@@ -124,13 +124,12 @@ impl Anodium {
                 if !self.input_state.pointer.is_grabbed() {
                     let under = self.surface_under(self.input_state.pointer_location);
                     let surface = under.as_ref().map(|&(ref s, _)| s);
-                    self.focused_window = None;
                     if let Some(surface) = surface {
+                        let mut window = None;
                         if let Some(space) = self.find_workspace_by_surface_mut(surface) {
-                            if let Some(window) = space.find_window(surface) {
-                                self.focused_window = Some(window.clone());
-                            }
+                            window = space.find_window(surface).cloned();
                         }
+                        self.update_focused_window(window);
                     }
                     self.input_state.keyboard.set_focus(surface, serial);
                 }

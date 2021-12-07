@@ -7,17 +7,14 @@ use crate::Anodium;
 impl Anodium {
     pub fn process_config_event(&mut self, event: ConfigEvent) {
         match event {
-            ConfigEvent::CloseFocused => {}
-            ConfigEvent::MaximizeFocused => {
-                if let Some(window) = self.focused_window.clone() {
-                    self.active_workspace().maximize_request(&window.toplevel());
-                }
+            // TODO: Implement window closing from events
+            ConfigEvent::Close(window) => {}
+            ConfigEvent::Maximize(window) => {
+                self.active_workspace().maximize_request(&window.toplevel());
             }
-            ConfigEvent::UnmaximizeFocused => {
-                if let Some(window) = self.focused_window.clone() {
-                    self.active_workspace()
-                        .unmaximize_request(&window.toplevel());
-                }
+            ConfigEvent::Unmaximize(window) => {
+                self.active_workspace()
+                    .unmaximize_request(&window.toplevel());
             }
             ConfigEvent::SwitchWorkspace(workspace) => self.switch_workspace(&workspace),
             ConfigEvent::Timeout(callback, millis) => {
@@ -33,7 +30,6 @@ impl Anodium {
                             .execute_callback(callback, &mut [])
                             .as_bool()
                         {
-                            //rescheduling doesn't work when the callbacks references any outside variables
                             if result {
                                 shared_data
                                     .config

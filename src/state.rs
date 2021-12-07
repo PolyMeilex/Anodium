@@ -517,8 +517,16 @@ impl Anodium {
             }
 
             self.active_workspace = Some(key.into());
-            self.focused_window = None;
+            self.update_focused_window(None);
             self.update_workspaces_geometry();
         }
+    }
+
+    pub fn update_focused_window(&mut self, window: Option<Window>) {
+        self.config
+            .anodize
+            .windows
+            .update_focused_window(window.clone());
+        self.focused_window = window;
     }
 }

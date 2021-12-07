@@ -74,6 +74,7 @@ struct Inner {
 pub struct ConfigVM {
     inner: Rc<RefCell<Inner>>,
     pub anodize: Anodize,
+    pub event_sender: Sender<ConfigEvent>,
 }
 
 impl ConfigVM {
@@ -86,15 +87,13 @@ impl ConfigVM {
         });
 
         output::register(&mut engine);
-
-        keyboard::register(&mut scope, &mut engine);
+        keyboard::register(&mut engine);
         log::register(&mut engine);
         system::register(&mut engine);
         workspace::register(&mut engine);
         windows::register(&mut engine);
-        eventloop::register(&mut scope, &mut engine, event_sender.clone());
 
-        let anodize = anodize::register(&mut scope, &mut engine, event_sender);
+        let anodize = anodize::register(&mut scope, &mut engine, event_sender.clone());
 
         let ast = engine.compile_file("config.rhai".into())?;
 
@@ -103,6 +102,7 @@ impl ConfigVM {
         Ok(ConfigVM {
             inner: Rc::new(RefCell::new(Inner { engine, ast, scope })),
             anodize,
+            event_sender,
         })
     }
 
@@ -186,48 +186,11 @@ impl ConfigVM {
 
     pub fn execute_callback(&self, callback: FnCallback, args: &mut [Dynamic]) -> Dynamic {
         let inner = &mut *self.inner.borrow_mut();
-        let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
-        callback.call(&inner.engine, Some(&mut event_loop.into()), args)
-    }
-
-    pub fn execute_fn_with_state(&self, function: &str, args: &mut [Dynamic]) -> Dynamic {
-        let inner = &mut *self.inner.borrow_mut();
-        //let fnptr = inner.ast.iter_fn_def();
-        let function_metadata = inner
-            .ast
-            .iter_functions()
-            .find(|x| x.name == function)
-            .unwrap();
-
-        let curried_arguments = function_metadata.params;
-        info!("curried_arguments: {:?}", curried_arguments);
-        let mut args = Vec::with_capacity(curried_arguments.len());
-        for curried in curried_arguments {
-            let dynamic: Dynamic = inner.scope.get_value(curried).unwrap();
-            let dynamic = dynamic.into_shared();
-            inner.scope.push(curried.to_string(), dynamic.clone());
-            args.push(dynamic);
-        }
-
-        let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
-        inner
-            .engine
-            .call_fn_raw(
-                &mut inner.scope,
-                &inner.ast,
-                false,
-                true,
-                function,
-                Some(&mut event_loop.into()),
-                args,
-            )
-            .unwrap()
+        callback.call(&inner.engine, None, args)
     }
 
     pub fn insert_event(&self, event: ConfigEvent) {
-        let inner = &mut *self.inner.borrow_mut();
-        let event_loop = inner.scope.get_value::<EventLoop>("_event_loop").unwrap();
-        event_loop.0.send(event).unwrap();
+        self.event_sender.send(event).unwrap();
     }
 
     pub fn key_action(&self, key: u32, state: KeyState, keys_pressed: &HashSet<u32>) -> bool {

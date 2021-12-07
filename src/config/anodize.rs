@@ -5,6 +5,7 @@ use smithay::reexports::calloop::channel::Sender;
 
 use super::eventloop::ConfigEvent;
 use super::keyboard::Keyboard;
+use super::log::Log;
 use super::system::System;
 use super::windows::Windows;
 use super::workspace::Workspace;
@@ -14,7 +15,8 @@ pub struct Anodize {
     pub keyboard: Keyboard,
     system: System,
     workspace: Workspace,
-    windows: Windows,
+    pub windows: Windows,
+    log: Log,
 }
 
 impl Anodize {
@@ -24,10 +26,9 @@ impl Anodize {
             system: System::new(event_sender.clone()),
             workspace: Workspace::new(event_sender.clone()),
             windows: Windows::new(event_sender.clone()),
+            log: Log::new(),
         }
     }
-
-    pub fn key_action() {}
 }
 
 impl From<Anodize> for Dynamic {
@@ -58,6 +59,11 @@ pub mod anodize_module {
     #[rhai_fn(get = "windows", pure)]
     pub fn get_windows(anodize: &mut Anodize) -> Windows {
         anodize.windows.clone()
+    }
+
+    #[rhai_fn(get = "log", pure)]
+    pub fn get_log(anodize: &mut Anodize) -> Log {
+        anodize.log.clone()
     }
 }
 

@@ -106,6 +106,7 @@ pub struct Callback {
 pub enum Capture {
     Numbers,
     Letters,
+    Functions,
 }
 
 impl Capture {
@@ -113,42 +114,8 @@ impl Capture {
         match self {
             Self::Letters => (xkb::KEY_a..=xkb::KEY_z).contains(&key),
             Self::Numbers => (xkb::KEY_0..=xkb::KEY_9).contains(&key),
+            Self::Functions => (xkb::KEY_F1..=xkb::KEY_F12).contains(&key),
         }
-    }
-}
-
-#[export_module]
-mod capture {
-    #[allow(non_snake_case)]
-    pub fn Numbers() -> Capture {
-        Capture::Numbers
-    }
-    #[allow(non_snake_case)]
-    pub fn Letters() -> Capture {
-        Capture::Letters
-    }
-
-    #[rhai_fn(global, get = "enum_type", pure)]
-    pub fn get_type(my_enum: &mut Capture) -> String {
-        match my_enum {
-            Capture::Numbers => "Numbers".to_string(),
-            Capture::Letters => "Letters".to_string(),
-        }
-    }
-
-    #[rhai_fn(global, name = "to_string", name = "to_debug", pure)]
-    pub fn to_string(my_enum: &mut Capture) -> String {
-        format!("{:?}", my_enum)
-    }
-
-    #[rhai_fn(global, name = "==", pure)]
-    pub fn eq(my_enum: &mut Capture, my_enum2: Capture) -> bool {
-        my_enum == &my_enum2
-    }
-
-    #[rhai_fn(global, name = "!=", pure)]
-    pub fn neq(my_enum: &mut Capture, my_enum2: Capture) -> bool {
-        my_enum != &my_enum2
     }
 }
 
@@ -189,6 +156,18 @@ pub mod keyboard {
     #[rhai_fn(get = "callbacks", pure, global)]
     pub fn get_callbacks(keyboard: &mut Keyboard) -> Callbacks {
         keyboard.callbacks.clone()
+    }
+
+    pub fn numbers() -> Capture {
+        Capture::Numbers
+    }
+
+    pub fn letters() -> Capture {
+        Capture::Letters
+    }
+
+    pub fn functions() -> Capture {
+        Capture::Functions
     }
 }
 
@@ -232,13 +211,10 @@ pub mod callbacks {
     }
 }
 
-pub fn register(scope: &mut Scope, engine: &mut Engine) {
-    let capture_module = exported_module!(capture);
-
+pub fn register(engine: &mut Engine) {
     let keyboard_module = exported_module!(keyboard);
     let callbacks_module = exported_module!(callbacks);
     engine
-        .register_static_module("KeyCapture", capture_module.into())
         .register_static_module("keyboard", keyboard_module.into())
         .register_static_module("callbacks", callbacks_module.into())
         .register_type::<Capture>()
