@@ -1,0 +1,8 @@
+[package]
+name = "gtk-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anodium-protocol = { path="../", features=["glib-adapter"] }
+gtk = "0.14.3"
