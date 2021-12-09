@@ -112,6 +112,11 @@ impl Anodium {
             .unwrap_or(KeyAction::None)
     }
 
+    pub fn clear_keyboard_focus(&mut self) {
+        let serial = SCOUNTER.next_serial();
+        self.input_state.keyboard.set_focus(None, serial);
+    }
+
     fn on_pointer_button<I: InputBackend>(&mut self, evt: I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
 

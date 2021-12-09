@@ -524,6 +524,7 @@ impl Anodium {
 
             self.active_workspace = Some(key.into());
             self.update_focused_window(None);
+            self.clear_keyboard_focus();
             self.update_workspaces_geometry();
         }
     }
