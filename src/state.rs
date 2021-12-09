@@ -308,6 +308,12 @@ impl Anodium {
 
         self.output_map.refresh();
 
+        if let Some(focused_window) = &self.focused_window {
+            if !focused_window.toplevel().alive() {
+                self.update_focused_window(None);
+            }
+        }
+
         self.last_update = Instant::now();
     }
 
