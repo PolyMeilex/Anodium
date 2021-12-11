@@ -40,7 +40,7 @@ use crate::config::eventloop::ConfigEvent;
 fn main() {
     std::env::set_var("RUST_LOG", "debug,smithay=error");
     // A logger facility, here we use the terminal here
-    let log = slog::Logger::root(
+    let _log = slog::Logger::root(
         slog_async::Async::default(slog_term::term_full().fuse()).fuse(),
         //std::sync::Mutex::new(slog_term::term_full().fuse()).fuse(),
         slog::o!(),

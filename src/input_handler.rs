@@ -1,6 +1,6 @@
 use std::sync::atomic::Ordering;
 
-use crate::{config, grabs::MoveSurfaceGrab, Anodium};
+use crate::{grabs::MoveSurfaceGrab, Anodium};
 
 use smithay::{
     backend::{
@@ -10,9 +10,7 @@ use smithay::{
         },
         session::Session,
     },
-    reexports::{
-        wayland_server::protocol::wl_pointer, winit::platform::unix::x11::ffi::NoEventMask,
-    },
+    reexports::wayland_server::protocol::wl_pointer,
     utils::{Logical, Point},
     wayland::{
         seat::{keysyms as xkb, AxisFrame, FilterResult, Keysym, ModifiersState},
@@ -85,7 +83,7 @@ impl Anodium {
                 // should be forwarded to the client or not.
 
                 if let KeyState::Pressed = state {
-                    let mut action = process_keyboard_shortcut(*modifiers, keysym);
+                    let action = process_keyboard_shortcut(*modifiers, keysym);
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);

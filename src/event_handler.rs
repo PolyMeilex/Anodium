@@ -8,7 +8,7 @@ impl Anodium {
     pub fn process_config_event(&mut self, event: ConfigEvent) {
         match event {
             // TODO: Implement window closing from events
-            ConfigEvent::Close(window) => {}
+            ConfigEvent::Close(_window) => {}
             ConfigEvent::Maximize(window) => {
                 self.active_workspace().maximize_request(&window.toplevel());
             }

@@ -1,10 +1,10 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::{cell::RefCell, convert::TryInto};
 
 use rhai::{
-    Array, Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, ImmutableString, Module,
-    NativeCallContext, Position, Scope, AST,
+    Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString, Module, NativeCallContext,
+    Position, Scope, AST,
 };
 
 mod anodize;
@@ -21,10 +21,7 @@ use smithay::backend::input::KeyState;
 use smithay::reexports::{calloop::channel::Sender, drm};
 
 use self::anodize::Anodize;
-use self::{
-    eventloop::{ConfigEvent, EventLoop},
-    output::Mode,
-};
+use self::{eventloop::ConfigEvent, output::Mode};
 
 #[derive(Debug, Clone)]
 pub struct FnCallback {

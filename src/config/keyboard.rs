@@ -5,7 +5,6 @@ use std::hash::Hash;
 use std::rc::Rc;
 
 use rhai::plugin::*;
-use rhai::Scope;
 
 use rhai::FnPtr;
 use smithay::backend::input::KeyState;
