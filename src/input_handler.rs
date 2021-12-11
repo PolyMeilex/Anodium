@@ -1,6 +1,6 @@
 use std::sync::atomic::Ordering;
 
-use crate::{config, grabs::MoveSurfaceGrab, Anodium};
+use crate::{grabs::MoveSurfaceGrab, Anodium};
 
 use smithay::{
     backend::{
@@ -83,19 +83,14 @@ impl Anodium {
                 // should be forwarded to the client or not.
 
                 if let KeyState::Pressed = state {
-                    let mut action = process_keyboard_shortcut(*modifiers, keysym);
+                    let action = process_keyboard_shortcut(*modifiers, keysym);
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);
                     } else {
-                        if config::keyboard::key_action(
-                            &configvm,
-                            &keysym_desc,
-                            state,
-                            pressed_keys,
-                        ) {
+                        if configvm.key_action(keysym, state, pressed_keys) {
                             suppressed_keys.push(keysym);
-                            action = None;
+                            return FilterResult::Intercept(KeyAction::None);
                         }
                     }
 
@@ -115,6 +110,11 @@ impl Anodium {
             .unwrap_or(KeyAction::None)
     }
 
+    pub fn clear_keyboard_focus(&mut self) {
+        let serial = SCOUNTER.next_serial();
+        self.input_state.keyboard.set_focus(None, serial);
+    }
+
     fn on_pointer_button<I: InputBackend>(&mut self, evt: I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
 
@@ -126,10 +126,15 @@ impl Anodium {
                 // change the keyboard focus unless the pointer is grabbed
                 if !self.input_state.pointer.is_grabbed() {
                     let under = self.surface_under(self.input_state.pointer_location);
-
-                    self.input_state
-                        .keyboard
-                        .set_focus(under.as_ref().map(|&(ref s, _)| s), serial);
+                    let surface = under.as_ref().map(|&(ref s, _)| s);
+                    if let Some(surface) = surface {
+                        let mut window = None;
+                        if let Some(space) = self.find_workspace_by_surface_mut(surface) {
+                            window = space.find_window(surface).cloned();
+                        }
+                        self.update_focused_window(window);
+                    }
+                    self.input_state.keyboard.set_focus(surface, serial);
                 }
                 wl_pointer::ButtonState::Pressed
             }

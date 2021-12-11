@@ -15,7 +15,7 @@ use smithay::{
         session::Session,
     },
     reexports::{
-        calloop::{self, generic::Generic, Interest, LoopHandle, PostAction},
+        calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
     utils::{Logical, Point},
@@ -32,7 +32,7 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
-    config::ConfigVM,
+    config::{eventloop::ConfigEvent, ConfigVM},
     framework::backend::session::AnodiumSession,
     framework::shell::ShellManager,
     output_map::{Output, OutputMap},
@@ -80,6 +80,7 @@ pub struct Anodium {
     pub workspaces: HashMap<String, Box<dyn Positioner>>,
     pub active_workspace: Option<String>,
     pub grabed_window: Option<Window>,
+    pub focused_window: Option<Window>,
 
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
@@ -201,6 +202,7 @@ impl Anodium {
         display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
         session: AnodiumSession,
+        event_sender: Sender<ConfigEvent>,
     ) -> Self {
         let log = slog_scope::logger();
 
@@ -225,7 +227,7 @@ impl Anodium {
         #[cfg(feature = "xwayland")]
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
-        let config = ConfigVM::new().unwrap();
+        let config = ConfigVM::new(event_sender).unwrap();
 
         let output_map = OutputMap::new(config.clone());
 
@@ -263,6 +265,7 @@ impl Anodium {
             workspaces: Default::default(),
             active_workspace: None,
             grabed_window: Default::default(),
+            focused_window: Default::default(),
 
             #[cfg(feature = "xwayland")]
             xwayland,
@@ -304,6 +307,12 @@ impl Anodium {
         }
 
         self.output_map.refresh();
+
+        if let Some(focused_window) = &self.focused_window {
+            if !focused_window.toplevel().alive() {
+                self.update_focused_window(None);
+            }
+        }
 
         self.last_update = Instant::now();
     }
@@ -514,7 +523,17 @@ impl Anodium {
             }
 
             self.active_workspace = Some(key.into());
+            self.update_focused_window(None);
+            self.clear_keyboard_focus();
             self.update_workspaces_geometry();
         }
+    }
+
+    pub fn update_focused_window(&mut self, window: Option<Window>) {
+        self.config
+            .anodize
+            .windows
+            .update_focused_window(window.clone());
+        self.focused_window = window;
     }
 }

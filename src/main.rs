@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate slog_scope;
 
+mod event_handler;
 mod input_handler;
 
 mod framework;
@@ -28,22 +29,39 @@ mod shell_handler;
 use state::Anodium;
 
 use slog::Drain;
-use smithay::reexports::calloop::EventLoop;
+use smithay::reexports::calloop::{
+    channel::{channel, Channel, Event, Sender},
+    EventLoop,
+};
 use std::sync::atomic::Ordering;
 
+use crate::config::eventloop::ConfigEvent;
+
 fn main() {
+    std::env::set_var("RUST_LOG", "debug,smithay=error");
     // A logger facility, here we use the terminal here
-    let log = slog::Logger::root(
+    let _log = slog::Logger::root(
         slog_async::Async::default(slog_term::term_full().fuse()).fuse(),
         //std::sync::Mutex::new(slog_term::term_full().fuse()).fuse(),
         slog::o!(),
     );
-    let _guard = slog_scope::set_global_logger(log.clone());
-    slog_stdlog::init().expect("Could not setup log backend");
+
+    let _guard = slog_envlogger::init().expect("Could not setup log backend");
+    //slog_stdlog::init().expect("Could not setup log backend");
 
     let mut event_loop = EventLoop::try_new().unwrap();
 
-    let anodium = framework::backend::auto(&mut event_loop);
+    let (sender, reciver): (Sender<ConfigEvent>, Channel<ConfigEvent>) = channel();
+    event_loop
+        .handle()
+        .insert_source(reciver, |event, _metadata, state: &mut Anodium| {
+            if let Event::Msg(event) = event {
+                state.process_config_event(event);
+            }
+        })
+        .unwrap();
+
+    let anodium = framework::backend::auto(&mut event_loop, sender);
     let anodium = anodium.expect("Could not create a backend!");
     run_loop(anodium, event_loop);
 }

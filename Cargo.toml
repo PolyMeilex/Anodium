@@ -14,7 +14,8 @@ rand = "0.8.4"
 slog = { version = "2.1.1" }
 slog-term = "2.8"
 slog-async = "2.2"
-slog-stdlog = "4.1.0"
+#slog-stdlog = "4.1.0"
+slog-envlogger = "2.2.0"
 slog-scope = "4.4.0"
 xkbcommon = "0.4.0"
 generational-arena = "0.2.8"
@@ -23,8 +24,6 @@ cgmath = "0.18.0"
 imgui = "0.8.0"
 imgui-smithay-renderer = {path="./imgui-smithay-renderer"}
 rhai = "1.2.1"
-
-lazy_static = "1.4.0"
 
 [dependencies.smithay]
 # git = "https://github.com/Smithay/smithay.git"

@@ -1,28 +1,79 @@
-print("config init!!!");
+anodize.log.info("initalizing!!!");
 
-log::info("initalizing!!!");
-
-keyboard::register(|| {
-    log::info("key called P");
+anodize.keyboard.callbacks.register(|| {
+    anodize.log.info("key called P");
 }, "Super_L", ["p"]);
 
-keyboard::register(|| {
-    log::info("key called H");
+anodize.keyboard.callbacks.register(|| {
+    anodize.log.info("key called H");
 }, "Super_L", ["h"]);
 
-keyboard::register(|| {
-    log::info("starting weston terminal");
-    system::exec("weston-terminal");
+anodize.keyboard.callbacks.register(|| {
+    anodize.log.info("starting weston terminal");
+    anodize.system.exec("weston-terminal");
 }, "Control_L", ["t"]);
 
-keyboard::register(|| {
-    system::exec("alacritty");
-}, "Super_L", ["return"]);
 
-
-keyboard::register(|| {
-    this.test();
+anodize.keyboard.callbacks.register(|| {
+    if anodize.windows.focused != () {
+        anodize.windows.focused.close()
+    }
 }, "Control_L", ["y"]);
+
+anodize.keyboard.callbacks.register(|| {
+    if anodize.windows.focused != () {
+        anodize.windows.focused.maximize();
+    }
+}, "Control_L", ["w"]);
+
+anodize.keyboard.callbacks.register(|| {
+    if anodize.windows.focused != () {
+        anodize.windows.focused.unmaximize()
+    }
+}, "Control_L", ["u"]);
+
+
+anodize.keyboard.callbacks.register_capture(|x| {
+    anodize.log.info(x);
+    anodize.workspace.select(x);
+
+}, "Control_L", ["s"], keyboard::numbers());
+
+anodize.keyboard.callbacks.register_capture(|x| {
+    anodize.log.info(x);
+}, "Control_L", ["l"], keyboard::letters());
+
+
+anodize.keyboard.callbacks.register(|| {
+    let j = 0;
+    anodize.system.add_timeout(|| {
+        anodize.log.info("rhai timeout keyboard " + j.to_string());
+        j = j + 1;
+        if j > 20 {
+            return false
+        }
+        return true;
+    }, 20);
+
+}, "Control_L", ["k"]);
+
+
+anodize.system.add_timeout(|| {
+    anodize.log.info("anodize timeout");
+    return false;
+}, 500);
+
+let b = 0;
+anodize.keyboard.callbacks.register(|| {
+    b = b + 1;
+    anodize.log.info("rhai b pressed " + b.to_string());
+}, "Control_L", ["b"]);
+
+
+anodize.keyboard.callbacks.register(|| {
+    anodize.log.info("anodize");
+}, "Control_L", ["g"]);
+
 
 fn arrange_outputs(outputs) {
     let output_x = 0;
