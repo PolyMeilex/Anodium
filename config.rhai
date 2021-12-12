@@ -78,6 +78,13 @@ anodize.keyboard.callbacks.register(|| {
     anodize.log.info("anodize");
 }, "Control_L", ["g"]);
 
+anodize.keyboard.callbacks.register(|| {
+    for output in anodize.outputs {
+        output.info();
+        output.set_wallpaper("bg.png")
+    }
+}, "Control_L", ["r"]);
+
 
 fn arrange_outputs(outputs) {
     let output_x = 0;

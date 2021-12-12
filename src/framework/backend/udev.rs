@@ -659,7 +659,7 @@ fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddat
                 let image =
                     ImageBuffer::from_raw(frame.width, frame.height, &*frame.pixels_rgba).unwrap();
                 let texture =
-                    import_bitmap(renderer, &image).expect("Failed to import cursor bitmap");
+                    import_bitmap(renderer, &image, None).expect("Failed to import cursor bitmap");
                 pointer_images.push((frame, texture.clone()));
                 texture
             });

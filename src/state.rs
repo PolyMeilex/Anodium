@@ -330,13 +330,27 @@ impl Anodium {
         // Layers bellow windows
         self.draw_layers(frame, Layer::Background, output_geometry, output_scale)?;
         if let Some(wallaper) = output.get_wallpaper(frame.renderer) {
-            frame.render_texture_from_to(
+            frame.render_texture_at(
                 &wallaper,
-                output_geometry.to_buffer(1),
-                output_geometry.to_f64().to_physical(output_scale),
+                Point::<i32, Logical>::from((0, 0))
+                    .to_f64()
+                    .to_physical(output_scale as f64)
+                    .to_i32_round(),
+                1,
+                output_scale as f64,
                 Transform::Normal,
                 1.0,
             )?;
+            //let src = Rectangle::from_loc_and_size((0, 0), (22, 35));
+            //let dst = Rectangle::from_loc_and_size((1000, 400), (22, 35)).to_f64();
+
+            /*frame.render_texture_from_to(
+                &wallaper,
+                output_geometry.to_buffer(1),
+                dst,
+                Transform::Normal,
+                1.0,
+            )?;*/
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;

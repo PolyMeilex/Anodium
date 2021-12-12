@@ -66,6 +66,7 @@ impl Inner {
 
         //let texture = import_bitmap(&image);
         self.wallpaper = Some(image);
+        self.wallpaper_texture = None;
 
         info!("loaded wallaper: {}", path);
     }
@@ -75,8 +76,13 @@ impl Inner {
             Some(wallpaper_texture.clone())
         } else {
             if let Some(wallpaper) = &self.wallpaper {
-                if let Ok(wallpaper_texture) = import_bitmap(renderer, &wallpaper.to_rgba8()) {
+                if let Ok(wallpaper_texture) = import_bitmap(
+                    renderer,
+                    &wallpaper.to_rgba8(),
+                    Some(self.current_mode.size.into()),
+                ) {
                     self.wallpaper_texture = Some(wallpaper_texture.clone());
+                    self.wallpaper = None;
                     Some(wallpaper_texture)
                 } else {
                     None

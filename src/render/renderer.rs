@@ -58,6 +58,7 @@ impl<'a> Frame for RenderFrame<'a> {
 pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
     renderer: &mut Gles2Renderer,
     image: &ImageBuffer<Rgba<u8>, C>,
+    scale: Option<(i32, i32)>,
 ) -> Result<Gles2Texture, Gles2Error> {
     use smithay::backend::renderer::gles2::ffi;
 
@@ -88,10 +89,12 @@ pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
         );
         gl.BindTexture(ffi::TEXTURE_2D, 0);
 
-        Gles2Texture::from_raw(
-            renderer,
-            tex,
-            (image.width() as i32, image.height() as i32).into(),
-        )
+        let size = if let Some(scale) = scale {
+            scale
+        } else {
+            (image.width() as i32, image.height() as i32)
+        };
+
+        Gles2Texture::from_raw(renderer, tex, size.into())
     })
 }
