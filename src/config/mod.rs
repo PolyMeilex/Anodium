@@ -12,6 +12,7 @@ pub mod eventloop;
 pub mod keyboard;
 mod log;
 mod output;
+mod outputs;
 mod system;
 mod windows;
 mod workspace;
@@ -19,6 +20,8 @@ mod workspace;
 use output::OutputConfig;
 use smithay::backend::input::KeyState;
 use smithay::reexports::{calloop::channel::Sender, drm};
+
+use crate::output_map::OutputMap;
 
 use self::anodize::Anodize;
 use self::{eventloop::ConfigEvent, output::Mode};
@@ -72,7 +75,10 @@ pub struct ConfigVM {
 }
 
 impl ConfigVM {
-    pub fn new(event_sender: Sender<ConfigEvent>) -> Result<ConfigVM, Box<EvalAltResult>> {
+    pub fn new(
+        event_sender: Sender<ConfigEvent>,
+        output_map: OutputMap,
+    ) -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
         let mut scope = Scope::new();
 
@@ -86,8 +92,9 @@ impl ConfigVM {
         system::register(&mut engine);
         workspace::register(&mut engine);
         windows::register(&mut engine);
+        outputs::register(&mut engine);
 
-        let anodize = anodize::register(&mut scope, &mut engine, event_sender.clone());
+        let anodize = anodize::register(&mut scope, &mut engine, event_sender.clone(), output_map);
 
         let ast = engine.compile_file("config.rhai".into())?;
 

@@ -1,11 +1,16 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
     utils::{Logical, Point, Rectangle, Size},
     wayland::output::{self, Mode, PhysicalProperties},
 };
+
+use image::{self, DynamicImage};
+
+use crate::render::renderer::import_bitmap;
 
 use super::layer_map::LayerMap;
 
@@ -22,6 +27,9 @@ struct Inner {
     userdata: UserDataMap,
 
     layer_map: LayerMap,
+
+    wallpaper: Option<DynamicImage>,
+    wallpaper_texture: Option<Gles2Texture>,
 }
 
 impl Inner {
@@ -48,6 +56,34 @@ impl Inner {
                 Some(scale.round() as i32),
                 None,
             );
+        }
+    }
+
+    pub fn set_wallpaper(&mut self, path: &str) {
+        info!("loading wallaper: {}", path);
+        let image = image::open(path).unwrap();
+        //info!("loaded image: {:?}", image);
+
+        //let texture = import_bitmap(&image);
+        self.wallpaper = Some(image);
+
+        info!("loaded wallaper: {}", path);
+    }
+
+    pub fn get_wallpaper(&mut self, renderer: &mut Gles2Renderer) -> Option<Gles2Texture> {
+        if let Some(wallpaper_texture) = &self.wallpaper_texture {
+            Some(wallpaper_texture.clone())
+        } else {
+            if let Some(wallpaper) = &self.wallpaper {
+                if let Ok(wallpaper_texture) = import_bitmap(renderer, &wallpaper.to_rgba8()) {
+                    self.wallpaper_texture = Some(wallpaper_texture.clone());
+                    Some(wallpaper_texture)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         }
     }
 }
@@ -90,6 +126,8 @@ impl Output {
                 userdata: Default::default(),
 
                 layer_map: Default::default(),
+                wallpaper: None,
+                wallpaper_texture: None,
             })),
         }
     }
@@ -182,6 +220,14 @@ impl Output {
 
     pub fn update_scale(&mut self, scale: f64) {
         self.inner.borrow_mut().update_scale(scale);
+    }
+
+    pub fn set_wallpaper(&mut self, path: &str) {
+        self.inner.borrow_mut().set_wallpaper(path);
+    }
+
+    pub fn get_wallpaper(&self, renderer: &mut Gles2Renderer) -> Option<Gles2Texture> {
+        self.inner.borrow_mut().get_wallpaper(renderer)
     }
 }
 

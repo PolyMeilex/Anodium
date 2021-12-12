@@ -18,16 +18,12 @@ pub use output::Output;
 
 pub struct OutputMap {
     outputs: Rc<RefCell<Vec<Output>>>,
-
-    config: ConfigVM,
 }
 
 impl OutputMap {
-    pub fn new(config: ConfigVM) -> Self {
+    pub fn new() -> Self {
         Self {
             outputs: Default::default(),
-
-            config,
         }
     }
 

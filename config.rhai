@@ -60,6 +60,10 @@ anodize.keyboard.callbacks.register(|| {
 
 anodize.system.add_timeout(|| {
     anodize.log.info("anodize timeout");
+    for output in anodize.outputs {
+        output.info();
+        output.set_wallpaper("bg.png")
+    }
     return false;
 }, 500);
 

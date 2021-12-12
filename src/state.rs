@@ -227,9 +227,9 @@ impl Anodium {
         #[cfg(feature = "xwayland")]
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
-        let config = ConfigVM::new(event_sender).unwrap();
+        let output_map = OutputMap::new();
 
-        let output_map = OutputMap::new(config.clone());
+        let config = ConfigVM::new(event_sender, output_map.clone()).unwrap();
 
         Self {
             handle,
@@ -328,9 +328,22 @@ impl Anodium {
         frame.clear([0.1, 0.1, 0.1, 1.0])?;
 
         // Layers bellow windows
-        for layer in [Layer::Background, Layer::Bottom] {
-            self.draw_layers(frame, layer, output_geometry, output_scale)?;
+        self.draw_layers(frame, Layer::Background, output_geometry, output_scale)?;
+        if let Some(wallaper) = output.get_wallpaper(frame.renderer) {
+            frame.render_texture_at(
+                &wallaper,
+                Point::<i32, Logical>::from((0, 0))
+                    .to_f64()
+                    .to_physical(output_scale as f64)
+                    .to_i32_round(),
+                1,
+                output_scale as f64,
+                Transform::Normal,
+                1.0,
+            )?;
         }
+
+        self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;
 
         // draw the windows
         self.draw_windows(frame, output_geometry, output_scale)?;
