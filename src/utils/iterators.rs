@@ -4,7 +4,7 @@ use crate::output_map::{Output, OutputMap};
 use crate::positioner::Positioner;
 
 pub struct VisibleWorkspaceIter<'a> {
-    outputs: std::slice::Iter<'a, Output>,
+    outputs: std::vec::IntoIter<Output>,
     workspaces: &'a HashMap<String, Box<dyn Positioner>>,
 }
 

@@ -508,7 +508,7 @@ impl Anodium {
                 self.input_state.pointer_location.y = (loc.y + size.h / 2) as f64;
             }
         } else {
-            for o in self.output_map.iter_mut() {
+            for mut o in self.output_map.iter_mut() {
                 if o.geometry()
                     .to_f64()
                     .contains(self.input_state.pointer_location)
