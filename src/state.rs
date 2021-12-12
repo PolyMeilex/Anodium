@@ -18,7 +18,7 @@ use smithay::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point},
+    utils::{Logical, Point, Rectangle},
     wayland::{
         data_device::{self, DataDeviceEvent},
         output::xdg::init_xdg_output_manager,
@@ -330,14 +330,10 @@ impl Anodium {
         // Layers bellow windows
         self.draw_layers(frame, Layer::Background, output_geometry, output_scale)?;
         if let Some(wallaper) = output.get_wallpaper(frame.renderer) {
-            frame.render_texture_at(
+            frame.render_texture_from_to(
                 &wallaper,
-                Point::<i32, Logical>::from((0, 0))
-                    .to_f64()
-                    .to_physical(output_scale as f64)
-                    .to_i32_round(),
-                1,
-                output_scale as f64,
+                output_geometry.to_buffer(1),
+                output_geometry.to_f64().to_physical(output_scale),
                 Transform::Normal,
                 1.0,
             )?;
