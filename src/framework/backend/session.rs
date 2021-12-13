@@ -26,6 +26,10 @@ impl AnodiumSession {
     pub fn new_winit() -> Self {
         Self { udev: None }
     }
+
+    pub fn new_x11() -> Self {
+        Self { udev: None }
+    }
 }
 
 impl Session for AnodiumSession {

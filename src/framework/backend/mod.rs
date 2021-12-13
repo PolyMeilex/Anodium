@@ -2,6 +2,8 @@
 pub mod udev;
 #[cfg(feature = "winit")]
 pub mod winit;
+#[cfg(feature = "x11")]
+pub mod x11;
 
 pub mod session;
 
@@ -71,6 +73,41 @@ pub fn winit(
     state
 }
 
+#[cfg(feature = "x11")]
+pub fn x11(
+    event_loop: &mut EventLoop<'static, Anodium>,
+    event_sender: Sender<ConfigEvent>,
+) -> Anodium {
+    info!("Starting Anodium with x11 backend");
+    let display = Rc::new(RefCell::new(Display::new()));
+
+    let mut state = Anodium::new(
+        display.clone(),
+        event_loop.handle(),
+        AnodiumSession::new_x11(),
+        event_sender,
+    );
+
+    x11::run_x11(
+        display,
+        event_loop,
+        &mut state,
+        |event, mut ddata| {
+            let state = ddata.get::<Anodium>().unwrap();
+            state.handle_backend_event(event);
+        },
+        |event, mut ddata| {
+            let state = ddata.get::<Anodium>().unwrap();
+            state.process_input_event(event);
+        },
+    )
+    .expect("Failed to initialize winit backend.");
+
+    info!("Winit initialized");
+
+    state
+}
+
 #[cfg(feature = "udev")]
 pub fn udev(
     event_loop: &mut EventLoop<'static, Anodium>,
@@ -116,7 +153,12 @@ pub fn auto(
     event_loop: &mut EventLoop<'static, Anodium>,
     event_sender: Sender<ConfigEvent>,
 ) -> Option<Anodium> {
-    if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
+    if std::env::args().find(|arg| arg == "--x11").is_some() {
+        #[cfg(feature = "x11")]
+        {
+            return Some(x11(event_loop, event_sender));
+        }
+    } else if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
         #[cfg(feature = "winit")]
         {
             return Some(winit(event_loop, event_sender));
@@ -127,9 +169,4 @@ pub fn auto(
             return Some(udev(event_loop, event_sender));
         }
     }
-}
-
-pub trait Backend {
-    fn seat_name(&self) -> String;
-    fn change_vt(&mut self, vt: i32);
 }
