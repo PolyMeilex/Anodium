@@ -190,3 +190,9 @@ impl Drop for Inner {
         self.global.take().unwrap().destroy();
     }
 }
+
+impl PartialEq for Output {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
+    }
+}
