@@ -29,13 +29,8 @@ mod shell_handler;
 use state::Anodium;
 
 use slog::Drain;
-use smithay::reexports::calloop::{
-    channel::{channel, Channel, Event, Sender},
-    EventLoop,
-};
+use smithay::reexports::calloop::EventLoop;
 use std::sync::atomic::Ordering;
-
-use crate::config::eventloop::ConfigEvent;
 
 fn main() {
     std::env::set_var("RUST_LOG", "debug,smithay=error");
@@ -51,17 +46,7 @@ fn main() {
 
     let mut event_loop = EventLoop::try_new().unwrap();
 
-    let (sender, reciver): (Sender<ConfigEvent>, Channel<ConfigEvent>) = channel();
-    event_loop
-        .handle()
-        .insert_source(reciver, |event, _metadata, state: &mut Anodium| {
-            if let Event::Msg(event) = event {
-                state.process_config_event(event);
-            }
-        })
-        .unwrap();
-
-    let anodium = framework::backend::auto(&mut event_loop, sender);
+    let anodium = framework::backend::auto(&mut event_loop);
     let anodium = anodium.expect("Could not create a backend!");
     run_loop(anodium, event_loop);
 }
