@@ -53,9 +53,9 @@ pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
             let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);
         },
-        |event, mut ddata| {
+        |event, output, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event);
+            state.process_input_event(event, Some(output));
         },
     )
     .expect("Failed to initialize winit backend.");
@@ -84,9 +84,9 @@ pub fn x11(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
             let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);
         },
-        |event, mut ddata| {
+        |event, output, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event);
+            state.process_input_event(event, Some(output));
         },
     )
     .expect("Failed to initialize winit backend.");
@@ -121,7 +121,7 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
         },
         |event, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event);
+            state.process_input_event(event, None);
         },
     )
     .expect("Failed to initialize tty backend.");

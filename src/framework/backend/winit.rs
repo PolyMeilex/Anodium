@@ -33,7 +33,7 @@ pub fn run_winit<F, IF, D>(
 ) -> Result<(), ()>
 where
     F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<WinitInput>, DispatchData) + 'static,
+    IF: FnMut(InputEvent<WinitInput>, &Output, DispatchData) + 'static,
     D: 'static,
 {
     let mut ddata = DispatchData::wrap(state);
@@ -156,7 +156,7 @@ where
                     );
                 }
                 WinitEvent::Input(event) => {
-                    input_cb(event, ddata.reborrow());
+                    input_cb(event, &output, ddata.reborrow());
                 }
                 _ => {}
             });
