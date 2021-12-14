@@ -60,15 +60,9 @@ impl Inner {
     }
 
     pub fn set_wallpaper(&mut self, path: &str) {
-        info!("loading wallaper: {}", path);
         let image = image::open(path).unwrap();
-        //info!("loaded image: {:?}", image);
-
-        //let texture = import_bitmap(&image);
         self.wallpaper = Some(image);
         self.wallpaper_texture = None;
-
-        info!("loaded wallaper: {}", path);
     }
 
     pub fn get_wallpaper(&mut self, renderer: &mut Gles2Renderer) -> Option<Gles2Texture> {
