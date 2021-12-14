@@ -2,17 +2,15 @@
 pub mod udev;
 #[cfg(feature = "winit")]
 pub mod winit;
+#[cfg(feature = "x11")]
+pub mod x11;
 
 pub mod session;
 
 use smithay::backend::renderer::gles2::Gles2Texture;
-use smithay::reexports::{
-    calloop::{channel::Sender, EventLoop},
-    wayland_server::Display,
-};
+use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
 use std::{cell::RefCell, rc::Rc};
 
-use crate::config::eventloop::ConfigEvent;
 use crate::framework::backend::session::AnodiumSession;
 use crate::output_map::Output;
 use crate::render::renderer::RenderFrame;
@@ -37,10 +35,7 @@ pub enum BackendEvent<'a, 'frame> {
 }
 
 #[cfg(feature = "winit")]
-pub fn winit(
-    event_loop: &mut EventLoop<'static, Anodium>,
-    event_sender: Sender<ConfigEvent>,
-) -> Anodium {
+pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -48,7 +43,6 @@ pub fn winit(
         display.clone(),
         event_loop.handle(),
         AnodiumSession::new_winit(),
-        event_sender,
     );
 
     winit::run_winit(
@@ -59,9 +53,40 @@ pub fn winit(
             let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);
         },
+        |event, output, mut ddata| {
+            let state = ddata.get::<Anodium>().unwrap();
+            state.process_input_event(event, Some(output));
+        },
+    )
+    .expect("Failed to initialize winit backend.");
+
+    info!("Winit initialized");
+
+    state
+}
+
+#[cfg(feature = "x11")]
+pub fn x11(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
+    info!("Starting Anodium with x11 backend");
+    let display = Rc::new(RefCell::new(Display::new()));
+
+    let mut state = Anodium::new(
+        display.clone(),
+        event_loop.handle(),
+        AnodiumSession::new_x11(),
+    );
+
+    x11::run_x11(
+        display,
+        event_loop,
+        &mut state,
         |event, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event);
+            state.handle_backend_event(event);
+        },
+        |event, output, mut ddata| {
+            let state = ddata.get::<Anodium>().unwrap();
+            state.process_input_event(event, Some(output));
         },
     )
     .expect("Failed to initialize winit backend.");
@@ -72,10 +97,7 @@ pub fn winit(
 }
 
 #[cfg(feature = "udev")]
-pub fn udev(
-    event_loop: &mut EventLoop<'static, Anodium>,
-    event_sender: Sender<ConfigEvent>,
-) -> Anodium {
+pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -85,12 +107,7 @@ pub fn udev(
      * Initialize the compositor
      */
 
-    let mut state = Anodium::new(
-        display.clone(),
-        event_loop.handle(),
-        session.clone(),
-        event_sender,
-    );
+    let mut state = Anodium::new(display.clone(), event_loop.handle(), session.clone());
 
     udev::run_udev(
         display,
@@ -104,7 +121,7 @@ pub fn udev(
         },
         |event, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event);
+            state.process_input_event(event, None);
         },
     )
     .expect("Failed to initialize tty backend.");
@@ -112,24 +129,21 @@ pub fn udev(
     state
 }
 
-pub fn auto(
-    event_loop: &mut EventLoop<'static, Anodium>,
-    event_sender: Sender<ConfigEvent>,
-) -> Option<Anodium> {
-    if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
+pub fn auto(event_loop: &mut EventLoop<'static, Anodium>) -> Option<Anodium> {
+    if std::env::args().find(|arg| arg == "--x11").is_some() {
+        #[cfg(feature = "x11")]
+        {
+            return Some(x11(event_loop));
+        }
+    } else if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
         #[cfg(feature = "winit")]
         {
-            return Some(winit(event_loop, event_sender));
+            return Some(winit(event_loop));
         }
     } else {
         #[cfg(feature = "udev")]
         {
-            return Some(udev(event_loop, event_sender));
+            return Some(udev(event_loop));
         }
     }
-}
-
-pub trait Backend {
-    fn seat_name(&self) -> String;
-    fn change_vt(&mut self, vt: i32);
 }

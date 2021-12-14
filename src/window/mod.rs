@@ -359,3 +359,9 @@ impl Window {
         self.inner.borrow().render_location()
     }
 }
+
+impl PartialEq for Window {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
+    }
+}

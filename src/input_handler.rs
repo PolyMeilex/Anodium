@@ -1,6 +1,6 @@
 use std::sync::atomic::Ordering;
 
-use crate::{grabs::MoveSurfaceGrab, Anodium};
+use crate::{grabs::MoveSurfaceGrab, output_map::Output, Anodium};
 
 use smithay::{
     backend::{
@@ -19,7 +19,11 @@ use smithay::{
 };
 
 impl Anodium {
-    pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
+    pub fn process_input_event<I: InputBackend>(
+        &mut self,
+        event: InputEvent<I>,
+        output: Option<&Output>,
+    ) {
         match event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
@@ -31,12 +35,14 @@ impl Anodium {
                 self.on_pointer_move(event.time());
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output_size = self.output_map.find_by_index(0).map(|o| o.size());
+                let output = output.unwrap_or_else(|| self.output_map.find_by_index(0).unwrap());
 
-                if let Some(output_size) = output_size {
-                    self.input_state.pointer_location = event.position_transformed(output_size);
-                    self.on_pointer_move(event.time());
-                }
+                let output_size = output.size();
+                let output_pos = output.location().to_f64();
+
+                self.input_state.pointer_location =
+                    event.position_transformed(output_size) + output_pos;
+                self.on_pointer_move(event.time());
             }
             InputEvent::PointerButton { event, .. } => self.on_pointer_button::<I>(event),
             InputEvent::PointerAxis { event, .. } => self.on_pointer_axis::<I>(event),

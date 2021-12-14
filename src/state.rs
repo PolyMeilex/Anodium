@@ -198,11 +198,25 @@ impl Anodium {
         (seat, pointer, keyboard, cursor_status)
     }
 
+    fn init_config_channel(handle: &LoopHandle<'static, Self>) -> Sender<ConfigEvent> {
+        let (sender, reciver) = calloop::channel::channel::<ConfigEvent>();
+
+        use calloop::channel::Event;
+        handle
+            .insert_source(reciver, |event, _metadata, state: &mut Anodium| {
+                if let Event::Msg(event) = event {
+                    state.process_config_event(event);
+                }
+            })
+            .unwrap();
+
+        sender
+    }
+
     pub fn new(
         display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
         session: AnodiumSession,
-        event_sender: Sender<ConfigEvent>,
     ) -> Self {
         let log = slog_scope::logger();
 
@@ -228,6 +242,8 @@ impl Anodium {
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
         let output_map = OutputMap::new();
+        let event_sender = Self::init_config_channel(&handle);
+        let config = ConfigVM::new(event_sender).unwrap();
 
         let config = ConfigVM::new(event_sender, output_map.clone()).unwrap();
 
