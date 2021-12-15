@@ -241,8 +241,8 @@ impl Anodium {
         #[cfg(feature = "xwayland")]
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
-        let output_map = OutputMap::new();
         let event_sender = Self::init_config_channel(&handle);
+        let output_map = OutputMap::new(event_sender.clone());
 
         let config = ConfigVM::new(event_sender, output_map.clone()).unwrap();
 

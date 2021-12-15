@@ -9,4 +9,5 @@ pub enum ConfigEvent {
     Close(Window),
     Maximize(Window),
     Unmaximize(Window),
+    OutputsRearrange,
 }

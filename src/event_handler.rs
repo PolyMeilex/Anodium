@@ -39,6 +39,9 @@ impl Anodium {
                     })
                     .unwrap();
             }
+            ConfigEvent::OutputsRearrange => {
+                self.config.output_rearrange();
+            }
         }
     }
 }

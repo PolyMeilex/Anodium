@@ -20,7 +20,7 @@ pub struct Anodize {
     workspace: Workspace,
     pub windows: Windows,
     log: Log,
-    outputs: Outputs,
+    pub outputs: Outputs,
 }
 
 impl Anodize {

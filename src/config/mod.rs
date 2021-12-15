@@ -80,11 +80,12 @@ impl ConfigVM {
         output_map: OutputMap,
     ) -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
+        engine.set_max_expr_depths(0, 0);
         let mut scope = Scope::new();
 
-        engine.register_fn("rev", |array: Array| {
-            array.into_iter().rev().collect::<Array>()
-        });
+        //engine.register_fn("rev", |array: Array| {
+        //    array.into_iter().rev().collect::<Array>()
+        //});
 
         output::register(&mut engine);
         keyboard::register(&mut engine);
@@ -107,7 +108,7 @@ impl ConfigVM {
         })
     }
 
-    pub fn arrange_outputs(
+    /*pub fn arrange_outputs(
         &mut self,
         outputs: &[crate::output_map::Output],
     ) -> Result<Vec<OutputConfig>, Box<EvalAltResult>> {
@@ -153,9 +154,9 @@ impl ConfigVM {
             .into_iter()
             .map(|item| item.try_cast().unwrap())
             .collect())
-    }
+    }*/
 
-    pub fn configure_output(
+    /*pub fn configure_output(
         &mut self,
         output_name: &str,
         modes: &[drm::control::Mode],
@@ -183,7 +184,7 @@ impl ConfigVM {
         let mode: Option<Mode> = result.try_cast();
         let id = mode.map(|m| m.id).unwrap_or(0);
         Ok(id)
-    }
+    }*/
 
     pub fn execute_callback(&self, callback: FnCallback, args: &mut [Dynamic]) -> Dynamic {
         let inner = &mut *self.inner.borrow_mut();
@@ -199,5 +200,10 @@ impl ConfigVM {
             .keyboard
             .callbacks
             .key_action(self, key, state, keys_pressed)
+    }
+
+    pub fn output_rearrange(&self) {
+        let inner = &*self.inner.borrow();
+        self.anodize.outputs.rearrange(&inner.engine, &inner.ast);
     }
 }

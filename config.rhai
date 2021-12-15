@@ -60,11 +60,6 @@ anodize.keyboard.callbacks.register(|| {
 
 
 anodize.system.add_timeout(|| {
-    anodize.log.info("anodize timeout");
-    for output in anodize.outputs {
-        output.info();
-        output.set_wallpaper("bg.png")
-    }
     return false;
 }, 500);
 
@@ -81,26 +76,27 @@ anodize.keyboard.callbacks.register(|| {
 
 anodize.keyboard.callbacks.register(|| {
     for output in anodize.outputs {
-        output.info();
-        output.set_wallpaper("bg.png")
+        output.set_wallpaper("bg.png");
     }
 }, "Control_L", ["r"]);
 
-
-fn arrange_outputs(outputs) {
+anodize.outputs.on_rearrange(|| {
+    anodize.log.info("anodize on_rearrange");
     let output_x = 0;
 
-    outputs.reverse();
-
-    outputs.map(|output| {
+    for output in anodize.outputs {
         output.x = output_x;
-        output.y = 0;
+        //output.info();
+        anodize.log.info("output width is " + output.w.to_string());
+        anodize.log.info("output height is " + output.h.to_string());
+        anodize.log.info("output x is " + output.x.to_string());
+        anodize.log.info("output y is " + output.y.to_string());
+        output.set_wallpaper("bg.png");
 
         output_x += output.w;
+    }
+});
 
-        output
-    })
-}
 
 
 fn configure_output(name, modes){

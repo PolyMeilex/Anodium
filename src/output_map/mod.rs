@@ -2,11 +2,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use smithay::{
-    reexports::wayland_server::protocol::wl_output::{self, WlOutput},
+    reexports::{
+        calloop::channel::Sender,
+        wayland_server::protocol::wl_output::{self, WlOutput},
+    },
     utils::{Logical, Point},
 };
 
-use crate::config::ConfigVM;
+use crate::config::eventloop::ConfigEvent;
 
 mod layer_map;
 pub use layer_map::LayerSurface;
@@ -18,16 +21,19 @@ pub use output::Output;
 
 pub struct OutputMap {
     outputs: Rc<RefCell<Vec<Output>>>,
+    event_sender: Sender<ConfigEvent>,
 }
 
 impl OutputMap {
-    pub fn new() -> Self {
+    pub fn new(event_sender: Sender<ConfigEvent>) -> Self {
         Self {
             outputs: Default::default(),
+            event_sender,
         }
     }
 
     pub fn rearrange(&mut self) {
+        warn!("rearange called");
         /*let configs = self.config.arrange_outputs(&self.outputs).unwrap();
 
         for config in configs {
@@ -38,6 +44,8 @@ impl OutputMap {
                 output.layer_map_mut().arange(geometry)
             }
         }*/
+
+        self.event_sender.send(ConfigEvent::OutputsRearrange);
     }
 
     pub fn add(&mut self, output: Output) -> Output {
