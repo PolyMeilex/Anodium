@@ -33,19 +33,9 @@ impl OutputMap {
     }
 
     pub fn rearrange(&mut self) {
-        warn!("rearange called");
-        /*let configs = self.config.arrange_outputs(&self.outputs).unwrap();
-
-        for config in configs {
-            if let Some(output) = self.outputs.get_mut(config.id()) {
-                output.set_location(config.location());
-
-                let geometry = output.geometry();
-                output.layer_map_mut().arange(geometry)
-            }
-        }*/
-
-        self.event_sender.send(ConfigEvent::OutputsRearrange);
+        self.event_sender
+            .send(ConfigEvent::OutputsRearrange)
+            .unwrap();
     }
 
     pub fn add(&mut self, output: Output) -> Output {

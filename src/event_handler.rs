@@ -17,24 +17,6 @@ impl Anodium {
                     .unmaximize_request(&window.toplevel());
             }
             ConfigEvent::SwitchWorkspace(workspace) => self.switch_workspace(&workspace),
-            ConfigEvent::Timeout(fnptr, millis) => {
-                let source = Timer::new().expect("Failed to create timer event source!");
-                let timer_handle = source.handle();
-                timer_handle.add_timeout(Duration::from_millis(millis), (fnptr, millis));
-
-                self.handle
-                    .insert_source(source, move |(fnptr, millis), _metadata, shared_data| {
-                        let fnptr_cloned = fnptr.clone();
-                        if let Ok(result) = shared_data.config.execute_fnptr(fnptr, ()).as_bool() {
-                            if result {
-                                shared_data
-                                    .config
-                                    .insert_event(ConfigEvent::Timeout(fnptr_cloned, millis));
-                            }
-                        }
-                    })
-                    .unwrap();
-            }
             ConfigEvent::OutputsRearrange => {
                 self.config.output_rearrange();
             }

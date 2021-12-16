@@ -19,9 +19,11 @@ mod workspace;
 
 use output::OutputConfig;
 use smithay::backend::input::KeyState;
+use smithay::reexports::calloop::LoopHandle;
 use smithay::reexports::{calloop::channel::Sender, drm};
 
 use crate::output_map::OutputMap;
+use crate::state::Anodium;
 
 use self::anodize::Anodize;
 use self::{eventloop::ConfigEvent, output::Mode};
@@ -44,6 +46,7 @@ impl ConfigVM {
     pub fn new(
         event_sender: Sender<ConfigEvent>,
         output_map: OutputMap,
+        loop_handle: LoopHandle<'static, Anodium>,
     ) -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
         engine.set_max_expr_depths(0, 0);
@@ -61,7 +64,13 @@ impl ConfigVM {
         windows::register(&mut engine);
         outputs::register(&mut engine);
 
-        let anodize = anodize::register(&mut scope, &mut engine, event_sender.clone(), output_map);
+        let anodize = anodize::register(
+            &mut scope,
+            &mut engine,
+            event_sender.clone(),
+            output_map,
+            loop_handle,
+        );
 
         let ast = engine.compile_file("config.rhai".into())?;
 

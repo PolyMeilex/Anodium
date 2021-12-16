@@ -80,21 +80,27 @@ anodize.keyboard.callbacks.register(|| {
     }
 }, "Control_L", ["r"]);
 
+
+let rearrange_timeout;
 anodize.outputs.on_rearrange(|| {
-    anodize.log.info("anodize on_rearrange");
-    let output_x = 0;
+    anodize.system.clear_timeout(rearrange_timeout);
+    rearrange_timeout = anodize.system.add_timeout(|| {
+        anodize.log.info("anodize on_rearrange");
+        let output_x = 0;
+        for output in anodize.outputs {
+            output.x = output_x;
+            //output.info();
+            anodize.log.info("output name is " + output.name);
+            anodize.log.info("output width is " + output.w.to_string());
+            anodize.log.info("output height is " + output.h.to_string());
+            anodize.log.info("output x is " + output.x.to_string());
+            anodize.log.info("output y is " + output.y.to_string());
+            output.set_wallpaper("bg.png");
 
-    for output in anodize.outputs {
-        output.x = output_x;
-        //output.info();
-        anodize.log.info("output width is " + output.w.to_string());
-        anodize.log.info("output height is " + output.h.to_string());
-        anodize.log.info("output x is " + output.x.to_string());
-        anodize.log.info("output y is " + output.y.to_string());
-        output.set_wallpaper("bg.png");
-
-        output_x += output.w;
-    }
+            output_x += output.w;
+        }
+        return false;
+    }, 500);
 });
 
 

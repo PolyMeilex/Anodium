@@ -31,6 +31,11 @@ impl Outputs {
 
 #[export_module]
 pub mod outputs {
+    #[rhai_fn(get = "name", pure)]
+    pub fn name(output: &mut Output) -> ImmutableString {
+        output.name().into()
+    }
+
     #[rhai_fn(get = "w", pure)]
     pub fn w(output: &mut Output) -> INT {
         output.geometry().size.w as _

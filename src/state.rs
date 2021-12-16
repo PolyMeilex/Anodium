@@ -244,7 +244,7 @@ impl Anodium {
         let event_sender = Self::init_config_channel(&handle);
         let output_map = OutputMap::new(event_sender.clone());
 
-        let config = ConfigVM::new(event_sender, output_map.clone()).unwrap();
+        let config = ConfigVM::new(event_sender, output_map.clone(), handle.clone()).unwrap();
 
         Self {
             handle,

@@ -2,8 +2,10 @@ use rhai::Dynamic;
 use rhai::{plugin::*, Scope};
 
 use smithay::reexports::calloop::channel::Sender;
+use smithay::reexports::calloop::LoopHandle;
 
 use crate::output_map::OutputMap;
+use crate::state::Anodium;
 
 use super::eventloop::ConfigEvent;
 use super::keyboard::Keyboard;
@@ -24,10 +26,14 @@ pub struct Anodize {
 }
 
 impl Anodize {
-    pub fn new(event_sender: Sender<ConfigEvent>, output_map: OutputMap) -> Self {
+    pub fn new(
+        event_sender: Sender<ConfigEvent>,
+        output_map: OutputMap,
+        loop_handle: LoopHandle<'static, Anodium>,
+    ) -> Self {
         Self {
             keyboard: Keyboard::new(),
-            system: System::new(event_sender.clone()),
+            system: System::new(event_sender.clone(), loop_handle),
             workspace: Workspace::new(event_sender.clone()),
             windows: Windows::new(event_sender.clone()),
             log: Log::new(),
@@ -82,8 +88,9 @@ pub fn register(
     engine: &mut Engine,
     event_sender: Sender<ConfigEvent>,
     output_map: OutputMap,
+    loop_handle: LoopHandle<'static, Anodium>,
 ) -> Anodize {
-    let anodize = Anodize::new(event_sender, output_map);
+    let anodize = Anodize::new(event_sender, output_map, loop_handle);
     let module = exported_module!(anodize_module);
 
     engine
