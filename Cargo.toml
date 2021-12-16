@@ -23,7 +23,7 @@ cgmath = "0.18.0"
 
 imgui = "0.8.0"
 imgui-smithay-renderer = {path="./imgui-smithay-renderer"}
-rhai = "1.2.1"
+rhai = "1.3.0"
 
 [dependencies.smithay]
 # git = "https://github.com/Smithay/smithay.git"

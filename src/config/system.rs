@@ -20,8 +20,6 @@ impl System {
 
 #[export_module]
 pub mod system {
-    use crate::config::FnCallback;
-
     #[rhai_fn(global)]
     pub fn exec(_system: &mut System, command: &str) {
         if let Err(e) = Command::new(command).spawn() {
@@ -30,12 +28,11 @@ pub mod system {
     }
 
     #[rhai_fn(global)]
-    pub fn add_timeout(context: NativeCallContext, system: &mut System, fnptr: FnPtr, milis: i64) {
+    pub fn add_timeout(system: &mut System, fnptr: FnPtr, milis: i64) {
         if milis >= 0 {
-            let callback = FnCallback::new(fnptr, context);
             system
                 .event_sender
-                .send(ConfigEvent::Timeout(callback, milis as u64))
+                .send(ConfigEvent::Timeout(fnptr, milis as u64))
                 .unwrap();
         }
     }

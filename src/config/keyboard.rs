@@ -11,7 +11,6 @@ use smithay::backend::input::KeyState;
 use xkbcommon::xkb;
 
 use super::ConfigVM;
-use super::FnCallback;
 
 #[derive(Debug, Clone)]
 pub struct Keyboard {
@@ -97,7 +96,7 @@ impl Callbacks {
 #[derive(Debug, Clone)]
 pub struct Callback {
     keys: Vec<u32>,
-    fncallback: FnCallback,
+    fnptr: FnPtr,
     capture: Option<Capture>,
 }
 
@@ -119,9 +118,9 @@ impl Capture {
 }
 
 impl Callback {
-    pub fn new(fncallback: FnCallback, keys: Vec<u32>, capture: Option<Capture>) -> Self {
+    pub fn new(fnptr: FnPtr, keys: Vec<u32>, capture: Option<Capture>) -> Self {
         Self {
-            fncallback,
+            fnptr,
             keys,
             capture,
         }
@@ -136,12 +135,9 @@ impl Callback {
         if self.keys.iter().all(|item| keys_pressed.contains(item)) {
             if let Some(captured) = captured {
                 let captured = ::xkbcommon::xkb::keysym_get_name(captured);
-                config.execute_callback(
-                    self.fncallback.clone(),
-                    &mut [rhai::Dynamic::from(captured)],
-                );
+                config.execute_fnptr(self.fnptr.clone(), (captured,));
             } else {
-                config.execute_callback(self.fncallback.clone(), &mut []);
+                config.execute_fnptr(self.fnptr.clone(), ());
             }
             true
         } else {
@@ -173,39 +169,28 @@ pub mod keyboard {
 #[export_module]
 pub mod callbacks {
     #[rhai_fn(global)]
-    pub fn register(
-        context: NativeCallContext,
-        callbacks: &mut Callbacks,
-        fnptr: FnPtr,
-        key: &str,
-        keys: rhai::Array,
-    ) {
-        let callback = FnCallback::new(fnptr, context);
-
+    pub fn register(callbacks: &mut Callbacks, fnptr: FnPtr, key: &str, keys: rhai::Array) {
         let keys_parsed: Vec<u32> = keys
             .iter()
             .map(|k| xkb::keysym_from_name(&format!("{}", k), xkb::KEYSYM_CASE_INSENSITIVE))
             .collect();
-        let callback = Callback::new(callback, keys_parsed, None);
+        let callback = Callback::new(fnptr, keys_parsed, None);
         callbacks.insert(key, callback);
     }
 
     #[rhai_fn(global)]
     pub fn register_capture(
-        context: NativeCallContext,
         callbacks: &mut Callbacks,
         fnptr: FnPtr,
         key: &str,
         keys: rhai::Array,
         capture: Capture,
     ) {
-        let callback = FnCallback::new(fnptr, context);
-
         let keys_parsed: Vec<u32> = keys
             .iter()
             .map(|k| xkb::keysym_from_name(&format!("{}", k), xkb::KEYSYM_CASE_INSENSITIVE))
             .collect();
-        let callback = Callback::new(callback, keys_parsed, Some(capture));
+        let callback = Callback::new(fnptr, keys_parsed, Some(capture));
         callbacks.insert(key, callback);
     }
 }

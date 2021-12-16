@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use rhai::{
-    Array, Dynamic, Engine, EvalAltResult, FnPtr, ImmutableString, Module, NativeCallContext,
-    Position, Scope, AST,
+    Array, Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, ImmutableString, Module, Position,
+    Scope, AST,
 };
 
 mod anodize;
@@ -25,40 +25,6 @@ use crate::output_map::OutputMap;
 
 use self::anodize::Anodize;
 use self::{eventloop::ConfigEvent, output::Mode};
-
-#[derive(Debug, Clone)]
-pub struct FnCallback {
-    fn_ptr: FnPtr,
-    fn_name: String,
-    lib: Box<[Module]>,
-}
-
-impl FnCallback {
-    pub fn new(fn_ptr: FnPtr, context: NativeCallContext) -> Self {
-        Self {
-            fn_ptr,
-            fn_name: context.fn_name().to_owned(),
-            lib: context
-                .iter_namespaces()
-                .map(|x| x.clone().clone())
-                .collect::<Vec<Module>>()
-                .into_boxed_slice(),
-        }
-    }
-
-    pub fn call(
-        &self,
-        engine: &Engine,
-        this_ptr: Option<&mut Dynamic>,
-        args: &mut [Dynamic],
-    ) -> Dynamic {
-        let lib = self.lib.iter().map(|x| x).collect::<Vec<&Module>>();
-
-        let context = NativeCallContext::new(engine, &self.fn_name, &lib[..]);
-
-        self.fn_ptr.call_dynamic(&context, this_ptr, args).unwrap()
-    }
-}
 
 #[derive(Debug)]
 struct Inner {
@@ -186,9 +152,9 @@ impl ConfigVM {
         Ok(id)
     }*/
 
-    pub fn execute_callback(&self, callback: FnCallback, args: &mut [Dynamic]) -> Dynamic {
+    pub fn execute_fnptr(&self, callback: FnPtr, args: impl FuncArgs) -> Dynamic {
         let inner = &mut *self.inner.borrow_mut();
-        callback.call(&inner.engine, None, args)
+        callback.call(&inner.engine, &inner.ast, args).unwrap()
     }
 
     pub fn insert_event(&self, event: ConfigEvent) {

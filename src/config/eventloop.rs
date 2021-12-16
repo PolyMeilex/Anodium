@@ -1,11 +1,10 @@
 use crate::window::Window;
-
-use super::FnCallback;
+use rhai::FnPtr;
 
 #[derive(Debug)]
 pub enum ConfigEvent {
     SwitchWorkspace(String),
-    Timeout(FnCallback, u64),
+    Timeout(FnPtr, u64),
     Close(Window),
     Maximize(Window),
     Unmaximize(Window),
