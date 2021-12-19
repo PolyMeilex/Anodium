@@ -5,13 +5,15 @@ pub mod winit;
 #[cfg(feature = "x11")]
 pub mod x11;
 
-pub mod session;
-
 use smithay::backend::renderer::gles2::Gles2Texture;
-use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
+use smithay::backend::session::{auto::AutoSession, Session};
+use smithay::reexports::{
+    calloop::{channel, EventLoop},
+    wayland_server::Display,
+};
+
 use std::{cell::RefCell, rc::Rc};
 
-use crate::framework::backend::session::AnodiumSession;
 use crate::output_map::Output;
 use crate::render::renderer::RenderFrame;
 use crate::state::Anodium;
@@ -34,21 +36,25 @@ pub enum BackendEvent<'a, 'frame> {
     CloseCompositor,
 }
 
+#[derive(Debug)]
+pub enum BackendRequest {
+    ChangeVT(i32),
+}
+
 #[cfg(feature = "winit")]
 pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    let mut state = Anodium::new(
-        display.clone(),
-        event_loop.handle(),
-        AnodiumSession::new_winit(),
-    );
+    let (tx, rx) = channel::channel();
+
+    let mut state = Anodium::new(display.clone(), event_loop.handle(), "winit".into(), tx);
 
     winit::run_winit(
         display,
         event_loop,
         &mut state,
+        rx,
         |event, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);
@@ -70,16 +76,15 @@ pub fn x11(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium with x11 backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    let mut state = Anodium::new(
-        display.clone(),
-        event_loop.handle(),
-        AnodiumSession::new_x11(),
-    );
+    let (tx, rx) = channel::channel();
+
+    let mut state = Anodium::new(display.clone(), event_loop.handle(), "x11".into(), tx);
 
     x11::run_x11(
         display,
         event_loop,
         &mut state,
+        rx,
         |event, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);
@@ -101,13 +106,16 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     info!("Starting Anodium on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
-    let (session, notifier) = AnodiumSession::new_udev().expect("Could not init session!");
+    let (session, notifier) =
+        AutoSession::new(slog_scope::logger()).expect("Could not init session!");
 
     /*
      * Initialize the compositor
      */
 
-    let mut state = Anodium::new(display.clone(), event_loop.handle(), session.clone());
+    let (tx, rx) = channel::channel();
+
+    let mut state = Anodium::new(display.clone(), event_loop.handle(), session.seat(), tx);
 
     udev::run_udev(
         display,
@@ -115,6 +123,7 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
         &mut state,
         session,
         notifier,
+        rx,
         |event, mut ddata| {
             let state = ddata.get::<Anodium>().unwrap();
             state.handle_backend_event(event);

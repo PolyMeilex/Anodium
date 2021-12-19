@@ -10,10 +10,7 @@ use std::{
 };
 
 use smithay::{
-    backend::{
-        renderer::{gles2::Gles2Texture, Frame, Transform},
-        session::Session,
-    },
+    backend::renderer::{gles2::Gles2Texture, Frame, Transform},
     reexports::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
@@ -33,7 +30,7 @@ use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
     config::{eventloop::ConfigEvent, ConfigVM},
-    framework::backend::session::AnodiumSession,
+    framework::backend::BackendRequest,
     framework::shell::ShellManager,
     output_map::{Output, OutputMap},
     positioner::{universal::Universal, Positioner},
@@ -68,7 +65,6 @@ pub struct Anodium {
 
     pub seat_name: String,
     pub seat: Seat,
-    pub session: AnodiumSession,
 
     pub start_time: std::time::Instant,
     last_update: Instant,
@@ -84,6 +80,8 @@ pub struct Anodium {
 
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
+
+    pub backend_tx: Sender<BackendRequest>,
 }
 
 impl Anodium {
@@ -169,18 +167,14 @@ impl Anodium {
     /// init wayland seat, keyboard and pointer
     fn init_seat(
         display: &Rc<RefCell<Display>>,
-        session: &AnodiumSession,
+        seat_name: String,
     ) -> (
         Seat,
         PointerHandle,
         KeyboardHandle,
         Arc<Mutex<CursorImageStatus>>,
     ) {
-        let (mut seat, _) = Seat::new(
-            &mut display.borrow_mut(),
-            session.seat(),
-            slog_scope::logger(),
-        );
+        let (mut seat, _) = Seat::new(&mut display.borrow_mut(), seat_name, slog_scope::logger());
 
         let cursor_status = Arc::new(Mutex::new(CursorImageStatus::Default));
 
@@ -216,7 +210,8 @@ impl Anodium {
     pub fn new(
         display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
-        session: AnodiumSession,
+        seat_name: String,
+        backend_tx: Sender<BackendRequest>,
     ) -> Self {
         let log = slog_scope::logger();
 
@@ -236,7 +231,7 @@ impl Anodium {
                 state.on_shell_event(event);
             });
 
-        let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, &session);
+        let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, seat_name.clone());
 
         #[cfg(feature = "xwayland")]
         let xwayland = Self::init_xwayland_connection(&handle, &display);
@@ -267,9 +262,8 @@ impl Anodium {
                 pressed_keys: HashSet::new(),
             },
 
-            seat_name: session.seat(),
+            seat_name,
             seat,
-            session,
 
             start_time: Instant::now(),
             last_update: Instant::now(),
@@ -284,6 +278,7 @@ impl Anodium {
 
             #[cfg(feature = "xwayland")]
             xwayland,
+            backend_tx,
         }
     }
 

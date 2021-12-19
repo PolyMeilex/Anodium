@@ -1,14 +1,13 @@
 use std::sync::atomic::Ordering;
 
-use crate::{grabs::MoveSurfaceGrab, output_map::Output, Anodium};
+use crate::{
+    framework::backend::BackendRequest, grabs::MoveSurfaceGrab, output_map::Output, Anodium,
+};
 
 use smithay::{
-    backend::{
-        input::{
-            self, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent,
-            PointerButtonEvent, PointerMotionAbsoluteEvent, PointerMotionEvent,
-        },
-        session::Session,
+    backend::input::{
+        self, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent,
+        PointerButtonEvent, PointerMotionAbsoluteEvent, PointerMotionEvent,
     },
     reexports::wayland_server::protocol::wl_pointer,
     utils::{Logical, Point},
@@ -322,7 +321,9 @@ impl Anodium {
             }
             KeyAction::VtSwitch(vt) => {
                 info!("Trying to switch to vt {}", vt);
-                self.session.change_vt(vt).ok();
+                // self.session.change_vt(vt).ok();
+                // TODO(poly)
+                self.backend_tx.send(BackendRequest::ChangeVT(vt)).ok();
             }
             // KeyAction::MoveToWorkspace(num) => {
             // let mut window_map = self.window_map.borrow_mut();

@@ -7,7 +7,7 @@ use smithay::{
         winit::{self, WinitEvent, WinitInput},
     },
     reexports::{
-        calloop::{timer::Timer, EventLoop},
+        calloop::{channel, timer::Timer, EventLoop},
         wayland_server::{protocol::wl_output, DispatchData, Display},
     },
     wayland::{
@@ -16,7 +16,7 @@ use smithay::{
     },
 };
 
-use super::BackendEvent;
+use super::{BackendEvent, BackendRequest};
 
 use crate::{output_map::Output, render::renderer::RenderFrame, render::*};
 
@@ -28,6 +28,8 @@ pub fn run_winit<F, IF, D>(
     event_loop: &mut EventLoop<'static, D>,
     state: &mut D,
 
+    rx: channel::Channel<BackendRequest>,
+
     mut cb: F,
     mut input_cb: IF,
 ) -> Result<(), ()>
@@ -37,6 +39,16 @@ where
     D: 'static,
 {
     let mut ddata = DispatchData::wrap(state);
+
+    event_loop
+        .handle()
+        .insert_source(rx, move |event, _, _| match event {
+            channel::Event::Msg(event) => match event {
+                BackendRequest::ChangeVT(_) => {}
+            },
+            channel::Event::Closed => {}
+        })
+        .unwrap();
 
     let (renderer, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
         crit!("Failed to initialize Winit backend: {}", err);

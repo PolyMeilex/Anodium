@@ -14,7 +14,7 @@ use smithay::{
         SwapBuffersError,
     },
     reexports::{
-        calloop::{timer::Timer, EventLoop},
+        calloop::{channel, timer::Timer, EventLoop},
         gbm,
         wayland_server::{protocol::wl_output, Display},
     },
@@ -31,7 +31,7 @@ use crate::{
     render::{draw_fps, renderer::RenderFrame},
 };
 
-use super::BackendEvent;
+use super::{BackendEvent, BackendRequest};
 
 pub const OUTPUT_NAME: &str = "x11";
 
@@ -141,6 +141,8 @@ pub fn run_x11<F, IF, D>(
     event_loop: &mut EventLoop<'static, D>,
     state: &mut D,
 
+    rx: channel::Channel<BackendRequest>,
+
     cb: F,
     input_cb: IF,
 ) -> Result<(), ()>
@@ -149,6 +151,16 @@ where
     IF: FnMut(InputEvent<X11Input>, &Output, DispatchData) + 'static,
     D: 'static,
 {
+    event_loop
+        .handle()
+        .insert_source(rx, move |event, _, _| match event {
+            channel::Event::Msg(event) => match event {
+                BackendRequest::ChangeVT(_) => {}
+            },
+            channel::Event::Closed => {}
+        })
+        .unwrap();
+
     let cb = Rc::new(RefCell::new(cb));
     let input_cb = Rc::new(RefCell::new(input_cb));
 
