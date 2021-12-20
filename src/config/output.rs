@@ -88,11 +88,6 @@ pub struct Mode {
 pub mod mode_module {
     use super::Mode;
 
-    #[rhai_fn(get = "name", pure)]
-    pub fn name(mode: &mut Mode) -> String {
-        mode.mode.name().to_owned().into_string().unwrap()
-    }
-
     #[rhai_fn(get = "clock", pure)]
     pub fn clock(mode: &mut Mode) -> INT {
         mode.mode.clock() as _

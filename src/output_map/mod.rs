@@ -14,6 +14,7 @@ use crate::config::eventloop::ConfigEvent;
 mod layer_map;
 pub use layer_map::LayerSurface;
 
+mod mode;
 mod output;
 pub use output::Output;
 

@@ -20,6 +20,8 @@ struct Inner {
     output: output::Output,
     global: Option<Global<WlOutput>>,
     current_mode: Mode,
+    pending_mode_change: bool,
+    possible_modes: Vec<Mode>,
     scale: f64,
     location: Point<i32, Logical>,
 
@@ -33,7 +35,9 @@ struct Inner {
 }
 
 impl Inner {
-    /* pub fn modes(&self) -> Vec<Mode> {}*/
+    pub fn possible_modes(&self) -> Vec<Mode> {
+        self.possible_modes.clone()
+    }
 
     pub fn update_mode(&mut self, mode: Mode) {
         let scale = self.scale.round() as i32;
@@ -44,6 +48,7 @@ impl Inner {
         self.output.set_preferred(mode);
 
         self.current_mode = mode;
+        self.pending_mode_change = true;
     }
 
     pub fn update_scale(&mut self, scale: f64) {
@@ -102,6 +107,7 @@ impl Output {
         display: &mut Display,
         physical: PhysicalProperties,
         mode: Mode,
+        possible_modes: Vec<Mode>,
         active_workspace: String,
         logger: slog::Logger,
     ) -> Self
@@ -121,7 +127,9 @@ impl Output {
                 global: Some(global),
                 output,
                 location,
+                pending_mode_change: false,
                 current_mode: mode,
+                possible_modes,
                 scale,
 
                 active_workspace,
@@ -220,6 +228,11 @@ impl Output {
         self.inner.borrow_mut().update_mode(mode);
     }
 
+    #[allow(unused)]
+    pub fn possible_modes(&self) -> Vec<Mode> {
+        self.inner.borrow().possible_modes()
+    }
+
     pub fn update_scale(&mut self, scale: f64) {
         self.inner.borrow_mut().update_scale(scale);
     }
@@ -230,6 +243,16 @@ impl Output {
 
     pub fn get_wallpaper(&self, renderer: &mut Gles2Renderer) -> Option<Gles2Texture> {
         self.inner.borrow_mut().get_wallpaper(renderer)
+    }
+
+    pub fn pending_mode_change(&self) -> bool {
+        let mut inner = self.inner.borrow_mut();
+        if inner.pending_mode_change {
+            inner.pending_mode_change = false;
+            true
+        } else {
+            false
+        }
     }
 }
 

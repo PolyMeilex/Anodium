@@ -98,6 +98,20 @@ anodize.outputs.on_rearrange(|| {
             output.set_wallpaper("bg.png");
 
             output_x += output.w;
+
+            for mode in output.modes {
+                mode.info();
+            }
+
+            anodize.log.info("searching for mode");
+
+            let mode = output.modes.filter(1280, 768, 60);
+            if mode != () {
+                mode.info();
+                output.update_mode(mode);
+            } else {
+                anodize.log.error("mode not found");
+            }
         }
         return false;
     }, 500);

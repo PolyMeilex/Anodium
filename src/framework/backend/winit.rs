@@ -104,7 +104,8 @@ where
             make: "Smithay".into(),
             model: "Winit".into(),
         },
-        mode,
+        mode.clone(),
+        vec![mode],
         // TODO: output should always have a workspace
         "Unknown".into(),
         slog_scope::logger(),

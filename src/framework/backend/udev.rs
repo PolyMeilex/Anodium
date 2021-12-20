@@ -39,7 +39,7 @@ use smithay::{
                 connector::{self, Info as ConnectorInfo, State as ConnectorState},
                 crtc,
                 encoder::Info as EncoderInfo,
-                Device as ControlDevice,
+                Device as ControlDevice, Mode as DrmMode,
             },
         },
         gbm::Device as GbmDevice,
@@ -273,6 +273,7 @@ struct OutputSurfaceData {
 
     output_name: String,
     mode: Mode,
+    modes: Vec<DrmMode>,
     connector_info: connector::Info,
     crtc: crtc::Handle,
 }
@@ -423,6 +424,7 @@ fn scan_connectors<D: 'static>(
 
                         output_name,
                         mode,
+                        modes: modes.to_owned(),
                         connector_info,
                         crtc,
                     })));
@@ -552,7 +554,18 @@ fn device_added<D: 'static>(
             for output_handle in outputs_order {
                 let output = {
                     let output = outputs.get(&output_handle).unwrap();
-                    let modes = modes.get(&output_handle).unwrap();
+                    let modes: Vec<Mode> = modes
+                        .get(&output_handle)
+                        .unwrap()
+                        .iter()
+                        .map(|m| {
+                            let size = m.size();
+                            Mode {
+                                size: (size.0 as i32, size.1 as i32).into(),
+                                refresh: (m.vrefresh() * 1000) as i32,
+                            }
+                        })
+                        .collect();
 
                     info!("FOUND MODES: {:?}", modes);
 
@@ -575,6 +588,7 @@ fn device_added<D: 'static>(
                             model: "Generic DRM".into(),
                         },
                         output.mode,
+                        modes,
                         // TODO: output should always have a workspace
                         "Unknown".into(),
                         slog_scope::logger(),
@@ -786,8 +800,23 @@ fn render_output_surface(
         return Ok(());
     };
 
+    if output.pending_mode_change() {
+        let current_mode = output.current_mode();
+        info!("drm modes: {:?}", surface.modes);
+        if let Some(drm_mode) = surface.modes.iter().find(|m| {
+            info!("size: {:?}, refresh: {}", m.size(), m.vrefresh());
+            m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
+                && m.vrefresh() == (current_mode.refresh / 1000) as u32
+        }) {
+            surface.surface.use_mode(*drm_mode).unwrap();
+        } else {
+            error!("pending mode: {:?} not found in drm", current_mode);
+        }
+    }
+
     let (dmabuf, _age) = surface.surface.next_buffer()?;
     renderer.bind(dmabuf)?;
+
     // and draw to our buffer
     match renderer
         .render(
