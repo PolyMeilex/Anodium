@@ -20,12 +20,16 @@ use smithay::{
             gles2::{Gles2Renderer, Gles2Texture},
             Bind, Frame, ImportDma, ImportEgl, Renderer, Transform,
         },
-        session::{auto::AutoSessionNotifier, Session, Signal as SessionSignal},
+        session::{
+            auto::{AutoSession, AutoSessionNotifier},
+            Session, Signal as SessionSignal,
+        },
         udev::{primary_gpu, UdevBackend, UdevEvent},
         SwapBuffersError,
     },
     reexports::{
         calloop::{
+            channel,
             timer::{Timer, TimerHandle},
             Dispatcher, EventLoop, LoopHandle,
         },
@@ -50,7 +54,7 @@ use smithay::{
     },
 };
 
-use super::{session::AnodiumSession, BackendEvent};
+use super::{BackendEvent, BackendRequest};
 use crate::{
     framework,
     output_map::Output,
@@ -63,7 +67,7 @@ struct Inner {
 
     display: Rc<RefCell<Display>>,
     primary_gpu: Option<PathBuf>,
-    session: AnodiumSession,
+    session: AutoSession,
     pointer_image: framework::cursor::Cursor,
     udev_devices: HashMap<dev_t, UdevDeviceData>,
 
@@ -92,8 +96,9 @@ pub fn run_udev<F, IF, D>(
     display: Rc<RefCell<Display>>,
     event_loop: &mut EventLoop<'static, D>,
     state: &mut D,
-    session: AnodiumSession,
+    mut session: AutoSession,
     notifier: AutoSessionNotifier,
+    rx: channel::Channel<BackendRequest>,
     cb: F,
     mut input_cb: IF,
 ) -> Result<(), ()>
@@ -134,7 +139,7 @@ where
      * Initialize libinput backend
      */
     let mut libinput_context =
-        Libinput::new_with_udev::<LibinputSessionInterface<AnodiumSession>>(session.clone().into());
+        Libinput::new_with_udev::<LibinputSessionInterface<AutoSession>>(session.clone().into());
     libinput_context.udev_assign_seat(&session.seat()).unwrap();
     let mut libinput_backend = LibinputInputBackend::new(libinput_context, log.clone());
     libinput_backend.link(session_signal.clone());
@@ -144,7 +149,14 @@ where
      */
     let _libinput_event_source = event_loop
         .handle()
-        .insert_source(libinput_backend, move |event, _, state| {
+        .insert_source(libinput_backend, move |mut event, _, state| {
+            match &mut event {
+                InputEvent::DeviceAdded { device } => {
+                    device.config_tap_set_enabled(true).ok();
+                }
+                _ => {}
+            }
+
             input_cb(event, DispatchData::wrap(state));
         })
         .unwrap();
@@ -198,6 +210,18 @@ where
             slog_scope::logger(),
         );
     }
+
+    event_loop
+        .handle()
+        .insert_source(rx, move |event, _, _| match event {
+            channel::Event::Msg(event) => match event {
+                BackendRequest::ChangeVT(id) => {
+                    session.change_vt(id).ok();
+                }
+            },
+            channel::Event::Closed => {}
+        })
+        .unwrap();
 
     let handle = event_loop.handle();
     let _udev_event_source = event_loop
@@ -427,7 +451,7 @@ fn scan_connectors<D: 'static>(
 
 /// Try to open the device
 fn open_device(
-    session: &mut AnodiumSession,
+    session: &mut AutoSession,
     device_id: dev_t,
     path: &Path,
 ) -> Option<(DrmDevice<SessionFd>, GbmDevice<SessionFd>)> {
