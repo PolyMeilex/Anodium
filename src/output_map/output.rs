@@ -33,6 +33,8 @@ struct Inner {
 }
 
 impl Inner {
+    /* pub fn modes(&self) -> Vec<Mode> {}*/
+
     pub fn update_mode(&mut self, mode: Mode) {
         let scale = self.scale.round() as i32;
 

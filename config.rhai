@@ -89,7 +89,7 @@ anodize.outputs.on_rearrange(|| {
         let output_x = 0;
         for output in anodize.outputs {
             output.x = output_x;
-            //output.info();
+
             anodize.log.info("output name is " + output.name);
             anodize.log.info("output width is " + output.w.to_string());
             anodize.log.info("output height is " + output.h.to_string());

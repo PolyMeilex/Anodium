@@ -274,6 +274,7 @@ fn scan_connectors<D: 'static>(
 ) -> (
     HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
     Vec<crtc::Handle>,
+    HashMap<crtc::Handle, Vec<smithay::reexports::drm::control::Mode>>,
 ) {
     // Get a set of all modesetting resource handles (excluding planes):
     let res_handles = drm.resource_handles().unwrap();
@@ -289,6 +290,7 @@ fn scan_connectors<D: 'static>(
 
     let mut backends = HashMap::new();
     let mut backends_order = Vec::new();
+    let mut modes_map = HashMap::new();
 
     // very naive way of finding good crtc/encoder/connector combinations. This problem is np-complete
     for connector_info in connector_infos {
@@ -328,6 +330,9 @@ fn scan_connectors<D: 'static>(
                     };
 
                     let modes = connector_info.modes();
+
+                    modes_map.insert(crtc, modes.to_owned());
+                    info!("ALL MODES: {:#?}", modes);
                     // let mode_id = anodium
                     //     .config
                     //     .configure_output(&output_name, modes)
@@ -417,7 +422,7 @@ fn scan_connectors<D: 'static>(
         }
     }
 
-    (backends, backends_order)
+    (backends, backends_order, modes_map)
 }
 
 /// Try to open the device
@@ -508,7 +513,7 @@ fn device_added<D: 'static>(
             }
         }
 
-        let (outputs, outputs_order) = scan_connectors(
+        let (outputs, outputs_order, modes) = scan_connectors(
             inner.clone(),
             handle.clone(),
             &mut drm,
@@ -520,9 +525,12 @@ fn device_added<D: 'static>(
         {
             let mut inner = inner.borrow_mut();
 
-            for output in outputs_order {
+            for output_handle in outputs_order {
                 let output = {
-                    let output = outputs.get(&output).unwrap();
+                    let output = outputs.get(&output_handle).unwrap();
+                    let modes = modes.get(&output_handle).unwrap();
+
+                    info!("FOUND MODES: {:?}", modes);
 
                     let display = inner.display.clone();
                     let display = &mut *display.borrow_mut();
