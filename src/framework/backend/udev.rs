@@ -145,8 +145,8 @@ where
     let _libinput_event_source = event_loop
         .handle()
         .insert_source(libinput_backend, move |mut event, _, state| {
-            match &mut event{
-                InputEvent::DeviceAdded{device} => {
+            match &mut event {
+                InputEvent::DeviceAdded { device } => {
                     device.config_tap_set_enabled(true).ok();
                 }
                 _ => {}
