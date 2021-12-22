@@ -81,13 +81,39 @@ anodize.keyboard.callbacks.register(|| {
 }, "Control_L", ["r"]);
 
 
+let mode_index = 0;
+anodize.keyboard.callbacks.register(|| {
+    let output = anodize.outputs[0];
+    let mode = output.modes[mode_index];
+    if mode == () {
+        mode_index = 0;
+    } else {
+        output.update_mode(mode);
+    }
+    mode_index += 1;
+}, "Control_L", ["equal"]);
+
+
 let rearrange_timeout;
 anodize.outputs.on_rearrange(|| {
     anodize.system.clear_timeout(rearrange_timeout);
     rearrange_timeout = anodize.system.add_timeout(|| {
+
+
+
         anodize.log.info("anodize on_rearrange");
         let output_x = 0;
         for output in anodize.outputs {
+            let mode = output.modes.filter(800, 600, 60);
+            if mode != () {
+                mode.info();
+                output.update_mode(mode);
+            } else {
+                let mode2 = output.modes.filter(1280, 800, 120);
+                output.update_mode(mode2);
+                anodize.log.error("mode not found");
+            }
+
             output.x = output_x;
 
             anodize.log.info("output name is " + output.name);
@@ -105,13 +131,7 @@ anodize.outputs.on_rearrange(|| {
 
             anodize.log.info("searching for mode");
 
-            let mode = output.modes.filter(1280, 768, 60);
-            if mode != () {
-                mode.info();
-                output.update_mode(mode);
-            } else {
-                anodize.log.error("mode not found");
-            }
+            
         }
         return false;
     }, 500);

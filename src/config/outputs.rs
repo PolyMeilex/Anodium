@@ -11,6 +11,25 @@ use crate::output_map::{Output, OutputMap}; // a "prelude" import for macros
 #[derive(Debug, Clone)]
 pub struct Modes(Vec<Mode>);
 
+impl Modes {
+    pub fn get(&mut self, index: i64) -> Dynamic {
+        if let Some(mode) = self.0.get(index as usize).cloned() {
+            Dynamic::from(mode)
+        } else {
+            Dynamic::from(())
+        }
+    }
+}
+
+impl IntoIterator for Modes {
+    type Item = Mode;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Outputs {
     output_map: OutputMap,
@@ -30,6 +49,14 @@ impl Outputs {
             let _result: () = on_rearrange.call(engine, ast, ()).unwrap();
         } else {
             error!("on_rearrange not configured");
+        }
+    }
+
+    pub fn get(&mut self, index: i64) -> Dynamic {
+        if let Some(output) = self.output_map.find_by_index(index as usize) {
+            Dynamic::from(output)
+        } else {
+            Dynamic::from(())
         }
     }
 }
@@ -133,15 +160,6 @@ impl IntoIterator for Outputs {
     }
 }
 
-impl IntoIterator for Modes {
-    type Item = Mode;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
 pub fn register(engine: &mut Engine) {
     let outputs_module = exported_module!(outputs);
     let modes_module = exported_module!(modes);
@@ -153,5 +171,7 @@ pub fn register(engine: &mut Engine) {
         .register_type::<Mode>()
         .register_type::<Modes>()
         .register_iterator::<Outputs>()
+        .register_indexer_get(Outputs::get)
+        .register_indexer_get(Modes::get)
         .register_iterator::<Modes>();
 }
