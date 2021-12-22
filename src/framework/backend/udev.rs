@@ -802,13 +802,13 @@ fn render_output_surface(
 
     if output.pending_mode_change() {
         let current_mode = output.current_mode();
-        info!("drm modes: {:?}", surface.modes);
         if let Some(drm_mode) = surface.modes.iter().find(|m| {
-            info!("size: {:?}, refresh: {}", m.size(), m.vrefresh());
             m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
                 && m.vrefresh() == (current_mode.refresh / 1000) as u32
         }) {
-            surface.surface.use_mode(*drm_mode).unwrap();
+            if let Err(err) = surface.surface.use_mode(*drm_mode) {
+                error!("pending mode: {:?} failed: {:?}", current_mode, err);
+            }
         } else {
             error!("pending mode: {:?} not found in drm", current_mode);
         }
