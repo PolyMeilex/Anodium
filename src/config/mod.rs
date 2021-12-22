@@ -2,36 +2,32 @@ use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use rhai::{
-    Array, Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, ImmutableString, Module, Position,
-    Scope, AST,
-};
+use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, Scope, AST};
 
 mod anodize;
 pub mod eventloop;
 pub mod keyboard;
 mod log;
-mod output;
 mod outputs;
 mod system;
 mod windows;
 mod workspace;
 
-use output::OutputConfig;
 use smithay::backend::input::KeyState;
+use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::LoopHandle;
-use smithay::reexports::{calloop::channel::Sender, drm};
 
 use crate::output_map::OutputMap;
 use crate::state::Anodium;
 
 use self::anodize::Anodize;
-use self::{eventloop::ConfigEvent, output::Mode};
+use self::eventloop::ConfigEvent;
 
 #[derive(Debug)]
 struct Inner {
     engine: Engine,
     ast: AST,
+    #[allow(unused)]
     scope: Scope<'static>,
 }
 
@@ -52,11 +48,6 @@ impl ConfigVM {
         engine.set_max_expr_depths(0, 0);
         let mut scope = Scope::new();
 
-        //engine.register_fn("rev", |array: Array| {
-        //    array.into_iter().rev().collect::<Array>()
-        //});
-
-        output::register(&mut engine);
         keyboard::register(&mut engine);
         log::register(&mut engine);
         system::register(&mut engine);
@@ -82,84 +73,6 @@ impl ConfigVM {
             event_sender,
         })
     }
-
-    /*pub fn arrange_outputs(
-        &mut self,
-        outputs: &[crate::output_map::Output],
-    ) -> Result<Vec<OutputConfig>, Box<EvalAltResult>> {
-        let inner = &mut *self.inner.borrow_mut();
-
-        let outputs: Array = outputs
-            .iter()
-            .enumerate()
-            .map(|(id, o)| {
-                let location = o.location();
-                let size = o.size();
-
-                Dynamic::from(OutputConfig {
-                    id,
-                    name: o.name().into(),
-                    x: location.x as _,
-                    y: location.y as _,
-                    w: size.w as _,
-                    h: size.h as _,
-                })
-            })
-            .collect();
-
-        let result: Array = inner
-            .engine
-            .call_fn_raw(
-                &mut inner.scope,
-                &inner.ast,
-                false,
-                true,
-                "arrange_outputs",
-                None,
-                &mut [outputs.into()],
-            )?
-            .try_cast()
-            .ok_or(EvalAltResult::ErrorMismatchOutputType(
-                "".to_owned(),
-                "".to_owned(),
-                Position::NONE,
-            ))?;
-
-        Ok(result
-            .into_iter()
-            .map(|item| item.try_cast().unwrap())
-            .collect())
-    }*/
-
-    /*pub fn configure_output(
-        &mut self,
-        output_name: &str,
-        modes: &[drm::control::Mode],
-    ) -> Result<usize, Box<EvalAltResult>> {
-        let inner = &mut *self.inner.borrow_mut();
-
-        let modes: Array = modes
-            .iter()
-            .enumerate()
-            .map(|(id, m)| Dynamic::from(Mode { id, mode: *m }))
-            .collect();
-
-        let output_name: ImmutableString = output_name.into();
-
-        let result: Dynamic = inner.engine.call_fn_raw(
-            &mut inner.scope,
-            &inner.ast,
-            false,
-            true,
-            "configure_output",
-            None,
-            &mut [output_name.into(), modes.into()],
-        )?;
-
-        let mode: Option<Mode> = result.try_cast();
-        let id = mode.map(|m| m.id).unwrap_or(0);
-        Ok(id)
-    }*/
 
     pub fn execute_fnptr(&self, callback: FnPtr, args: impl FuncArgs) -> Dynamic {
         let inner = &mut *self.inner.borrow_mut();

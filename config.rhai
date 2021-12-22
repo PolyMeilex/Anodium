@@ -137,24 +137,6 @@ anodize.outputs.on_rearrange(|| {
     }, 500);
 });
 
-
-
-fn configure_output(name, modes){
-    let find_mode = |w, h, r|{
-        for mode in modes {
-            if mode.w == w && mode.h == h && mode.refresh == r{
-                return mode;
-            }
-        }
-    };
-
-    switch name {
-        "HDMI-A-1" => {
-            find_mode.call(1920, 1080, 60)
-        },
-        "DP-1" => {
-            find_mode.call(1920, 1080, 60)
-        }
-        _ => {}
-    }
-}
+anodize.outputs.on_new(|output| {
+    
+});

@@ -357,16 +357,7 @@ fn scan_connectors<D: 'static>(
                     let modes = connector_info.modes();
 
                     modes_map.insert(crtc, modes.to_owned());
-                    info!("ALL MODES: {:#?}", modes);
-                    // let mode_id = anodium
-                    //     .config
-                    //     .configure_output(&output_name, modes)
-                    //     .unwrap();
-
-                    // let mode = modes.get(mode_id).unwrap();
                     let mode = modes[0];
-
-                    info!("MODE: {:#?}", mode);
 
                     let mut surface =
                         match drm.create_surface(crtc, mode, &[connector_info.handle()]) {
@@ -566,8 +557,6 @@ fn device_added<D: 'static>(
                             }
                         })
                         .collect();
-
-                    info!("FOUND MODES: {:?}", modes);
 
                     let display = inner.display.clone();
                     let display = &mut *display.borrow_mut();
