@@ -107,10 +107,10 @@ anodize.outputs.on_rearrange(|| {
             let mode = output.modes.filter(800, 600, 60);
             if mode != () {
                 mode.info();
-                output.update_mode(mode);
+                //output.update_mode(mode);
             } else {
                 let mode2 = output.modes.filter(1280, 800, 120);
-                output.update_mode(mode2);
+                //output.update_mode(mode2);
                 anodize.log.error("mode not found");
             }
 
