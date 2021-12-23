@@ -89,6 +89,7 @@ anodize.keyboard.callbacks.register(|| {
         mode_index = 0;
     } else {
         output.update_mode(mode);
+        output.set_wallpaper("bg.png");
     }
     mode_index += 1;
 }, "Control_L", ["equal"]);

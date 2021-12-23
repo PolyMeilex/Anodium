@@ -797,6 +797,8 @@ fn render_output_surface(
         }) {
             if let Err(err) = surface.surface.use_mode(*drm_mode) {
                 error!("pending mode: {:?} failed: {:?}", current_mode, err);
+            } else {
+                surface.mode = current_mode.clone();
             }
         } else {
             error!("pending mode: {:?} not found in drm", current_mode);
