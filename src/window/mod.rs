@@ -13,6 +13,8 @@ use smithay::{
     },
 };
 
+use crate::render;
+use crate::render::renderer::RenderFrame;
 use crate::{
     animations::enter_exit::EnterExitAnimation,
     framework::surface_data::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
@@ -45,6 +47,33 @@ impl Window {
         };
         window.self_update();
         window
+    }
+
+    pub fn render(
+        &self,
+        frame: &mut RenderFrame,
+        initial_location: Point<i32, Logical>,
+        output_scale: f64,
+    ) {
+        let mut render_location = self.render_location();
+        render_location.x -= initial_location.x;
+
+        if let Some(wl_surface) = self.surface().as_ref() {
+            // this surface is a root of a subsurface tree that needs to be drawn
+            if let Err(err) =
+                render::draw_surface_tree(frame, wl_surface, render_location, output_scale)
+            {
+                error!("{:?}", err);
+            }
+            // furthermore, draw its popups
+            let toplevel_geometry_offset = self.geometry().loc;
+            let render_location = render_location + toplevel_geometry_offset;
+
+            let window = self.borrow();
+            for popup in window.popups().iter() {
+                popup.render(frame, render_location, output_scale);
+            }
+        }
     }
 }
 

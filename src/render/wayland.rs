@@ -188,29 +188,12 @@ impl Anodium {
         output_scale: f64,
     ) -> Result<(), SwapBuffersError> {
         let mut render = move |window: &Window| {
-            let mut initial_place = window.render_location();
-
             // skip windows that do not overlap with a given output
             if !output_rect.overlaps(window.bbox_in_comp_space()) {
                 return;
             }
-            initial_place.x -= output_rect.loc.x;
 
-            if let Some(wl_surface) = window.surface().as_ref() {
-                // this surface is a root of a subsurface tree that needs to be drawn
-                if let Err(err) = draw_surface_tree(frame, wl_surface, initial_place, output_scale)
-                {
-                    error!("{:?}", err);
-                }
-                // furthermore, draw its popups
-                let toplevel_geometry_offset = window.geometry().loc;
-                let initial_location = initial_place + toplevel_geometry_offset;
-
-                let window = window.borrow();
-                for popup in window.popups().iter() {
-                    popup.render(frame, initial_location, output_scale);
-                }
-            }
+            window.render(frame, output_rect.loc, output_scale);
         };
 
         // redraw the frame, in a simple but inneficient way
