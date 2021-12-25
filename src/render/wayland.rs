@@ -3,9 +3,7 @@
 use std::{cell::RefCell, sync::Mutex};
 
 #[cfg(feature = "image")]
-use image::{ImageBuffer, Rgba};
-#[cfg(feature = "image")]
-use smithay::backend::renderer::gles2::{Gles2Error, Gles2Renderer, Gles2Texture};
+use smithay::backend::renderer::gles2::Gles2Texture;
 use smithay::{
     backend::{
         renderer::{buffer_type, BufferType, Frame, ImportAll, Transform},

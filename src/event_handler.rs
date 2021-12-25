@@ -1,6 +1,3 @@
-use smithay::reexports::calloop::timer::Timer;
-use std::time::Duration;
-
 use crate::config::eventloop::ConfigEvent;
 use crate::Anodium;
 

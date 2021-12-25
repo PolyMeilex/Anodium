@@ -1,7 +1,6 @@
 use rhai::plugin::*;
 use rhai::{Dynamic, EvalAltResult, FnPtr};
 use smithay::reexports::calloop::LoopHandle;
-use x11rb::protocol::xproto::Time;
 
 use std::cell::RefCell;
 use std::process::Command;
@@ -42,6 +41,7 @@ impl Timeout {
 
 #[derive(Debug, Clone)]
 pub struct System {
+    #[allow(unused)]
     event_sender: Sender<ConfigEvent>,
     loop_handle: LoopHandle<'static, Anodium>,
     timer_handle: TimerHandle<Timeout>,

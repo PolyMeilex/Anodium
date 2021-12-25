@@ -1,5 +1,4 @@
 use crate::window::Window;
-use rhai::FnPtr;
 
 #[derive(Debug)]
 pub enum ConfigEvent {
