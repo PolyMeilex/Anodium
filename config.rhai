@@ -99,6 +99,7 @@ let rearrange_timeout;
 anodize.outputs.on_rearrange(|| {
     anodize.system.clear_timeout(rearrange_timeout);
     rearrange_timeout = anodize.system.add_timeout(|| {
+        anodize.log.info("anodize rearrange");
         let output_x = 0;
         for output in anodize.outputs {
             output_x += output.w;
@@ -110,10 +111,6 @@ anodize.outputs.on_rearrange(|| {
 
 anodize.outputs.on_new(|output| {
     anodize.log.info("anodize on_new");
-    for mode in output.modes {
-        mode.info();
-    }
-
     if output.name == "Virtual-1" {
         let mode = output.modes.filter(1440, 900, 60);
         if mode != () {

@@ -72,11 +72,6 @@ impl Outputs {
 }
 #[export_module]
 pub mod modes {
-    #[rhai_fn(global)]
-    pub fn info(mode: &mut Mode) {
-        info!("mode: {:?}", mode);
-    }
-
     #[rhai_fn(get = "w", pure)]
     pub fn w(mode: &mut Mode) -> INT {
         mode.size.w as _
