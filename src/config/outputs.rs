@@ -46,11 +46,19 @@ impl Outputs {
         }
     }
 
-    pub fn rearrange(&self, engine: &Engine, ast: &AST) {
+    pub fn on_rearrange(&self, engine: &Engine, ast: &AST) {
         if let Some(on_rearrange) = self.on_rearrange.borrow().clone() {
             let _result: () = on_rearrange.call(engine, ast, ()).unwrap();
         } else {
             error!("on_rearrange not configured");
+        }
+    }
+
+    pub fn on_new(&self, engine: &Engine, ast: &AST, output: Output) {
+        if let Some(on_new) = self.on_new.borrow().clone() {
+            let _result: () = on_new.call(engine, ast, (output,)).unwrap();
+        } else {
+            error!("on_new not configured");
         }
     }
 

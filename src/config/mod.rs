@@ -17,7 +17,7 @@ use smithay::backend::input::KeyState;
 use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::LoopHandle;
 
-use crate::output_map::OutputMap;
+use crate::output_map::{Output, OutputMap};
 use crate::state::Anodium;
 
 use self::anodize::Anodize;
@@ -92,6 +92,13 @@ impl ConfigVM {
 
     pub fn output_rearrange(&self) {
         let inner = &*self.inner.borrow();
-        self.anodize.outputs.rearrange(&inner.engine, &inner.ast);
+        self.anodize.outputs.on_rearrange(&inner.engine, &inner.ast);
+    }
+
+    pub fn output_new(&self, output: Output) {
+        let inner = &*self.inner.borrow();
+        self.anodize
+            .outputs
+            .on_new(&inner.engine, &inner.ast, output);
     }
 }

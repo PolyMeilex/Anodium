@@ -99,45 +99,27 @@ let rearrange_timeout;
 anodize.outputs.on_rearrange(|| {
     anodize.system.clear_timeout(rearrange_timeout);
     rearrange_timeout = anodize.system.add_timeout(|| {
-
-
-
-        anodize.log.info("anodize on_rearrange");
         let output_x = 0;
         for output in anodize.outputs {
-            let mode = output.modes.filter(800, 600, 60);
-            if mode != () {
-                mode.info();
-                //output.update_mode(mode);
-            } else {
-                let mode2 = output.modes.filter(1280, 800, 120);
-                //output.update_mode(mode2);
-                anodize.log.error("mode not found");
-            }
-
-            output.x = output_x;
-
-            anodize.log.info("output name is " + output.name);
-            anodize.log.info("output width is " + output.w.to_string());
-            anodize.log.info("output height is " + output.h.to_string());
-            anodize.log.info("output x is " + output.x.to_string());
-            anodize.log.info("output y is " + output.y.to_string());
-            output.set_wallpaper("bg.png");
-
             output_x += output.w;
-
-            for mode in output.modes {
-                mode.info();
-            }
-
             anodize.log.info("searching for mode");
-
-            
         }
         return false;
     }, 500);
 });
 
 anodize.outputs.on_new(|output| {
-    
+    anodize.log.info("anodize on_new");
+    for mode in output.modes {
+        mode.info();
+    }
+
+    if output.name == "Virtual-1" {
+        let mode = output.modes.filter(1440, 900, 60);
+        if mode != () {
+            output.update_mode(mode);
+        }
+    }
+
+    output.set_wallpaper("bg.png");
 });
