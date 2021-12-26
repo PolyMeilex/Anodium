@@ -34,7 +34,11 @@ impl Anodium {
                 self.on_pointer_move(event.time());
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output = output.unwrap_or_else(|| self.output_map.find_by_index(0).unwrap());
+                let mut output_holder_if_missing = None;
+                let output = output.unwrap_or_else(|| {
+                    output_holder_if_missing = self.output_map.find_by_index(0);
+                    output_holder_if_missing.as_ref().unwrap()
+                });
 
                 let output_size = output.size();
                 let output_pos = output.location().to_f64();

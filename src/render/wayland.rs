@@ -3,9 +3,7 @@
 use std::{cell::RefCell, sync::Mutex};
 
 #[cfg(feature = "image")]
-use image::{ImageBuffer, Rgba};
-#[cfg(feature = "image")]
-use smithay::backend::renderer::gles2::{Gles2Error, Gles2Renderer, Gles2Texture};
+use smithay::backend::renderer::gles2::Gles2Texture;
 use smithay::{
     backend::{
         renderer::{buffer_type, BufferType, Frame, ImportAll, Transform},
@@ -291,47 +289,4 @@ pub fn draw_fps(ui: &imgui::Ui, _output_scale: f64, value: f64) {
         .build(ui, || {
             ui.text(&format!("{}FPS", value as u32));
         });
-}
-
-// TODO: Move this to diferent module, this is not wayland specyfic
-#[cfg(feature = "image")]
-pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
-    renderer: &mut Gles2Renderer,
-    image: &ImageBuffer<Rgba<u8>, C>,
-) -> Result<Gles2Texture, Gles2Error> {
-    use smithay::backend::renderer::gles2::ffi;
-
-    renderer.with_context(|renderer, gl| unsafe {
-        let mut tex = 0;
-        gl.GenTextures(1, &mut tex);
-        gl.BindTexture(ffi::TEXTURE_2D, tex);
-        gl.TexParameteri(
-            ffi::TEXTURE_2D,
-            ffi::TEXTURE_WRAP_S,
-            ffi::CLAMP_TO_EDGE as i32,
-        );
-        gl.TexParameteri(
-            ffi::TEXTURE_2D,
-            ffi::TEXTURE_WRAP_T,
-            ffi::CLAMP_TO_EDGE as i32,
-        );
-        gl.TexImage2D(
-            ffi::TEXTURE_2D,
-            0,
-            ffi::RGBA as i32,
-            image.width() as i32,
-            image.height() as i32,
-            0,
-            ffi::RGBA,
-            ffi::UNSIGNED_BYTE as u32,
-            image.as_ptr() as *const _,
-        );
-        gl.BindTexture(ffi::TEXTURE_2D, 0);
-
-        Gles2Texture::from_raw(
-            renderer,
-            tex,
-            (image.width() as i32, image.height() as i32).into(),
-        )
-    })
 }

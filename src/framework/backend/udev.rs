@@ -39,7 +39,7 @@ use smithay::{
                 connector::{self, Info as ConnectorInfo, State as ConnectorState},
                 crtc,
                 encoder::Info as EncoderInfo,
-                Device as ControlDevice,
+                Device as ControlDevice, Mode as DrmMode,
             },
         },
         gbm::Device as GbmDevice,
@@ -55,7 +55,13 @@ use smithay::{
 };
 
 use super::{BackendEvent, BackendRequest};
-use crate::{framework, output_map::Output, render::renderer::RenderFrame, render::*};
+use crate::{
+    framework,
+    output_map::Output,
+    render::renderer::{import_bitmap, RenderFrame},
+    render::*,
+    state::Anodium,
+};
 
 struct Inner {
     cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
@@ -268,6 +274,7 @@ struct OutputSurfaceData {
 
     output_name: String,
     mode: Mode,
+    modes: Vec<DrmMode>,
     connector_info: connector::Info,
     crtc: crtc::Handle,
 }
@@ -290,8 +297,10 @@ fn scan_connectors<D: 'static>(
     gbm: &GbmDevice<SessionFd>,
     renderer: &mut Gles2Renderer,
     signaler: &Signaler<SessionSignal>,
+    mut ddata: DispatchData,
 ) -> (
     HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
+    HashMap<crtc::Handle, Output>,
     Vec<crtc::Handle>,
 ) {
     // Get a set of all modesetting resource handles (excluding planes):
@@ -308,6 +317,7 @@ fn scan_connectors<D: 'static>(
 
     let mut backends = HashMap::new();
     let mut backends_order = Vec::new();
+    let mut outputs_map = HashMap::new();
 
     // very naive way of finding good crtc/encoder/connector combinations. This problem is np-complete
     for connector_info in connector_infos {
@@ -347,15 +357,61 @@ fn scan_connectors<D: 'static>(
                     };
 
                     let modes = connector_info.modes();
-                    // let mode_id = anodium
-                    //     .config
-                    //     .configure_output(&output_name, modes)
-                    //     .unwrap();
 
-                    // let mode = modes.get(mode_id).unwrap();
+                    let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
+
+                    let connector_inner = inner.borrow_mut();
+                    let display = connector_inner.display.clone();
+                    let display = &mut *display.borrow_mut();
+
                     let mode = modes[0];
 
-                    info!("MODE: {:#?}", mode);
+                    let size = mode.size();
+                    let output_mode = Mode {
+                        size: (size.0 as i32, size.1 as i32).into(),
+                        refresh: (mode.vrefresh() * 1000) as i32,
+                    };
+
+                    let output_modes: Vec<Mode> = modes
+                        .iter()
+                        .map(|m| {
+                            let size = m.size();
+                            Mode {
+                                size: (size.0 as i32, size.1 as i32).into(),
+                                refresh: (m.vrefresh() * 1000) as i32,
+                            }
+                        })
+                        .collect();
+
+                    let output = Output::new(
+                        &output_name,
+                        Default::default(),
+                        display,
+                        PhysicalProperties {
+                            size: (phys_w as i32, phys_h as i32).into(),
+                            subpixel: wl_output::Subpixel::Unknown,
+                            make: "Smithay".into(),
+                            model: "Generic DRM".into(),
+                        },
+                        output_mode,
+                        output_modes,
+                        // TODO: output should always have a workspace
+                        "Unknown".into(),
+                        slog_scope::logger(),
+                    );
+
+                    let anodium = ddata.get::<Anodium>().unwrap();
+                    anodium.config.output_new(output.clone());
+                    let current_mode = output.current_mode();
+
+                    let mode = modes
+                        .iter()
+                        .find(|m| {
+                            m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
+                                && m.vrefresh() == (current_mode.refresh / 1000) as u32
+                        })
+                        .cloned()
+                        .unwrap_or(mode);
 
                     let mut surface =
                         match drm.create_surface(crtc, mode, &[connector_info.handle()]) {
@@ -382,11 +438,6 @@ fn scan_connectors<D: 'static>(
                             continue;
                         }
                     };
-                    let size = mode.size();
-                    let mode = Mode {
-                        size: (size.0 as i32, size.1 as i32).into(),
-                        refresh: (mode.vrefresh() * 1000) as i32,
-                    };
 
                     let timer = Timer::new().unwrap();
 
@@ -404,6 +455,8 @@ fn scan_connectors<D: 'static>(
                         })
                         .unwrap();
 
+                    outputs_map.insert(crtc, output);
+
                     entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
@@ -412,7 +465,8 @@ fn scan_connectors<D: 'static>(
                         imgui_pipeline,
 
                         output_name,
-                        mode,
+                        mode: output_mode,
+                        modes: modes.to_owned(),
                         connector_info,
                         crtc,
                     })));
@@ -436,7 +490,7 @@ fn scan_connectors<D: 'static>(
         }
     }
 
-    (backends, backends_order)
+    (backends, outputs_map, backends_order)
 }
 
 /// Try to open the device
@@ -527,52 +581,33 @@ fn device_added<D: 'static>(
             }
         }
 
-        let (outputs, outputs_order) = scan_connectors(
+        let (outputs, outputs_map, outputs_order) = scan_connectors(
             inner.clone(),
             handle.clone(),
             &mut drm,
             &gbm,
             &mut *renderer.borrow_mut(),
             session_signal,
+            ddata.reborrow(),
         );
 
         {
             let mut inner = inner.borrow_mut();
 
-            for output in outputs_order {
+            for output_handle in outputs_order {
                 let output = {
-                    let output = outputs.get(&output).unwrap();
+                    let outputsurface = outputs.get(&output_handle).unwrap();
+                    let output = outputs_map.get(&output_handle).unwrap();
 
-                    let display = inner.display.clone();
-                    let display = &mut *display.borrow_mut();
-
-                    let output = &*output.borrow();
-                    let crtc = output.crtc;
-
-                    let (phys_w, phys_h) = output.connector_info.size().unwrap_or((0, 0));
-
-                    let output = Output::new(
-                        &output.output_name,
-                        Default::default(),
-                        display,
-                        PhysicalProperties {
-                            size: (phys_w as i32, phys_h as i32).into(),
-                            subpixel: wl_output::Subpixel::Unknown,
-                            make: "Smithay".into(),
-                            model: "Generic DRM".into(),
-                        },
-                        output.mode,
-                        // TODO: output should always have a workspace
-                        "Unknown".into(),
-                        slog_scope::logger(),
-                    );
+                    let outputsurface = &*outputsurface.borrow();
+                    let crtc = outputsurface.crtc;
 
                     output.userdata().insert_if_missing(|| UdevOutputId {
                         crtc,
                         device_id: drm.device_id(),
                     });
 
-                    output
+                    output.clone()
                 };
 
                 inner.outputs.push(output.clone());
@@ -678,7 +713,7 @@ fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddat
                 let image =
                     ImageBuffer::from_raw(frame.width, frame.height, &*frame.pixels_rgba).unwrap();
                 let texture =
-                    import_bitmap(renderer, &image).expect("Failed to import cursor bitmap");
+                    import_bitmap(renderer, &image, None).expect("Failed to import cursor bitmap");
                 pointer_images.push((frame, texture.clone()));
                 texture
             });
@@ -773,8 +808,25 @@ fn render_output_surface(
         return Ok(());
     };
 
+    if output.pending_mode_change() {
+        let current_mode = output.current_mode();
+        if let Some(drm_mode) = surface.modes.iter().find(|m| {
+            m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
+                && m.vrefresh() == (current_mode.refresh / 1000) as u32
+        }) {
+            if let Err(err) = surface.surface.use_mode(*drm_mode) {
+                error!("pending mode: {:?} failed: {:?}", current_mode, err);
+            } else {
+                surface.mode = current_mode.clone();
+            }
+        } else {
+            error!("pending mode: {:?} not found in drm", current_mode);
+        }
+    }
+
     let (dmabuf, _age) = surface.surface.next_buffer()?;
     renderer.bind(dmabuf)?;
+
     // and draw to our buffer
     match renderer
         .render(

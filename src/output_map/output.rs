@@ -1,11 +1,16 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
     utils::{Logical, Point, Rectangle, Size},
     wayland::output::{self, Mode, PhysicalProperties},
 };
+
+use image::{self, DynamicImage};
+
+use crate::render::renderer::import_bitmap;
 
 use super::layer_map::LayerMap;
 
@@ -15,6 +20,8 @@ struct Inner {
     output: output::Output,
     global: Option<Global<WlOutput>>,
     current_mode: Mode,
+    pending_mode_change: bool,
+    possible_modes: Vec<Mode>,
     scale: f64,
     location: Point<i32, Logical>,
 
@@ -22,9 +29,16 @@ struct Inner {
     userdata: UserDataMap,
 
     layer_map: LayerMap,
+
+    wallpaper: Option<DynamicImage>,
+    wallpaper_texture: Option<Gles2Texture>,
 }
 
 impl Inner {
+    pub fn possible_modes(&self) -> Vec<Mode> {
+        self.possible_modes.clone()
+    }
+
     pub fn update_mode(&mut self, mode: Mode) {
         let scale = self.scale.round() as i32;
 
@@ -34,6 +48,7 @@ impl Inner {
         self.output.set_preferred(mode);
 
         self.current_mode = mode;
+        self.pending_mode_change = true;
     }
 
     pub fn update_scale(&mut self, scale: f64) {
@@ -50,6 +65,34 @@ impl Inner {
             );
         }
     }
+
+    pub fn set_wallpaper(&mut self, path: &str) {
+        let image = image::open(path).unwrap();
+        self.wallpaper = Some(image);
+        self.wallpaper_texture = None;
+    }
+
+    pub fn get_wallpaper(&mut self, renderer: &mut Gles2Renderer) -> Option<Gles2Texture> {
+        if let Some(wallpaper_texture) = &self.wallpaper_texture {
+            Some(wallpaper_texture.clone())
+        } else {
+            if let Some(wallpaper) = &self.wallpaper {
+                if let Ok(wallpaper_texture) = import_bitmap(
+                    renderer,
+                    &wallpaper.to_rgba8(),
+                    Some(self.current_mode.size.into()),
+                ) {
+                    self.wallpaper_texture = Some(wallpaper_texture.clone());
+                    self.wallpaper = None;
+                    Some(wallpaper_texture)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +107,7 @@ impl Output {
         display: &mut Display,
         physical: PhysicalProperties,
         mode: Mode,
+        possible_modes: Vec<Mode>,
         active_workspace: String,
         logger: slog::Logger,
     ) -> Self
@@ -83,13 +127,17 @@ impl Output {
                 global: Some(global),
                 output,
                 location,
+                pending_mode_change: false,
                 current_mode: mode,
+                possible_modes,
                 scale,
 
                 active_workspace,
                 userdata: Default::default(),
 
                 layer_map: Default::default(),
+                wallpaper: None,
+                wallpaper_texture: None,
             })),
         }
     }
@@ -180,8 +228,31 @@ impl Output {
         self.inner.borrow_mut().update_mode(mode);
     }
 
+    #[allow(unused)]
+    pub fn possible_modes(&self) -> Vec<Mode> {
+        self.inner.borrow().possible_modes()
+    }
+
     pub fn update_scale(&mut self, scale: f64) {
         self.inner.borrow_mut().update_scale(scale);
+    }
+
+    pub fn set_wallpaper(&mut self, path: &str) {
+        self.inner.borrow_mut().set_wallpaper(path);
+    }
+
+    pub fn get_wallpaper(&self, renderer: &mut Gles2Renderer) -> Option<Gles2Texture> {
+        self.inner.borrow_mut().get_wallpaper(renderer)
+    }
+
+    pub fn pending_mode_change(&self) -> bool {
+        let mut inner = self.inner.borrow_mut();
+        if inner.pending_mode_change {
+            inner.pending_mode_change = false;
+            true
+        } else {
+            false
+        }
     }
 }
 
