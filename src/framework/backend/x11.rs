@@ -368,23 +368,27 @@ where
 
     event_loop
         .handle()
-        .insert_source(backend, move |event, window, state| {
+        .insert_source(backend, move |event, _, state| {
             let mut ddata = DispatchData::wrap(state);
 
             let mut surface_datas = surface_datas.borrow_mut();
-            let surface_data = surface_datas
-                .iter_mut()
-                .find(|sd| &sd.window == window)
-                .unwrap();
 
             match event {
-                X11Event::CloseRequested => {
+                X11Event::CloseRequested { .. } => {
                     let mut cb = cb.borrow_mut();
                     cb(BackendEvent::CloseCompositor {}, ddata.reborrow());
                 }
 
-                X11Event::Resized(size) => {
-                    let size = (size.w as i32, size.h as i32).into();
+                X11Event::Resized {
+                    new_size,
+                    window_id,
+                } => {
+                    let surface_data = surface_datas
+                        .iter_mut()
+                        .find(|sd| sd.window.id() == window_id)
+                        .unwrap();
+
+                    let size = (new_size.w as i32, new_size.h as i32).into();
                     let scale_factor = 1.0;
 
                     let mode = Mode {
@@ -415,12 +419,38 @@ where
                     surface_data.rerender = true;
                 }
 
-                X11Event::PresentCompleted | X11Event::Refresh => {
+                X11Event::PresentCompleted { window_id, .. }
+                | X11Event::Refresh { window_id, .. } => {
+                    let surface_data = surface_datas
+                        .iter_mut()
+                        .find(|sd| sd.window.id() == window_id)
+                        .unwrap();
+
                     surface_data.rerender = true;
                 }
 
                 X11Event::Input(event) => {
-                    (input_cb.borrow_mut())(event, &surface_data.output, ddata.reborrow());
+                    let id: Option<u32> = match &event {
+                        InputEvent::Keyboard { event } => event.window().map(|w| w.as_ref().id()),
+                        InputEvent::PointerMotionAbsolute { event } => {
+                            event.window().map(|w| w.as_ref().id())
+                        }
+                        InputEvent::PointerAxis { event } => {
+                            event.window().map(|w| w.as_ref().id())
+                        }
+                        InputEvent::PointerButton { event } => {
+                            event.window().map(|w| w.as_ref().id())
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(window_id) = id {
+                        let surface_data = surface_datas
+                            .iter_mut()
+                            .find(|sd| sd.window.id() == window_id)
+                            .unwrap();
+                        (input_cb.borrow_mut())(event, &surface_data.output, ddata.reborrow());
+                    }
                 }
             }
         })

@@ -674,9 +674,9 @@ dependencies = [
 
 [[package]]
 name = "imgui"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4edc4023dc7b1161e25ec9bcee478173f97d6f618a1d04eced2d559ce03119b4"
+checksum = "cef019eb80ce33831259255df6dab44b4a73fc2c60a209cf4647b9e69bd062aa"
 dependencies = [
  "bitflags",
  "imgui-sys",
@@ -695,9 +695,9 @@ dependencies = [
 
 [[package]]
 name = "imgui-sys"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0914d5ebaec1086300b970defc7ed71edc2cf102bdc3dd75fd51179549d4455b"
+checksum = "16468c8681a13a502c2317348bd0f3e2f3a8a9078e109ac7bbf3edb9e6610e8d"
 dependencies = [
  "cc",
  "chlorine",
@@ -1421,7 +1421,7 @@ dependencies = [
 [[package]]
 name = "smithay"
 version = "0.3.0"
-source = "git+https://github.com/PolyMeilex/smithay.git?branch=seat-ddata#bd5231593a6eb19545b8fce2b5ea79e796729bf1"
+source = "git+https://github.com/PolyMeilex/smithay.git?branch=seat-ddata#9a2e173e4f58bddaf76793f0447f654b127e8a2f"
 dependencies = [
  "appendlist",
  "bitflags",
@@ -1491,9 +1491,9 @@ checksum = "6446ced80d6c486436db5c078dde11a9f73d42b57fb273121e160b84f63d894c"
 
 [[package]]
 name = "syn"
-version = "1.0.82"
+version = "1.0.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8daf5dd0bb60cbd4137b1b587d2fc0ae729bc07cf01cd70b36a1ed5ade3b9d59"
+checksum = "ecb2e6da8ee5eb9a61068762a32fa9619cc591ceb055b3687f4cd4051ec2e06b"
 dependencies = [
  "proc-macro2",
  "quote",
