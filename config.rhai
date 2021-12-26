@@ -102,6 +102,7 @@ anodize.outputs.on_rearrange(|| {
         anodize.log.info("anodize rearrange");
         let output_x = 0;
         for output in anodize.outputs {
+            output.x = output_x;
             output_x += output.w;
             anodize.log.info("searching for mode");
         }
