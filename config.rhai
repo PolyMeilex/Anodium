@@ -76,7 +76,7 @@ anodize.keyboard.callbacks.register(|| {
 
 anodize.keyboard.callbacks.register(|| {
     for output in anodize.outputs {
-        output.set_wallpaper("bg.png");
+        output.set_wallpaper("./resources/anocube.png");
     }
 }, "Control_L", ["r"]);
 
@@ -89,7 +89,7 @@ anodize.keyboard.callbacks.register(|| {
         mode_index = 0;
     } else {
         output.update_mode(mode);
-        output.set_wallpaper("bg.png");
+        output.set_wallpaper("./resources/anocube.png");
     }
     mode_index += 1;
 }, "Control_L", ["equal"]);
