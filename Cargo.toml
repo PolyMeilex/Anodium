@@ -45,6 +45,6 @@ default = ["udev","winit", "xwayland", "x11"]
 x11 = [ "smithay/backend_x11", "x11rb"]
 
 winit = [ "smithay/backend_winit" ]
-udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_libseat", "input", "image", "xcursor" ]
+udev = [ "smithay/backend_libinput", "smithay/backend_udev", "smithay/backend_drm", "smithay/backend_gbm", "smithay/backend_session", "smithay/backend_session_logind", "input", "image", "xcursor" ]
 
 xwayland = [ "smithay/xwayland", "smithay/x11rb_event_source", "x11rb" ]
