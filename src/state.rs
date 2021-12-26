@@ -395,11 +395,12 @@ impl Anodium {
             let ui = &frame.imgui;
 
             imgui::Window::new("Workspace")
-                .size([100.0, 20.0], imgui::Condition::Always)
+                .size([200.0, 120.0], imgui::Condition::Always)
                 .position([0.0, 30.0], imgui::Condition::Always)
                 .title_bar(false)
                 .build(&ui, || {
                     ui.text(&format!("Workspace: {}", space));
+                    ui.text(&format!("Geo: {:#?}", output_geometry));
                 });
         }
 
