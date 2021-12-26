@@ -41,7 +41,7 @@ jobs:
       - name: Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
           override: true
           profile: minimal
           default: true
@@ -54,16 +54,6 @@ jobs:
           key: ${{ runner.os }}-cargo-rust_nightly-${{ hashFiles('**/Cargo.toml') }}
       - name: System dependencies
         run: sudo apt-get update; sudo apt-get install libudev-dev libgbm-dev libxkbcommon-dev libegl1-mesa-dev libwayland-dev libinput-dev libsystemd-dev libdbus-1-dev
-      - name: Downgrade to minimal dependencies
-        uses: actions-rs/cargo@v1
-        with:
-          command: update
-          args: -Z minimal-versions
-      - name: Update exceptions
-        uses: actions-rs/cargo@v1
-        with:
-          command: update
-          args: -p libdbus-sys -p calloop:0.6.1
       - name: Check
         uses: actions-rs/cargo@v1
         with:
