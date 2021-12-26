@@ -22,7 +22,8 @@ unsafe fn get_attrib_location(gl: &Gles2, program: ffi::types::GLuint, name: &st
 
 unsafe fn get_uniform_location(gl: &Gles2, program: ffi::types::GLuint, name: &str) -> Option<u32> {
     let name = CString::new(name).unwrap();
-    let uniform_location = gl.GetUniformLocation(program, name.as_ptr() as *const ffi::types::GLchar);
+    let uniform_location =
+        gl.GetUniformLocation(program, name.as_ptr() as *const ffi::types::GLchar);
     if uniform_location < 0 {
         None
     } else {
@@ -297,8 +298,8 @@ impl Renderer {
                 gl.BlendFunc(ffi::SRC_ALPHA, ffi::ONE_MINUS_SRC_ALPHA);
                 gl.UseProgram(self.program);
 
-                let shader_loc =
-                    get_uniform_location(gl, self.program, "matrix").expect("error finding matrix uniform");
+                let shader_loc = get_uniform_location(gl, self.program, "matrix")
+                    .expect("error finding matrix uniform");
 
                 gl.UniformMatrix4fv(
                     shader_loc as i32,
