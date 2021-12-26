@@ -76,7 +76,7 @@ anodize.keyboard.callbacks.register(|| {
 
 anodize.keyboard.callbacks.register(|| {
     for output in anodize.outputs {
-        output.set_wallpaper("bg.png");
+        output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     }
 }, "Control_L", ["r"]);
 
@@ -89,7 +89,7 @@ anodize.keyboard.callbacks.register(|| {
         mode_index = 0;
     } else {
         output.update_mode(mode);
-        output.set_wallpaper("bg.png");
+        output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     }
     mode_index += 1;
 }, "Control_L", ["equal"]);
@@ -120,3 +120,22 @@ anodize.outputs.on_new(|output| {
 
     output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
 });
+
+
+anodize.system.add_timeout(|| {
+    anodize.log.info("anodize wget start");
+    anodize.system.exec_read("wget -O - https://wttr.in/Moscow?format=3", |o| {
+        anodize.log.info("anodize wget end, got: " + o);
+    });
+    return true;
+}, 1000);
+
+anodize.system.add_timeout(|| {
+    anodize.log.info("anodize hwmon start");
+    anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {
+        anodize.log.info("anodize hwmon end, got: " + o);
+    });
+    return true;
+}, 250);
+
+anodize.log.info("anodize initalize end");

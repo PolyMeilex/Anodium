@@ -3,12 +3,16 @@ use rhai::{Dynamic, EvalAltResult, FnPtr};
 use smithay::reexports::calloop::LoopHandle;
 
 use std::cell::RefCell;
-use std::process::Command;
+use std::error::Error;
+use std::process::{Command, Stdio};
 use std::rc::Rc;
 use std::time::Duration;
 
+use futures::io::AsyncReadExt;
+
 use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::timer::{Timeout as TimeoutHandle, Timer, TimerHandle};
+use smithay::reexports::calloop::{futures as calloop_futures, futures::Scheduler};
 
 use crate::state::Anodium;
 
@@ -45,6 +49,8 @@ pub struct System {
     event_sender: Sender<ConfigEvent>,
     loop_handle: LoopHandle<'static, Anodium>,
     timer_handle: TimerHandle<Timeout>,
+    #[allow(unused)]
+    io_scheduler: Rc<Scheduler<(FnPtr, Result<String, Box<dyn Error>>)>>,
 }
 
 impl System {
@@ -52,19 +58,35 @@ impl System {
         event_sender: Sender<ConfigEvent>,
         loop_handle: LoopHandle<'static, Anodium>,
     ) -> Self {
-        let source: Timer<Timeout> = Timer::new().expect("Failed to create timer event source!");
-        let timer_handle = source.handle();
+        let timer_source: Timer<Timeout> =
+            Timer::new().expect("Failed to create timer event source!");
+        let timer_handle = timer_source.handle();
+
+        let (io_source, io_scheduler) = calloop_futures::executor().unwrap();
+
+        loop_handle
+            .insert_source(
+                io_source,
+                |evt: (FnPtr, Result<String, Box<dyn Error>>), _metadata, shared_data| {
+                    //TODO: execute call back on error too, pass informantion about that to callback
+                    if let Ok(result) = evt.1 {
+                        shared_data.config.execute_fnptr(evt.0.clone(), (result,));
+                    }
+                },
+            )
+            .unwrap();
 
         let system = Self {
             event_sender,
             loop_handle,
             timer_handle,
+            io_scheduler: Rc::new(io_scheduler),
         };
 
         let share_system = system.clone();
         system
             .loop_handle
-            .insert_source(source, move |timeout, _metadata, shared_data| {
+            .insert_source(timer_source, move |timeout, _metadata, shared_data| {
                 if let Ok(result) = shared_data
                     .config
                     .execute_fnptr(timeout.fnptr.clone(), ())
@@ -89,7 +111,12 @@ impl System {
 pub mod system {
     #[rhai_fn(global)]
     pub fn exec(_system: &mut System, command: &str) {
-        if let Err(e) = Command::new(command).spawn() {
+        let command_split = shell_words::split(&command).unwrap();
+
+        if let Err(e) = Command::new(&command_split[0])
+            .args(&command_split[1..])
+            .spawn()
+        {
             slog_scope::error!("failed to start command: {}, err: {:?}", command, e);
         }
     }
@@ -115,6 +142,33 @@ pub mod system {
                 system.timer_handle.cancel_timeout(&timeout_handle);
             }
         }
+    }
+
+    #[rhai_fn(global)]
+    pub fn exec_read(system: &mut System, command: String, callback: FnPtr) {
+        let command_split = shell_words::split(&command).unwrap();
+
+        let loop_handle_io = system.loop_handle.clone();
+        let async_spawn = async move {
+            let mut child = Command::new(&command_split[0])
+                .args(&command_split[1..])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()?;
+
+            let stdout = child.stdout.take().unwrap();
+            let mut reader = loop_handle_io.adapt_io(stdout)?;
+            let mut readed = String::new();
+            reader.read_to_string(&mut readed).await?;
+            //TODO: return Err when no code or code is not zero
+            let code = child.wait()?.code();
+
+            Ok(readed)
+        };
+
+        let async_wrap = async move { (callback, async_spawn.await) };
+
+        system.io_scheduler.schedule(async_wrap).unwrap();
     }
 }
 
