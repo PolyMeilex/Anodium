@@ -118,5 +118,5 @@ anodize.outputs.on_new(|output| {
         }
     }
 
-    output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+    output.set_wallpaper("./resources/anocube.png");
 });
