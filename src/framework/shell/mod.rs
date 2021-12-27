@@ -1,9 +1,10 @@
+use smithay::desktop::{PopupKind, PopupManager};
 use smithay::reexports::calloop::LoopHandle;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{Client, DispatchData, Display};
 use smithay::utils::{Logical, Point};
-use smithay::wayland::compositor::{self,  TraversalAction};
+use smithay::wayland::compositor::{self, TraversalAction};
 use smithay::wayland::seat::{GrabStartData, Seat};
 use smithay::wayland::shell::wlr_layer::{
     wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
@@ -121,6 +122,8 @@ struct Inner {
     not_mapped_list: NotMappedList,
     windows: ShellWindowList,
     layers: ShellLayerList,
+
+    popup_manager: PopupManager,
 }
 
 impl Inner {
@@ -192,6 +195,13 @@ impl Inner {
         }
 
         if let Some(popup) = self.not_mapped_list.try_popup_map(surface) {
+            self.popup_manager
+                .track_popup(PopupKind::Xdg({
+                    let PopupSurface::Xdg(xdg) = popup.popup_surface();
+                    xdg
+                }))
+                .unwrap();
+
             if let Some(parent) = popup.popup_surface().parent() {
                 let popup_surface = popup.popup_surface();
 
@@ -239,12 +249,6 @@ impl Inner {
                     states
                         .data_map
                         .insert_if_missing(|| RefCell::new(SurfaceData::default()));
-                    // let mut data = states
-                    // .data_map
-                    // .get::<RefCell<SurfaceData>>()
-                    // .unwrap()
-                    // .borrow_mut();
-                    // data.update_buffer(&mut *states.cached_state.current::<SurfaceAttributes>());
                 },
                 |_, _, _| true,
             );
@@ -257,23 +261,7 @@ impl Inner {
         self.try_update_mapped(&surface);
 
         // TODO:
-        // if let Some(popup) = self.window_map.borrow().popups().find(surface) {
-        //     let PopupKind::Xdg(ref popup) = popup.popup;
-        //     let initial_configure_sent = with_states(surface, |states| {
-        //         states
-        //             .data_map
-        //             .get::<Mutex<XdgPopupSurfaceRoleAttributes>>()
-        //             .unwrap()
-        //             .lock()
-        //             .unwrap()
-        //             .initial_configure_sent
-        //     })
-        //     .unwrap();
-        //     if !initial_configure_sent {
-        //         // TODO: properly recompute the geometry with the whole of positioner state
-        //         popup.send_configure();
-        //     }
-        // }
+        self.popup_manager.commit(&surface);
 
         if let Some(layer) = self.layers.find(&surface) {
             let initial_configure_sent = compositor::with_states(&surface, |states| {
@@ -310,6 +298,8 @@ impl ShellManager {
             not_mapped_list: Default::default(),
             windows: Default::default(),
             layers: Default::default(),
+
+            popup_manager: PopupManager::new(),
         }));
 
         // Create the compositor

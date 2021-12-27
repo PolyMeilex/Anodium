@@ -30,14 +30,19 @@ pub struct Window {
 
 impl Window {
     pub fn new(toplevel: WindowSurface, location: Point<i32, Logical>) -> Self {
+        let kind = match &toplevel {
+            WindowSurface::Xdg(xdg) => smithay::desktop::Kind::Xdg(xdg.clone()),
+        };
+
         let mut window = Window {
             inner: Rc::new(RefCell::new(Inner {
                 location,
-                bbox: Default::default(),
-                toplevel,
+                toplevel: toplevel.clone(),
 
                 animation: EnterExitAnimation::Enter(0.0),
                 popups: Vec::new(),
+
+                window: smithay::desktop::Window::new(kind),
             })),
         };
         window.self_update();
@@ -69,22 +74,42 @@ impl Window {
                 popup.render(frame, render_location, output_scale);
             }
         }
+
+        // TODO: Figure out why this is broken both in anvil and anodium.
+        // let inner = self.inner.borrow();
+        // if let Some(wl_surface) = self.surface().as_ref() {
+        //     let damage = [smithay::desktop::utils::bbox_from_surface_tree(
+        //         wl_surface,
+        //         (0, 0),
+        //     )];
+
+        //     let renderer = &mut *frame.renderer;
+        //     let frame = &mut *frame.frame;
+
+        //     smithay::desktop::draw_window(
+        //         renderer,
+        //         frame,
+        //         &inner.window,
+        //         output_scale,
+        //         render_location,
+        //         &damage,
+        //         &slog_scope::logger(),
+        //     )
+        //     .unwrap();
+        // }
     }
 }
 
 #[derive(Debug)]
 pub struct Inner {
     location: Point<i32, Logical>,
-    /// A bounding box over this window and its children.
-    ///
-    /// Used for the fast path of the check in `matching`, and as the fall-back for the window
-    /// geometry if that's not set explicitly.
-    bbox: Rectangle<i32, Logical>,
     toplevel: WindowSurface,
 
     animation: EnterExitAnimation,
 
     popups: Vec<Popup>,
+
+    window: smithay::desktop::Window,
 }
 
 impl Inner {
@@ -109,13 +134,13 @@ impl Inner {
     }
 
     pub fn bbox_in_comp_space(&self) -> Rectangle<i32, Logical> {
-        let mut bbox = self.bbox;
+        let mut bbox = self.bbox_in_window_space();
         bbox.loc += self.location;
         bbox
     }
 
     pub fn bbox_in_window_space(&self) -> Rectangle<i32, Logical> {
-        self.bbox
+        self.window.bbox()
     }
 }
 
@@ -214,15 +239,15 @@ impl Inner {
     }
 
     pub fn self_update(&mut self) {
-        if let Some(surface) = self.toplevel.get_surface() {
-            self.bbox = utils::surface_bounding_box(surface);
-        }
+        self.window.refresh();
 
         self.popups.retain(|popup| popup.popup_surface().alive());
 
         for popup in self.popups.iter_mut() {
             popup.self_update();
         }
+
+        self.bbox_in_window_space();
     }
 
     /// Returns the geometry of this window.
