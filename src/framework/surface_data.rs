@@ -1,14 +1,13 @@
 use std::cell::RefCell;
 
 use smithay::{
-    backend::renderer::buffer_dimensions,
     reexports::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
-        wayland_server::protocol::{wl_buffer, wl_shell_surface, wl_surface::WlSurface},
+        wayland_server::protocol::{wl_shell_surface, wl_surface::WlSurface},
     },
-    utils::{Logical, Physical, Point, Rectangle, Size},
+    utils::{Logical, Point, Rectangle, Size},
     wayland::{
-        compositor::{self, BufferAssignment, SurfaceAttributes},
+        compositor::{self},
         Serial,
     },
 };
@@ -17,13 +16,9 @@ use crate::utils::LogResult;
 
 #[derive(Default)]
 pub struct SurfaceData {
-    pub buffer: Option<wl_buffer::WlBuffer>,
-    pub texture: Option<Box<dyn std::any::Any + 'static>>,
     pub geometry: Option<Rectangle<i32, Logical>>,
     pub resize_state: ResizeState,
     pub move_after_resize_state: MoveAfterResizeState,
-    pub buffer_dimensions: Option<Size<i32, Physical>>,
-    pub buffer_scale: i32,
 }
 
 impl SurfaceData {
@@ -74,73 +69,6 @@ impl SurfaceData {
             cb(&mut data)
         })
         .expect("The surface is dead")
-    }
-}
-
-impl SurfaceData {
-    pub(super) fn update_buffer(&mut self, attrs: &mut SurfaceAttributes) {
-        match attrs.buffer.take() {
-            Some(BufferAssignment::NewBuffer { buffer, .. }) => {
-                // new contents
-                self.buffer_dimensions = buffer_dimensions(&buffer);
-                self.buffer_scale = attrs.buffer_scale;
-                if let Some(old_buffer) = std::mem::replace(&mut self.buffer, Some(buffer)) {
-                    old_buffer.release();
-                }
-                self.texture = None;
-            }
-            Some(BufferAssignment::Removed) => {
-                // remove the contents
-                self.buffer = None;
-                self.buffer_dimensions = None;
-                self.texture = None;
-            }
-            None => {}
-        }
-    }
-
-    /// Returns the size of the surface.
-    pub fn size(&self) -> Option<Size<i32, Logical>> {
-        self.buffer_dimensions
-            .map(|dims| dims.to_logical(self.buffer_scale))
-    }
-
-    /// Checks if the surface's input region contains the point.
-    pub fn contains_point(&self, attrs: &SurfaceAttributes, point: Point<f64, Logical>) -> bool {
-        let size = match self.size() {
-            None => return false, // If the surface has no size, it can't have an input region.
-            Some(size) => size,
-        };
-
-        let rect = Rectangle {
-            loc: (0, 0).into(),
-            size,
-        }
-        .to_f64();
-
-        // The input region is always within the surface itself, so if the surface itself doesn't contain the
-        // point we can return false.
-        if !rect.contains(point) {
-            return false;
-        }
-
-        // If there's no input region, we're done.
-        if attrs.input_region.is_none() {
-            return true;
-        }
-
-        attrs
-            .input_region
-            .as_ref()
-            .unwrap()
-            .contains(point.to_i32_floor())
-    }
-
-    /// Send the frame callback if it had been requested
-    pub fn send_frame(attrs: &mut SurfaceAttributes, time: u32) {
-        for callback in attrs.frame_callbacks.drain(..) {
-            callback.done(time);
-        }
     }
 }
 

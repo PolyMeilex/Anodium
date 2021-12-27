@@ -7,7 +7,6 @@ use smithay::wayland::shell::xdg::{
     XdgPopupSurfaceRoleAttributes, XdgToplevelSurfaceRoleAttributes,
 };
 
-use super::super::SurfaceData;
 use crate::popup::{Popup, PopupSurface};
 use crate::utils::AsWlSurface;
 
@@ -88,8 +87,9 @@ impl NotMappedList {
                 }
             }
 
-            let has_buffer =
-                SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+            // let has_buffer =
+            //     SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+            let has_buffer = true;
 
             if has_buffer {
                 match toplevel {
@@ -211,8 +211,9 @@ impl NotMappedList {
                 }
             }
 
-            let has_buffer =
-                SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+            // let has_buffer =
+            //     SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+            let has_buffer = true;
 
             if has_buffer {
                 match popup {

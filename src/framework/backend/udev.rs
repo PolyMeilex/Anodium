@@ -17,8 +17,8 @@ use smithay::{
         input::InputEvent,
         libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{
-            gles2::{Gles2Renderer, Gles2Texture},
-            Bind, Frame, ImportDma, ImportEgl, Renderer, Transform,
+            gles2::{ffi::COLOR_BUFFER_BIT, Gles2Renderer, Gles2Texture},
+            Bind, ImportDma, ImportEgl, Renderer, Transform,
         },
         session::{
             auto::{AutoSession, AutoSessionNotifier},
@@ -829,51 +829,46 @@ fn render_output_surface(
 
     // and draw to our buffer
     match renderer
-        .render(
-            surface.mode.size,
-            Transform::Flipped180, // Scanout is rotated
-            |renderer, frame| {
-                let imgui = surface.imgui.take().unwrap();
-                let mut imgui = imgui.activate().unwrap();
-                let ui = imgui.frame();
+        .render(surface.mode.size, Transform::Normal, |renderer, frame| {
+            let imgui = surface.imgui.take().unwrap();
+            let mut imgui = imgui.activate().unwrap();
+            let ui = imgui.frame();
 
-                {
-                    let mut frame = RenderFrame {
-                        transform: Transform::Flipped180,
-                        renderer,
-                        frame,
-                        imgui: &ui,
-                    };
+            {
+                let mut frame = RenderFrame {
+                    renderer,
+                    frame,
+                    imgui: &ui,
+                };
 
-                    cb(
-                        BackendEvent::OutputRender {
-                            frame: &mut frame,
-                            output,
-                            pointer_image: Some(pointer_image),
-                        },
-                        ddata,
-                    );
-                }
+                cb(
+                    BackendEvent::OutputRender {
+                        frame: &mut frame,
+                        output,
+                        pointer_image: Some(pointer_image),
+                    },
+                    ddata,
+                );
+            }
 
-                {
-                    draw_fps(&ui, 1.0, surface.fps.avg());
-                    let draw_data = ui.render();
+            {
+                draw_fps(&ui, 1.0, surface.fps.avg());
+                let draw_data = ui.render();
 
-                    renderer
-                        .with_context(|_renderer, gles| {
-                            surface
-                                .imgui_pipeline
-                                .render(Transform::Flipped180, gles, draw_data);
-                        })
-                        .unwrap();
+                renderer
+                    .with_context(|_renderer, gles| {
+                        surface
+                            .imgui_pipeline
+                            .render(Transform::Flipped180, gles, draw_data);
+                    })
+                    .unwrap();
 
-                    surface.imgui = Some(imgui.suspend());
-                }
+                surface.imgui = Some(imgui.suspend());
+            }
 
-                surface.fps.tick();
-                Ok(())
-            },
-        )
+            surface.fps.tick();
+            Ok(())
+        })
         .map_err(Into::<SwapBuffersError>::into)
         .and_then(|x| x)
         .map_err(Into::<SwapBuffersError>::into)
@@ -894,10 +889,13 @@ fn initial_render(
     renderer.bind(dmabuf)?;
     // Does not matter if we render an empty frame
     renderer
-        .render((1, 1).into(), Transform::Normal, |_renderer, frame| {
-            frame
-                .clear([0.8, 0.8, 0.9, 1.0])
-                .map_err(Into::<SwapBuffersError>::into)
+        .render((1, 1).into(), Transform::Normal, |renderer, _| {
+            renderer.with_context(|_, gl| {
+                unsafe {
+                    gl.ClearColor(0.8, 0.8, 0.9, 1.0);
+                    gl.Clear(COLOR_BUFFER_BIT);
+                };
+            })
         })
         .map_err(Into::<SwapBuffersError>::into)
         .and_then(|x| x.map_err(Into::<SwapBuffersError>::into))?;

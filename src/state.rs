@@ -10,12 +10,12 @@ use std::{
 };
 
 use smithay::{
-    backend::renderer::{gles2::Gles2Texture, Frame, Transform},
+    backend::renderer::{gles2::Gles2Texture, Frame, Texture, Transform},
     reexports::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point},
+    utils::{Logical, Point, Rectangle},
     wayland::{
         data_device::{self, DataDeviceEvent},
         output::xdg::init_xdg_output_manager,
@@ -335,11 +335,22 @@ impl Anodium {
     ) -> Result<(), smithay::backend::SwapBuffersError> {
         let (output_geometry, output_scale) = (output.geometry(), output.scale());
 
-        frame.clear([0.1, 0.1, 0.1, 1.0])?;
+        {
+            let mut damage = output_geometry;
+            damage.loc = (0, 0).into();
+
+            frame.clear(
+                [0.1, 0.1, 0.1, 1.0],
+                &[damage.to_physical(output_scale.round() as i32)],
+            )?;
+        }
 
         // Layers bellow windows
         self.draw_layers(frame, Layer::Background, output_geometry, output_scale)?;
         if let Some(wallaper) = output.get_wallpaper(frame.renderer) {
+            let mut damage = output_geometry;
+            damage.loc = (0, 0).into();
+
             frame.render_texture_at(
                 &wallaper,
                 Point::<i32, Logical>::from((0, 0))
@@ -349,18 +360,9 @@ impl Anodium {
                 1,
                 output_scale as f64,
                 Transform::Normal,
+                &[damage.to_physical(output_scale as i32)],
                 1.0,
             )?;
-            //let src = Rectangle::from_loc_and_size((0, 0), (22, 35));
-            //let dst = Rectangle::from_loc_and_size((1000, 400), (22, 35)).to_f64();
-
-            /*frame.render_texture_from_to(
-                &wallaper,
-                output_geometry.to_buffer(1),
-                dst,
-                Transform::Normal,
-                1.0,
-            )?;*/
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;
@@ -453,6 +455,8 @@ impl Anodium {
                         )?;
                     } else {
                         if let Some(pointer_image) = pointer_image {
+                            let size = pointer_image.size();
+
                             frame.render_texture_at(
                                 pointer_image,
                                 relative_ptr_location
@@ -462,6 +466,7 @@ impl Anodium {
                                 1,
                                 output_scale as f64,
                                 Transform::Normal,
+                                &[Rectangle::from_loc_and_size((0, 0), (size.w, size.h))],
                                 1.0,
                             )?;
                         }

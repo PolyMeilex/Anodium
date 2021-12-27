@@ -1,20 +1,12 @@
 #![allow(dead_code)]
 
-use std::cell::RefCell;
-
 use smithay::{
     reexports::wayland_server::protocol::wl_surface::{self, WlSurface},
     utils::{Logical, Point, Rectangle},
-    wayland::{
-        compositor::{
-            with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction,
-        },
-        shell::xdg::SurfaceCachedState,
-    },
+    wayland::{compositor::with_states, shell::xdg::SurfaceCachedState},
 };
 
 use crate::{
-    framework::surface_data::SurfaceData,
     render::{self, renderer::RenderFrame},
     utils,
 };
@@ -93,44 +85,14 @@ impl Popup {
         if !bbox.to_f64().contains(point) {
             return None;
         }
-        // need to check more carefully
-        let found = RefCell::new(None);
+
         let wl_surface = self.popup.get_surface()?;
 
-        with_surface_tree_downward(
+        smithay::desktop::utils::under_from_surface_tree(
             wl_surface,
+            point,
             self.popup.location() + parent_location,
-            |wl_surface, states, location| {
-                let mut location = *location;
-                let data = states.data_map.get::<RefCell<SurfaceData>>();
-
-                if states.role == Some("subsurface") {
-                    let current = states.cached_state.current::<SubsurfaceCachedState>();
-                    location += current.location;
-                }
-
-                let contains_the_point = data
-                    .map(|data| {
-                        data.borrow().contains_point(
-                            &*states.cached_state.current(),
-                            point - location.to_f64(),
-                        )
-                    })
-                    .unwrap_or(false);
-                if contains_the_point {
-                    *found.borrow_mut() = Some((wl_surface.clone(), location));
-                }
-
-                TraversalAction::DoChildren(location)
-            },
-            |_, _, _| {},
-            |_, _, _| {
-                // only continue if the point is not found
-                found.borrow().is_none()
-            },
-        );
-
-        found.into_inner()
+        )
     }
 
     pub fn self_update(&mut self) {

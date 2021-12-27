@@ -2,9 +2,7 @@ use smithay::{
     reexports::wayland_server::protocol::wl_surface,
     utils::{Logical, Point, Rectangle},
     wayland::{
-        compositor::{
-            with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction,
-        },
+        compositor::with_states,
         shell::wlr_layer::{self, LayerSurfaceCachedState},
     },
 };
@@ -12,7 +10,7 @@ use smithay::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::{framework::surface_data::SurfaceData, utils};
+use crate::utils;
 
 #[derive(Debug)]
 struct Inner {
@@ -73,43 +71,10 @@ impl LayerSurface {
         if !inner.bbox.to_f64().contains(point) {
             return None;
         }
-        // need to check more carefully
-        let found = RefCell::new(None);
-        if let Some(wl_surface) = inner.surface.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                inner.location,
-                |wl_surface, states, location| {
-                    let mut location = *location;
-                    let data = states.data_map.get::<RefCell<SurfaceData>>();
 
-                    if states.role == Some("subsurface") {
-                        let current = states.cached_state.current::<SubsurfaceCachedState>();
-                        location += current.location;
-                    }
+        let wl_surface = inner.surface.get_surface()?;
 
-                    let contains_the_point = data
-                        .map(|data| {
-                            data.borrow().contains_point(
-                                &*states.cached_state.current(),
-                                point - location.to_f64(),
-                            )
-                        })
-                        .unwrap_or(false);
-                    if contains_the_point {
-                        *found.borrow_mut() = Some((wl_surface.clone(), location));
-                    }
-
-                    TraversalAction::DoChildren(location)
-                },
-                |_, _, _| {},
-                |_, _, _| {
-                    // only continue if the point is not found
-                    found.borrow().is_none()
-                },
-            );
-        }
-        found.into_inner()
+        smithay::desktop::utils::under_from_surface_tree(wl_surface, point, inner.location)
     }
 
     pub fn self_update(&mut self) {

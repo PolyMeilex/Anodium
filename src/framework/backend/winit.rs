@@ -184,7 +184,6 @@ where
 
                             {
                                 let mut frame = RenderFrame {
-                                    transform: Transform::Normal,
                                     renderer,
                                     frame,
                                     imgui: &ui,
