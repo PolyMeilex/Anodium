@@ -62,7 +62,11 @@ let weather = text::widget("");
 let date = text::widget("");
 anodize.system.add_timeout(|| {
     let output = anodize.outputs[0];
+    output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+    
     let box = box::new_raw(output.w, 50, 0, output.h - 50, layout::vertical());
+    box.alpha = 0.0;
+    box.background = false;
     box.add_widget(weather.convert());
     box.add_widget(date.convert());
 
@@ -71,7 +75,7 @@ anodize.system.add_timeout(|| {
 }, 500);
 
 anodize.system.add_timeout(|| {
-    anodize.system.exec_read("wget -O - https://wttr.in/Warsaw?format=3", |o| {
+    anodize.system.exec_read("wget -O -d /dev/null - https://wttr.in/Warsaw?format=3", |o| {
         if o.status {
             weather.update(o.output);
         }

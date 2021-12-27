@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use imgui::Ui;
 use rhai::Engine;
-use rhai::{plugin::*, INT};
+use rhai::{plugin::*, FLOAT, INT};
 
 use super::widget::Widget;
 
@@ -22,6 +22,8 @@ pub struct BoxInner {
     y: u32,
     layout: Layout,
     widgets: Vec<Rc<dyn Widget>>,
+    alpha: f32,
+    background: bool,
 }
 
 #[derive(Clone)]
@@ -40,6 +42,8 @@ impl Box {
                 y,
                 layout,
                 widgets: vec![],
+                alpha: 1.0,
+                background: true,
             })),
         }
     }
@@ -51,6 +55,8 @@ impl Box {
             .position([inner.x as _, inner.y as _], imgui::Condition::Always)
             .title_bar(false)
             .resizable(false)
+            .bg_alpha(inner.alpha)
+            .draw_background(inner.background)
             .build(&ui, || {
                 for widget in &inner.widgets {
                     widget.render(ui);
@@ -113,6 +119,26 @@ pub mod r#box {
     #[rhai_fn(set = "layout", pure)]
     pub fn set_layout(r#box: &mut Box, layout: Layout) {
         r#box.inner.borrow_mut().layout = layout;
+    }
+
+    #[rhai_fn(get = "alpha", pure)]
+    pub fn alpha(r#box: &mut Box) -> INT {
+        r#box.inner.borrow_mut().alpha as _
+    }
+
+    #[rhai_fn(set = "alpha", pure)]
+    pub fn set_alpha(r#box: &mut Box, alpha: FLOAT) {
+        r#box.inner.borrow_mut().alpha = alpha as _;
+    }
+
+    #[rhai_fn(get = "background", pure)]
+    pub fn background(r#box: &mut Box) -> bool {
+        r#box.inner.borrow_mut().background
+    }
+
+    #[rhai_fn(set = "background", pure)]
+    pub fn set_background(r#box: &mut Box, background: bool) {
+        r#box.inner.borrow_mut().background = background;
     }
 
     #[rhai_fn(global)]
