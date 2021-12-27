@@ -102,6 +102,7 @@ anodize.outputs.on_rearrange(|| {
         anodize.log.info("anodize rearrange");
         let output_x = 0;
         for output in anodize.outputs {
+            output.x = output_x;
             output_x += output.w;
             anodize.log.info("searching for mode");
         }
@@ -124,8 +125,12 @@ anodize.outputs.on_new(|output| {
 
 anodize.system.add_timeout(|| {
     anodize.log.info("anodize wget start");
-    anodize.system.exec_read("wget -O - https://wttr.in/Moscow?format=3", |o| {
-        anodize.log.info("anodize wget end, got: " + o);
+    anodize.system.exec_read("wget -O - https://wttr.in/Warsaw?format=3", |o| {
+        if o.status {
+            anodize.log.info("anodize wget end, got: " + o.output);
+        } else {
+            anodize.log.info("anodize wget error, got: " + o.error);
+        }
     });
     return true;
 }, 1000);
@@ -133,9 +138,11 @@ anodize.system.add_timeout(|| {
 anodize.system.add_timeout(|| {
     anodize.log.info("anodize hwmon start");
     anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {
-        anodize.log.info("anodize hwmon end, got: " + o);
+        if o.status {
+             anodize.log.info("anodize hwmon end, got: " + o.output);
+        }
     });
     return true;
-}, 250);
+}, 1000);
 
 anodize.log.info("anodize initalize end");
