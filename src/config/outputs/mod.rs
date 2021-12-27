@@ -8,6 +8,8 @@ use smithay::wayland::output::Mode;
 
 use crate::output_map::{Output, OutputMap}; // a "prelude" import for macros
 
+pub mod shell;
+
 #[derive(Debug, Clone)]
 pub struct Modes(Vec<Mode>);
 
@@ -131,6 +133,11 @@ pub mod outputs {
         Modes(output.possible_modes())
     }
 
+    #[rhai_fn(get = "shell", pure)]
+    pub fn shell(output: &mut Output) -> shell::Shell {
+        output.shell()
+    }
+
     #[rhai_fn(set = "x", pure)]
     pub fn x(output: &mut Output, x: INT) {
         let mut location = output.location();
@@ -184,4 +191,6 @@ pub fn register(engine: &mut Engine) {
         .register_indexer_get(Outputs::get)
         .register_indexer_get(Modes::get)
         .register_iterator::<Modes>();
+
+    shell::register(engine);
 }

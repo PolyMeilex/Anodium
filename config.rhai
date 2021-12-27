@@ -58,10 +58,35 @@ anodize.keyboard.callbacks.register(|| {
 
 }, "Control_L", ["k"]);
 
-
+let weather = text::widget("");
+let date = text::widget("");
 anodize.system.add_timeout(|| {
+    let output = anodize.outputs[0];
+    let box = box::new_raw(output.w, 50, 0, output.h - 50, layout::vertical());
+    box.add_widget(weather.convert());
+    box.add_widget(date.convert());
+
+    output.shell.add_box(box);
     return false;
 }, 500);
+
+anodize.system.add_timeout(|| {
+    anodize.system.exec_read("wget -O - https://wttr.in/Warsaw?format=3", |o| {
+        if o.status {
+            weather.update(o.output);
+        }
+    });
+    return true;
+}, 1000);
+
+anodize.system.add_timeout(|| {
+    anodize.system.exec_read("date", |o| {
+        if o.status {
+             date.update(o.output);
+        }
+    });
+    return true;
+}, 1000);
 
 let b = 0;
 anodize.keyboard.callbacks.register(|| {
@@ -123,26 +148,17 @@ anodize.outputs.on_new(|output| {
 });
 
 
+
+
 anodize.system.add_timeout(|| {
-    anodize.log.info("anodize wget start");
-    anodize.system.exec_read("wget -O - https://wttr.in/Warsaw?format=3", |o| {
+    anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {
         if o.status {
-            anodize.log.info("anodize wget end, got: " + o.output);
-        } else {
-            anodize.log.info("anodize wget error, got: " + o.error);
+             //anodize.log.info("anodize hwmon end, got: " + o.output);
         }
     });
     return true;
 }, 1000);
 
-anodize.system.add_timeout(|| {
-    anodize.log.info("anodize hwmon start");
-    anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {
-        if o.status {
-             anodize.log.info("anodize hwmon end, got: " + o.output);
-        }
-    });
-    return true;
-}, 1000);
+
 
 anodize.log.info("anodize initalize end");

@@ -398,9 +398,12 @@ impl Anodium {
                 .size([100.0, 20.0], imgui::Condition::Always)
                 .position([0.0, 30.0], imgui::Condition::Always)
                 .title_bar(false)
+                .resizable(false)
                 .build(&ui, || {
                     ui.text(&format!("Workspace: {}", space));
                 });
+
+            output.render_shell(ui);
         }
 
         // Pointer Related:
