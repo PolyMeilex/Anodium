@@ -836,13 +836,14 @@ fn render_output_surface(
                 let imgui = surface.imgui.take().unwrap();
                 let mut imgui = imgui.activate().unwrap();
                 let ui = imgui.frame();
+                draw_fps(&ui, 1.0, surface.fps.avg());
 
                 {
                     let mut frame = RenderFrame {
                         transform: Transform::Flipped180,
                         renderer,
                         frame,
-                        imgui: &ui,
+                        imgui: Some((ui, &surface.imgui_pipeline)),
                     };
 
                     cb(
@@ -856,8 +857,7 @@ fn render_output_surface(
                 }
 
                 {
-                    draw_fps(&ui, 1.0, surface.fps.avg());
-                    let draw_data = ui.render();
+                    /*let draw_data = ui.render();
 
                     renderer
                         .with_context(|_renderer, gles| {
@@ -865,7 +865,7 @@ fn render_output_surface(
                                 .imgui_pipeline
                                 .render(Transform::Flipped180, gles, draw_data);
                         })
-                        .unwrap();
+                        .unwrap();*/
 
                     surface.imgui = Some(imgui.suspend());
                 }

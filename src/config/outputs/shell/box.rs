@@ -1,4 +1,3 @@
-use std::boxed::Box as StdBox;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -8,14 +7,28 @@ use rhai::{plugin::*, FLOAT, INT};
 
 use super::widget::Widget;
 
+thread_local! {
+    static BOX_ID: RefCell<i32> = RefCell::new(0);
+}
+
 #[derive(Debug, Clone)]
 pub enum Layout {
     Vertical,
     Horizontal,
 }
 
+impl Layout {
+    pub fn render(&self, ui: &Ui) {
+        match self {
+            Layout::Horizontal => ui.same_line(),
+            &Layout::Vertical => {}
+        }
+    }
+}
+
 //#[derive(Debug)]
 pub struct BoxInner {
+    id: String,
     w: u16,
     h: u16,
     x: u32,
@@ -24,6 +37,7 @@ pub struct BoxInner {
     widgets: Vec<Rc<dyn Widget>>,
     alpha: f32,
     background: bool,
+    visable: bool,
 }
 
 #[derive(Clone)]
@@ -33,35 +47,45 @@ pub struct Box {
 
 impl Box {
     pub fn new(w: u16, h: u16, x: u32, y: u32, layout: Layout) -> Self {
-        info!("new box!!!");
-        Self {
-            inner: Rc::new(RefCell::new(BoxInner {
-                w,
-                h,
-                x,
-                y,
-                layout,
-                widgets: vec![],
-                alpha: 1.0,
-                background: true,
-            })),
-        }
+        BOX_ID.with(move |id| {
+            let mut id = id.borrow_mut();
+            let r#box = Self {
+                inner: Rc::new(RefCell::new(BoxInner {
+                    id: format!("{}", id),
+                    w,
+                    h,
+                    x,
+                    y,
+                    layout,
+                    widgets: vec![],
+                    alpha: 1.0,
+                    background: true,
+                    visable: true,
+                })),
+            };
+            *id += 1;
+
+            r#box
+        })
     }
 
     pub fn render(&self, ui: &Ui) {
         let inner = self.inner.borrow();
-        imgui::Window::new("ignore")
-            .size([inner.w as _, inner.h as _], imgui::Condition::Always)
-            .position([inner.x as _, inner.y as _], imgui::Condition::Always)
-            .title_bar(false)
-            .resizable(false)
-            .bg_alpha(inner.alpha)
-            .draw_background(inner.background)
-            .build(&ui, || {
-                for widget in &inner.widgets {
-                    widget.render(ui);
-                }
-            });
+        if inner.visable {
+            imgui::Window::new(&inner.id)
+                .size([inner.w as _, inner.h as _], imgui::Condition::Always)
+                .position([inner.x as _, inner.y as _], imgui::Condition::Always)
+                .title_bar(false)
+                .resizable(false)
+                .bg_alpha(inner.alpha)
+                .draw_background(inner.background)
+                .build(&ui, || {
+                    for widget in &inner.widgets {
+                        widget.render(ui);
+                        inner.layout.render(ui);
+                    }
+                });
+        }
     }
 }
 
@@ -139,6 +163,16 @@ pub mod r#box {
     #[rhai_fn(set = "background", pure)]
     pub fn set_background(r#box: &mut Box, background: bool) {
         r#box.inner.borrow_mut().background = background;
+    }
+
+    #[rhai_fn(get = "visable", pure)]
+    pub fn visable(r#box: &mut Box) -> bool {
+        r#box.inner.borrow().visable
+    }
+
+    #[rhai_fn(set = "visable", pure)]
+    pub fn set_visable(r#box: &mut Box, visable: bool) {
+        r#box.inner.borrow_mut().visable = visable
     }
 
     #[rhai_fn(global)]

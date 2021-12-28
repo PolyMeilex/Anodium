@@ -300,13 +300,14 @@ where
                         Transform::Flipped180,
                         |renderer, frame| {
                             let ui = imgui.frame();
+                            draw_fps(&ui, 1.0, surface_data.fps.avg());
 
                             {
                                 let mut frame = RenderFrame {
                                     transform: Transform::Flipped180,
                                     renderer,
                                     frame,
-                                    imgui: &ui,
+                                    imgui: Some((ui, &surface_data.imgui_pipeline)),
                                 };
 
                                 cb(
@@ -319,9 +320,7 @@ where
                                 );
                             }
 
-                            draw_fps(&ui, 1.0, surface_data.fps.avg());
-
-                            let draw_data = ui.render();
+                            /*let draw_data = ui.render();
 
                             renderer
                                 .with_context(|_renderer, gles| {
@@ -331,7 +330,7 @@ where
                                         draw_data,
                                     );
                                 })
-                                .unwrap();
+                                .unwrap();*/
                         },
                     );
 

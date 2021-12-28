@@ -40,9 +40,7 @@ anodize.keyboard.callbacks.register_capture(|x| {
 
 }, "Control_L", ["s"], keyboard::numbers());
 
-anodize.keyboard.callbacks.register_capture(|x| {
-    anodize.log.info(x);
-}, "Control_L", ["l"], keyboard::letters());
+
 
 
 anodize.keyboard.callbacks.register(|| {
@@ -60,28 +58,46 @@ anodize.keyboard.callbacks.register(|| {
 
 let weather = text::widget("");
 let date = text::widget("");
+let logger_box = box::new_raw(700, 330, 5, 65, layout::vertical());
+let logger = logger::widget();
+logger_box.background = false;
+logger_box.add_widget(logger.convert());
+
+anodize.keyboard.callbacks.register(|| {
+    if logger_box.visable {
+        logger_box.visable = false;
+    } else {
+        logger_box.visable = true;
+    }
+}, "Control_L", ["l"]);
+
 anodize.system.add_timeout(|| {
     let output = anodize.outputs[0];
     output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     
-    let box = box::new_raw(output.w, 50, 0, output.h - 50, layout::vertical());
+    let box = box::new_raw(output.w, 50, 0, output.h - 50, layout::horizontal());
     box.alpha = 0.0;
     box.background = false;
     box.add_widget(weather.convert());
     box.add_widget(date.convert());
 
     output.shell.add_box(box);
+
+    let box = box::new_raw(output.w - 110, 50, 110, 0, layout::vertical());
+    output.shell.add_box(box);
+
+    output.shell.add_box(logger_box);
     return false;
 }, 500);
 
 anodize.system.add_timeout(|| {
-    anodize.system.exec_read("wget -O -d /dev/null - https://wttr.in/Warsaw?format=3", |o| {
+    anodize.system.exec_read("wget -o /dev/null -O - https://wttr.in/Warsaw?format=3", |o| {
         if o.status {
             weather.update(o.output);
         }
     });
     return true;
-}, 1000);
+}, 10000);
 
 anodize.system.add_timeout(|| {
     anodize.system.exec_read("date", |o| {
