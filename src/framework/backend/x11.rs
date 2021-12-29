@@ -26,10 +26,7 @@ use smithay::{
     wayland::dmabuf::init_dmabuf_global,
 };
 
-use crate::{
-    output_map::Output,
-    render::{draw_fps, renderer::RenderFrame},
-};
+use crate::{output_map::Output, render::renderer::RenderFrame};
 
 use super::{BackendEvent, BackendRequest};
 
