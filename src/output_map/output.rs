@@ -11,7 +11,7 @@ use smithay::{
 
 use image::{self, DynamicImage};
 
-use crate::config::outputs::shell::{r#box::Box, Shell};
+use crate::config::outputs::shell::Shell;
 use crate::render::renderer::import_bitmap;
 
 use super::layer_map::LayerMap;
@@ -35,6 +35,7 @@ struct Inner {
     wallpaper: Option<DynamicImage>,
     wallpaper_texture: Option<Gles2Texture>,
     shell: Shell,
+    fps: f64,
 }
 
 impl Inner {
@@ -142,6 +143,7 @@ impl Output {
                 wallpaper: None,
                 wallpaper_texture: None,
                 shell: Shell::new(),
+                fps: 0.0,
             })),
         }
     }
@@ -265,6 +267,14 @@ impl Output {
 
     pub fn shell(&self) -> Shell {
         self.inner.borrow().shell.clone()
+    }
+
+    pub fn get_fps(&self) -> f64 {
+        self.inner.borrow().fps
+    }
+
+    pub fn update_fps(&self, fps: f64) {
+        self.inner.borrow_mut().fps = fps;
     }
 }
 

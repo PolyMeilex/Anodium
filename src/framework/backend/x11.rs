@@ -300,7 +300,6 @@ where
                         Transform::Flipped180,
                         |renderer, frame| {
                             let ui = imgui.frame();
-                            draw_fps(&ui, 1.0, surface_data.fps.avg());
 
                             {
                                 let mut frame = RenderFrame {
@@ -309,6 +308,8 @@ where
                                     frame,
                                     imgui: Some((ui, &surface_data.imgui_pipeline)),
                                 };
+
+                                surface_data.output.update_fps(surface_data.fps.avg());
 
                                 cb(
                                     BackendEvent::OutputRender {

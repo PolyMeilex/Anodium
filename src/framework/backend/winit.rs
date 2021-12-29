@@ -18,7 +18,7 @@ use smithay::{
 
 use super::{BackendEvent, BackendRequest};
 
-use crate::{output_map::Output, render::renderer::RenderFrame, render::*};
+use crate::{output_map::Output, render::renderer::RenderFrame, render::*, state::Anodium};
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -111,6 +111,12 @@ where
         slog_scope::logger(),
     );
 
+    ddata
+        .get::<Anodium>()
+        .unwrap()
+        .config
+        .output_new(output.clone());
+
     cb(
         BackendEvent::OutputCreated {
             output: output.clone(),
@@ -181,7 +187,6 @@ where
                     renderer
                         .render(|renderer, frame| {
                             let ui = imgui.frame();
-                            draw_fps(&ui, 1.0, fps.avg());
 
                             {
                                 let mut frame = RenderFrame {
@@ -190,6 +195,8 @@ where
                                     frame,
                                     imgui: Some((ui, &imgui_pipeline)),
                                 };
+
+                                output.update_fps(fps.avg());
 
                                 cb(
                                     BackendEvent::OutputRender {

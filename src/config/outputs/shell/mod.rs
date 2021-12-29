@@ -6,6 +6,7 @@ use rhai::plugin::*;
 use rhai::Engine;
 
 pub mod r#box;
+mod fps;
 pub mod logger;
 mod text;
 mod widget;
@@ -56,4 +57,5 @@ pub fn register(engine: &mut Engine) {
     r#box::register(engine);
     text::register(engine);
     logger::register(engine);
+    fps::register(engine);
 }

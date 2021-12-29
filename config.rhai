@@ -75,7 +75,7 @@ anodize.keyboard.callbacks.register(|| {
 
 anodize.system.add_timeout(|| {
     let output = anodize.outputs[0];
-    output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+    //output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     
     let box = box::new_raw(output.w, 50, 0, output.h - 50, layout::horizontal());
     box.alpha = 0.0;
@@ -90,7 +90,7 @@ anodize.system.add_timeout(|| {
 
     output.shell.add_box(logger_box);
 
-    logger_box.w = output.w-110;
+    logger_box.w = output.w - 15;
     return false;
 }, 500);
 
@@ -169,6 +169,14 @@ anodize.outputs.on_new(|output| {
     }
 
     output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+
+    let fps_box = box::new_raw(65, 15, 0, 0, layout::horizontal());
+    let fps_widget = fps::widget(output);
+
+    fps_box.add_widget(fps_widget.convert());
+
+    output.shell.add_box(fps_box);
+
 });
 
 
