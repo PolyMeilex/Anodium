@@ -110,7 +110,12 @@ where
         "Unknown".into(),
         slog_scope::logger(),
     );
-
+    cb(
+        BackendEvent::RequestOutputConfigure {
+            output: output.clone(),
+        },
+        ddata.reborrow(),
+    );
     cb(
         BackendEvent::OutputCreated {
             output: output.clone(),

@@ -247,6 +247,12 @@ where
 
     for surface_data in surface_datas.iter() {
         (cb.borrow_mut())(
+            BackendEvent::RequestOutputConfigure {
+                output: surface_data.output.clone(),
+            },
+            ddata.reborrow(),
+        );
+        (cb.borrow_mut())(
             BackendEvent::OutputCreated {
                 output: surface_data.output.clone(),
             },

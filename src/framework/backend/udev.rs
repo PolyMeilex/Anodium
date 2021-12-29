@@ -59,7 +59,6 @@ use crate::{
     framework,
     output_map::Output,
     render::renderer::{import_bitmap, RenderFrame},
-    state::Anodium,
 };
 
 struct Inner {
@@ -359,7 +358,7 @@ fn scan_connectors<D: 'static>(
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 
-                    let connector_inner = inner.borrow_mut();
+                    let mut connector_inner = inner.borrow_mut();
                     let display = connector_inner.display.clone();
                     let display = &mut *display.borrow_mut();
 
@@ -398,9 +397,13 @@ fn scan_connectors<D: 'static>(
                         "Unknown".into(),
                         slog_scope::logger(),
                     );
+                    (connector_inner.cb)(
+                        BackendEvent::RequestOutputConfigure {
+                            output: output.clone(),
+                        },
+                        ddata.reborrow(),
+                    );
 
-                    let anodium = ddata.get::<Anodium>().unwrap();
-                    anodium.config.output_new(output.clone());
                     let current_mode = output.current_mode();
 
                     let mode = modes
