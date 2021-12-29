@@ -58,7 +58,7 @@ anodize.keyboard.callbacks.register(|| {
 
 let weather = widget::text("");
 let date = widget::text("");
-let logger_box = box::new_raw(700, 330, 5, 65, layout::vertical());
+let logger_box = box::new_raw(700, 330, 5, 35, layout::vertical());
 let logger = widget::logger();
 //logger.c_debug = [1.0, 0.1, 1.0, 0.5];
 
@@ -77,7 +77,7 @@ anodize.system.add_timeout(|| {
     let output = anodize.outputs[0];
     //output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     
-    let box = box::new_raw(output.w, 50, 0, output.h - 50, layout::horizontal());
+    let box = box::new_raw(output.w, 25, 0, output.h - 25, layout::horizontal());
     box.alpha = 0.0;
     box.background = false;
     box.add_widget(weather.convert());
