@@ -303,7 +303,11 @@ where
                                     transform: Transform::Flipped180,
                                     renderer,
                                     frame,
-                                    imgui: Some((ui, &surface_data.imgui_pipeline)),
+                                    imgui: Some((
+                                        ui,
+                                        &surface_data.imgui_pipeline,
+                                        Transform::Normal,
+                                    )),
                                 };
 
                                 surface_data.output.update_fps(surface_data.fps.avg());

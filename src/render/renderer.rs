@@ -10,7 +10,7 @@ use smithay::{
 pub struct RenderFrame<'a> {
     pub transform: Transform,
     pub frame: &'a mut Gles2Frame,
-    pub imgui: Option<(imgui::Ui<'a>, &'a Renderer)>,
+    pub imgui: Option<(imgui::Ui<'a>, &'a Renderer, Transform)>,
 
     pub renderer: &'a mut Gles2Renderer,
 }

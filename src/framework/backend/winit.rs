@@ -193,7 +193,7 @@ where
                                     transform: Transform::Normal,
                                     renderer,
                                     frame,
-                                    imgui: Some((ui, &imgui_pipeline)),
+                                    imgui: Some((ui, &imgui_pipeline, Transform::Normal)),
                                 };
 
                                 output.update_fps(fps.avg());

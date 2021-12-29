@@ -355,7 +355,7 @@ impl Anodium {
 
         {
             let space = output.active_workspace();
-            let (ui, pipeline) = frame.imgui.take().unwrap();
+            let (ui, pipeline, transform) = frame.imgui.take().unwrap();
 
             imgui::Window::new("Workspace")
                 .size([100.0, 20.0], imgui::Condition::Always)
@@ -373,7 +373,7 @@ impl Anodium {
             frame
                 .renderer
                 .with_context(|_renderer, gles| {
-                    pipeline.render(Transform::Normal, gles, draw_data);
+                    pipeline.render(transform, gles, draw_data);
                 })
                 .unwrap();
         }
