@@ -1,0 +1,39 @@
+use std::rc::Rc;
+
+use imgui::Ui;
+use rhai::plugin::*;
+use rhai::Engine;
+
+use crate::output_map::Output;
+
+use super::widget::Widget;
+
+#[derive(Debug, Clone)]
+pub struct CurrentWorkspace(Output);
+
+impl CurrentWorkspace {
+    pub fn new(output: Output) -> Self {
+        Self(output)
+    }
+}
+
+impl Widget for CurrentWorkspace {
+    fn render(&self, ui: &Ui) {
+        ui.text(format!("Workspace: {}", self.0.active_workspace()));
+    }
+}
+
+#[export_module]
+pub mod workspace {
+    #[rhai_fn(global)]
+    pub fn convert(current_workspace: &mut CurrentWorkspace) -> Rc<dyn Widget> {
+        Rc::new(current_workspace.clone())
+    }
+}
+
+pub fn register(engine: &mut Engine) {
+    let workspace_module = exported_module!(workspace);
+    engine
+        .register_static_module("workspace", workspace_module.into())
+        .register_type::<CurrentWorkspace>();
+}

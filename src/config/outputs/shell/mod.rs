@@ -10,6 +10,7 @@ mod fps;
 pub mod logger;
 mod text;
 mod widget;
+mod workspace;
 
 #[derive(Clone)]
 pub struct Shell {
@@ -59,4 +60,5 @@ pub fn register(engine: &mut Engine) {
     text::register(engine);
     logger::register(engine);
     fps::register(engine);
+    workspace::register(engine);
 }

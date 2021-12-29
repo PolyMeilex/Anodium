@@ -85,9 +85,6 @@ anodize.system.add_timeout(|| {
 
     output.shell.add_box(box);
 
-    let box = box::new_raw(output.w - 110, 50, 110, 0, layout::vertical());
-    output.shell.add_box(box);
-
     output.shell.add_box(logger_box);
 
     logger_box.w = output.w - 15;
@@ -175,7 +172,13 @@ anodize.outputs.on_new(|output| {
 
     fps_box.add_widget(fps_widget.convert());
 
+    let current_workspace_box = box::new_raw(100, 15, 0, 30, layout::horizontal());
+    let current_workspace_widget = widget::current_workspace(output);
+
+    current_workspace_box.add_widget(current_workspace_widget.convert());
+
     output.shell.add_box(fps_box);
+    output.shell.add_box(current_workspace_box);
 
 });
 
