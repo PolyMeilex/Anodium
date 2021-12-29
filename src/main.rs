@@ -36,7 +36,7 @@ use smithay::reexports::calloop::EventLoop;
 use std::sync::atomic::Ordering;
 
 fn main() {
-    std::env::set_var("RUST_LOG", "debug,smithay=error");
+    std::env::set_var("RUST_LOG", "trace,smithay=error");
     let terminal_drain = slog_async::Async::default(slog_envlogger::new(
         slog_term::CompactFormat::new(slog_term::TermDecorator::new().stderr().build())
             .build()
@@ -68,6 +68,7 @@ fn main() {
 }
 
 fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
+    trace!("trace test");
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {

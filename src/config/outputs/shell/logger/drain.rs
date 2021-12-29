@@ -15,7 +15,7 @@ use lazy_static::lazy_static;
 const BUFFER_SIZE: usize = 16;
 
 lazy_static! {
-    pub static ref BUFFER: Mutex<VecDeque<String>> =
+    pub static ref BUFFER: Mutex<VecDeque<(Level, String)>> =
         Mutex::new(VecDeque::with_capacity(BUFFER_SIZE));
 }
 
@@ -84,11 +84,11 @@ impl slog::Drain for ShellDrain {
         let mut field_serializer = serializer.field_serializer();
         info.kv().serialize(info, &mut field_serializer)?;
 
-        let data = serializer.end(false)?;
+        let data = serializer.end()?;
 
         let mut buffer = BUFFER.lock().unwrap();
 
-        buffer.push_front(data);
+        buffer.push_front((info.level(), data));
         buffer.truncate(BUFFER_SIZE);
 
         Ok(())
@@ -122,7 +122,6 @@ impl ShellDrainBuilder {
 
     pub fn default_tags(self) -> Self {
         self.add_tag_kv(o!(
-            "level" => FnValue(move |rinfo| rinfo.level().as_usize()),
             "msg" => PushFnValue(move |record, ser| ser.emit(record.msg())),
             "mod" => FnValue(move |rinfo| rinfo.module()),
         ))

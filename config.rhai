@@ -60,6 +60,8 @@ let weather = text::widget("");
 let date = text::widget("");
 let logger_box = box::new_raw(700, 330, 5, 65, layout::vertical());
 let logger = logger::widget();
+//logger.c_debug = [1.0, 0.1, 1.0, 0.5];
+
 logger_box.background = false;
 logger_box.add_widget(logger.convert());
 

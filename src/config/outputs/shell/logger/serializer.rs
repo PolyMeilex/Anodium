@@ -2,31 +2,26 @@ use slog::Key;
 use std::fmt;
 use std::fmt::Write;
 
-#[doc(hidden)]
-// ShellSerializer is only exported to use it in benchmarks. It is not considered
-// stable API.
-// Reference: https://docs.influxdata.com/influxdb/v1.8/write_protocols/line_protocol_tutorial/
 pub struct ShellSerializer {
     data: String,
 }
 
 impl ShellSerializer {
     pub fn start(len: Option<usize>) -> Result<Self, slog::Error> {
-        let mut data = String::with_capacity(len.unwrap_or(120));
+        let data = String::with_capacity(len.unwrap_or(120));
 
         Ok(ShellSerializer { data })
     }
 
-    pub fn tag_serializer(&mut self) -> TelegrafSocketTagSerializer {
-        TelegrafSocketTagSerializer {
+    pub fn tag_serializer(&mut self) -> ShellSocketTagSerializer {
+        ShellSocketTagSerializer {
             data: &mut self.data,
         }
     }
 
-    pub fn field_serializer(&mut self) -> TelegrafSocketFieldSerializer {
-        TelegrafSocketFieldSerializer {
+    pub fn field_serializer(&mut self) -> ShellSocketFieldSerializer {
+        ShellSocketFieldSerializer {
             data: &mut self.data,
-            skip_comma: true,
         }
     }
 
@@ -34,18 +29,14 @@ impl ShellSerializer {
         self.data.write_char(' ').map_err(|e| e.into())
     }
 
-    pub fn end(self, insert_dummy_field: bool) -> Result<String, slog::Error> {
+    pub fn end(self) -> Result<String, slog::Error> {
         let mut data = self.data;
-        if insert_dummy_field {
-            // The log statement contains no field, so insert a dummy field
-            data.write_fmt(format_args!("_dummy=1i"))?;
-        }
         data.write_char('\n')?;
         Ok(data)
     }
 }
 
-pub struct TelegrafSocketTagSerializer<'a> {
+pub struct ShellSocketTagSerializer<'a> {
     data: &'a mut String,
 }
 
@@ -59,7 +50,7 @@ macro_rules! emit_m {
     };
 }
 
-impl<'a> slog::Serializer for TelegrafSocketTagSerializer<'a> {
+impl<'a> slog::Serializer for ShellSocketTagSerializer<'a> {
     emit_m!(emit_u8, u8);
     emit_m!(emit_i8, i8);
     emit_m!(emit_u16, u16);
@@ -93,38 +84,25 @@ impl<'a> slog::Serializer for TelegrafSocketTagSerializer<'a> {
     emit_m!(emit_arguments, &fmt::Arguments);
 }
 
-pub struct TelegrafSocketFieldSerializer<'a> {
+pub struct ShellSocketFieldSerializer<'a> {
     data: &'a mut String,
-    pub skip_comma: bool,
 }
 
-impl<'a> TelegrafSocketFieldSerializer<'a> {
-    fn maybe_write_comma(&mut self) -> slog::Result {
-        if self.skip_comma {
-            self.skip_comma = false;
-        } else {
-            self.data.write_char(',')?;
-        }
-
-        Ok(())
-    }
-
+impl<'a> ShellSocketFieldSerializer<'a> {
     fn write_int(&mut self, key: Key, integer: i64) -> slog::Result {
-        self.maybe_write_comma()?;
         self.data
             .write_fmt(format_args!("{}={}i", key, integer))
             .map_err(|e| e.into())
     }
 
     fn write_float(&mut self, key: Key, float: f64) -> slog::Result {
-        self.maybe_write_comma()?;
         self.data
             .write_fmt(format_args!("{}={}", key, float))
             .map_err(|e| e.into())
     }
 }
 
-impl<'a> slog::Serializer for TelegrafSocketFieldSerializer<'a> {
+impl<'a> slog::Serializer for ShellSocketFieldSerializer<'a> {
     fn emit_u8(&mut self, key: Key, val: u8) -> slog::Result {
         self.write_int(key, val as i64)
     }
@@ -174,7 +152,6 @@ impl<'a> slog::Serializer for TelegrafSocketFieldSerializer<'a> {
     }
 
     fn emit_bool(&mut self, key: Key, val: bool) -> slog::Result {
-        self.maybe_write_comma()?;
         if val {
             self.data
                 .write_fmt(format_args!("{}=t", key))
@@ -187,14 +164,12 @@ impl<'a> slog::Serializer for TelegrafSocketFieldSerializer<'a> {
     }
 
     fn emit_char(&mut self, key: Key, val: char) -> slog::Result {
-        self.maybe_write_comma()?;
         self.data
             .write_fmt(format_args!(r#"{}="{}""#, key, val))
             .map_err(|e| e.into())
     }
 
     fn emit_str(&mut self, key: Key, val: &str) -> slog::Result {
-        self.maybe_write_comma()?;
         self.data
             .write_fmt(format_args!(r#"{}="{}""#, key, val))
             .map_err(|e| e.into())
@@ -202,7 +177,6 @@ impl<'a> slog::Serializer for TelegrafSocketFieldSerializer<'a> {
 
     // Serialize '()' as '0'
     fn emit_unit(&mut self, key: Key) -> slog::Result {
-        self.maybe_write_comma()?;
         self.data
             .write_fmt(format_args!("{}=0", key))
             .map_err(|e| e.into())
@@ -210,14 +184,12 @@ impl<'a> slog::Serializer for TelegrafSocketFieldSerializer<'a> {
 
     // Serialize 'None' as 'false'
     fn emit_none(&mut self, key: Key) -> slog::Result {
-        self.maybe_write_comma()?;
         self.data
             .write_fmt(format_args!("{}=f", key))
             .map_err(|e| e.into())
     }
 
     fn emit_arguments(&mut self, key: Key, val: &fmt::Arguments) -> slog::Result {
-        self.maybe_write_comma()?;
         self.data
             .write_fmt(format_args!("{}=\"{}\"", key, val))
             .map_err(|e| e.into())
