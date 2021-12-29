@@ -18,7 +18,7 @@ use smithay::{
 
 use super::{BackendEvent, BackendRequest};
 
-use crate::{output_map::Output, render::renderer::RenderFrame, state::Anodium};
+use crate::{output_map::Output, render::renderer::RenderFrame};
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -110,12 +110,6 @@ where
         "Unknown".into(),
         slog_scope::logger(),
     );
-
-    ddata
-        .get::<Anodium>()
-        .unwrap()
-        .config
-        .output_new(output.clone());
 
     cb(
         BackendEvent::OutputCreated {

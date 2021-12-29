@@ -6,6 +6,8 @@ impl Anodium {
     pub fn handle_backend_event(&mut self, event: BackendEvent) {
         match event {
             BackendEvent::OutputCreated { mut output } => {
+                self.config.output_new(output.clone());
+
                 info!("OutputCreated: {}", output.name());
                 let id = self.workspaces.len() + 1;
                 let id = format!("{}", id);
