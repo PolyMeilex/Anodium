@@ -1,6 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use imgui::Ui;
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
@@ -10,6 +11,7 @@ use smithay::{
 
 use image::{self, DynamicImage};
 
+use crate::config::outputs::shell::Shell;
 use crate::render::renderer::import_bitmap;
 
 use super::layer_map::LayerMap;
@@ -32,6 +34,8 @@ struct Inner {
 
     wallpaper: Option<DynamicImage>,
     wallpaper_texture: Option<Gles2Texture>,
+    shell: Shell,
+    fps: f64,
 }
 
 impl Inner {
@@ -138,6 +142,8 @@ impl Output {
                 layer_map: Default::default(),
                 wallpaper: None,
                 wallpaper_texture: None,
+                shell: Shell::new(),
+                fps: 0.0,
             })),
         }
     }
@@ -245,6 +251,10 @@ impl Output {
         self.inner.borrow_mut().get_wallpaper(renderer)
     }
 
+    pub fn render_shell(&self, ui: &Ui) {
+        self.inner.borrow().shell.render(ui);
+    }
+
     pub fn pending_mode_change(&self) -> bool {
         let mut inner = self.inner.borrow_mut();
         if inner.pending_mode_change {
@@ -253,6 +263,18 @@ impl Output {
         } else {
             false
         }
+    }
+
+    pub fn shell(&self) -> Shell {
+        self.inner.borrow().shell.clone()
+    }
+
+    pub fn get_fps(&self) -> f64 {
+        self.inner.borrow().fps
+    }
+
+    pub fn update_fps(&self, fps: f64) {
+        self.inner.borrow_mut().fps = fps;
     }
 }
 

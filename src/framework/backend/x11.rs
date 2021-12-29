@@ -26,10 +26,7 @@ use smithay::{
     wayland::dmabuf::init_dmabuf_global,
 };
 
-use crate::{
-    output_map::Output,
-    render::{draw_fps, renderer::RenderFrame},
-};
+use crate::{output_map::Output, render::renderer::RenderFrame};
 
 use super::{BackendEvent, BackendRequest};
 
@@ -250,6 +247,12 @@ where
 
     for surface_data in surface_datas.iter() {
         (cb.borrow_mut())(
+            BackendEvent::RequestOutputConfigure {
+                output: surface_data.output.clone(),
+            },
+            ddata.reborrow(),
+        );
+        (cb.borrow_mut())(
             BackendEvent::OutputCreated {
                 output: surface_data.output.clone(),
             },
@@ -306,8 +309,10 @@ where
                                     transform: Transform::Flipped180,
                                     renderer,
                                     frame,
-                                    imgui: &ui,
+                                    imgui: Some((ui, &surface_data.imgui_pipeline)),
                                 };
+
+                                surface_data.output.update_fps(surface_data.fps.avg());
 
                                 cb(
                                     BackendEvent::OutputRender {
@@ -318,20 +323,6 @@ where
                                     ddata.reborrow(),
                                 );
                             }
-
-                            draw_fps(&ui, 1.0, surface_data.fps.avg());
-
-                            let draw_data = ui.render();
-
-                            renderer
-                                .with_context(|_renderer, gles| {
-                                    surface_data.imgui_pipeline.render(
-                                        Transform::Flipped180,
-                                        gles,
-                                        draw_data,
-                                    );
-                                })
-                                .unwrap();
                         },
                     );
 

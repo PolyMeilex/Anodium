@@ -59,8 +59,6 @@ use crate::{
     framework,
     output_map::Output,
     render::renderer::{import_bitmap, RenderFrame},
-    render::*,
-    state::Anodium,
 };
 
 struct Inner {
@@ -360,7 +358,7 @@ fn scan_connectors<D: 'static>(
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 
-                    let connector_inner = inner.borrow_mut();
+                    let mut connector_inner = inner.borrow_mut();
                     let display = connector_inner.display.clone();
                     let display = &mut *display.borrow_mut();
 
@@ -399,9 +397,13 @@ fn scan_connectors<D: 'static>(
                         "Unknown".into(),
                         slog_scope::logger(),
                     );
+                    (connector_inner.cb)(
+                        BackendEvent::RequestOutputConfigure {
+                            output: output.clone(),
+                        },
+                        ddata.reborrow(),
+                    );
 
-                    let anodium = ddata.get::<Anodium>().unwrap();
-                    anodium.config.output_new(output.clone());
                     let current_mode = output.current_mode();
 
                     let mode = modes
@@ -842,8 +844,10 @@ fn render_output_surface(
                         transform: Transform::Flipped180,
                         renderer,
                         frame,
-                        imgui: &ui,
+                        imgui: Some((ui, &surface.imgui_pipeline)),
                     };
+
+                    output.update_fps(surface.fps.avg());
 
                     cb(
                         BackendEvent::OutputRender {
@@ -856,17 +860,6 @@ fn render_output_surface(
                 }
 
                 {
-                    draw_fps(&ui, 1.0, surface.fps.avg());
-                    let draw_data = ui.render();
-
-                    renderer
-                        .with_context(|_renderer, gles| {
-                            surface
-                                .imgui_pipeline
-                                .render(Transform::Flipped180, gles, draw_data);
-                        })
-                        .unwrap();
-
                     surface.imgui = Some(imgui.suspend());
                 }
 

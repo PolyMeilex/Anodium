@@ -40,9 +40,7 @@ anodize.keyboard.callbacks.register_capture(|x| {
 
 }, "Control_L", ["s"], keyboard::numbers());
 
-anodize.keyboard.callbacks.register_capture(|x| {
-    anodize.log.info(x);
-}, "Control_L", ["l"], keyboard::letters());
+
 
 
 anodize.keyboard.callbacks.register(|| {
@@ -58,10 +56,58 @@ anodize.keyboard.callbacks.register(|| {
 
 }, "Control_L", ["k"]);
 
+let weather = widget::text("");
+let date = widget::text("");
+let logger_box = box::new_raw(700, 330, 5, 35, layout::vertical());
+let logger = widget::logger();
+//logger.c_debug = [1.0, 0.1, 1.0, 0.5];
+
+logger_box.background = false;
+logger_box.add_widget(logger.convert());
+
+anodize.keyboard.callbacks.register(|| {
+    if logger_box.visable {
+        logger_box.visable = false;
+    } else {
+        logger_box.visable = true;
+    }
+}, "Control_L", ["l"]);
 
 anodize.system.add_timeout(|| {
+    let output = anodize.outputs[0];
+    //output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+    
+    let box = box::new_raw(output.w, 25, 0, output.h - 25, layout::horizontal());
+    box.alpha = 0.0;
+    box.background = false;
+    box.add_widget(weather.convert());
+    box.add_widget(date.convert());
+
+    output.shell.add_box(box);
+
+    output.shell.add_box(logger_box);
+
+    logger_box.w = output.w - 15;
     return false;
 }, 500);
+
+anodize.system.add_timeout(|| {
+    anodize.system.exec_read("wget -o /dev/null -O - https://wttr.in/Warsaw?format=3", |o| {
+        if o.status {
+            weather.update(o.output);
+        }
+    });
+    return true;
+}, 10000);
+
+anodize.system.add_timeout(|| {
+    anodize.system.exec_read("date", |o| {
+        if o.status {
+             date.update(o.output);
+        }
+    });
+    return true;
+}, 1000);
 
 let b = 0;
 anodize.keyboard.callbacks.register(|| {
@@ -120,4 +166,35 @@ anodize.outputs.on_new(|output| {
     }
 
     output.set_wallpaper("./resources/anocube.png");
+
+    let top_box = box::new_raw(output.w, 15, 0, 0, layout::horizontal());
+    let fps_widget = widget::fps(output);
+
+    top_box.add_widget(fps_widget.convert());
+
+    let current_workspace_widget = widget::current_workspace(output);
+
+    top_box.add_widget(current_workspace_widget.convert());
+
+    let output_geometry_widget = widget::output_geometry(output);
+
+    top_box.add_widget(output_geometry_widget.convert());
+
+    output.shell.add_box(top_box);
 });
+
+
+
+
+anodize.system.add_timeout(|| {
+    anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {
+        if o.status {
+             //anodize.log.info("anodize hwmon end, got: " + o.output);
+        }
+    });
+    return true;
+}, 1000);
+
+
+
+anodize.log.info("anodize initalize end");

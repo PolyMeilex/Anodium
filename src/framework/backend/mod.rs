@@ -19,6 +19,9 @@ use crate::render::renderer::RenderFrame;
 use crate::state::Anodium;
 
 pub enum BackendEvent<'a, 'frame> {
+    RequestOutputConfigure {
+        output: Output,
+    },
     OutputCreated {
         output: Output,
     },

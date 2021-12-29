@@ -270,14 +270,3 @@ pub fn draw_dnd_icon(
     }
     draw_surface_tree(frame, surface, location, output_scale)
 }
-
-// TODO: Move this to diferent module, this is not wayland specyfic
-pub fn draw_fps(ui: &imgui::Ui, _output_scale: f64, value: f64) {
-    imgui::Window::new("FPS")
-        .size([50.0, 20.0], imgui::Condition::Always)
-        .position([0.0, 0.0], imgui::Condition::Always)
-        .title_bar(false)
-        .build(ui, || {
-            ui.text(&format!("{}FPS", value as u32));
-        });
-}

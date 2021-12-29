@@ -18,7 +18,7 @@ use smithay::{
 
 use super::{BackendEvent, BackendRequest};
 
-use crate::{output_map::Output, render::renderer::RenderFrame, render::*};
+use crate::{output_map::Output, render::renderer::RenderFrame};
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -110,7 +110,12 @@ where
         "Unknown".into(),
         slog_scope::logger(),
     );
-
+    cb(
+        BackendEvent::RequestOutputConfigure {
+            output: output.clone(),
+        },
+        ddata.reborrow(),
+    );
     cb(
         BackendEvent::OutputCreated {
             output: output.clone(),
@@ -187,8 +192,10 @@ where
                                     transform: Transform::Normal,
                                     renderer,
                                     frame,
-                                    imgui: &ui,
+                                    imgui: Some((ui, &imgui_pipeline)),
                                 };
+
+                                output.update_fps(fps.avg());
 
                                 cb(
                                     BackendEvent::OutputRender {
@@ -199,16 +206,6 @@ where
                                     ddata.reborrow(),
                                 );
                             }
-
-                            draw_fps(&ui, 1.0, fps.avg());
-
-                            let draw_data = ui.render();
-
-                            renderer
-                                .with_context(|_renderer, gles| {
-                                    imgui_pipeline.render(Transform::Normal, gles, draw_data);
-                                })
-                                .unwrap();
                         })
                         .unwrap();
 

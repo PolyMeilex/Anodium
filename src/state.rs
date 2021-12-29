@@ -351,16 +351,22 @@ impl Anodium {
                 Transform::Normal,
                 1.0,
             )?;
-            //let src = Rectangle::from_loc_and_size((0, 0), (22, 35));
-            //let dst = Rectangle::from_loc_and_size((1000, 400), (22, 35)).to_f64();
+        }
 
-            /*frame.render_texture_from_to(
-                &wallaper,
-                output_geometry.to_buffer(1),
-                dst,
-                Transform::Normal,
-                1.0,
-            )?;*/
+        {
+            let (ui, pipeline) = frame.imgui.take().unwrap();
+
+            output.render_shell(&ui);
+
+            let draw_data = ui.render();
+            let transform = frame.transform;
+
+            frame
+                .renderer
+                .with_context(|_renderer, gles| {
+                    pipeline.render(transform, gles, draw_data);
+                })
+                .unwrap();
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;
@@ -389,20 +395,6 @@ impl Anodium {
         //         );
         //     }
         // }
-
-        {
-            let space = output.active_workspace();
-            let ui = &frame.imgui;
-
-            imgui::Window::new("Workspace")
-                .size([200.0, 120.0], imgui::Condition::Always)
-                .position([0.0, 30.0], imgui::Condition::Always)
-                .title_bar(false)
-                .build(&ui, || {
-                    ui.text(&format!("Workspace: {}", space));
-                    ui.text(&format!("Geo: {:#?}", output_geometry));
-                });
-        }
 
         // Pointer Related:
         if output_geometry

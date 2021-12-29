@@ -8,7 +8,7 @@ mod anodize;
 pub mod eventloop;
 pub mod keyboard;
 mod log;
-mod outputs;
+pub mod outputs;
 mod system;
 mod windows;
 mod workspace;
