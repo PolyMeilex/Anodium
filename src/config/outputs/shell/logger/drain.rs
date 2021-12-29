@@ -10,6 +10,8 @@ use std::collections::VecDeque;
 use std::io;
 use std::sync::Mutex;
 
+use chrono::prelude::*;
+
 use lazy_static::lazy_static;
 
 const BUFFER_SIZE: usize = 16;
@@ -86,6 +88,8 @@ impl slog::Drain for ShellDrain {
 
         let data = serializer.end()?;
 
+        let data = format!("[{}] {}", chrono::Local::now().format("%H:%M:%S.%3f"), data);
+
         let mut buffer = BUFFER.lock().unwrap();
 
         buffer.push_front((info.level(), data));
@@ -124,6 +128,7 @@ impl ShellDrainBuilder {
         self.add_tag_kv(o!(
             "msg" => PushFnValue(move |record, ser| ser.emit(record.msg())),
             "mod" => FnValue(move |rinfo| rinfo.module()),
+
         ))
     }
 }

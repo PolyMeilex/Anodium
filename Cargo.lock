@@ -54,6 +54,7 @@ dependencies = [
  "bitflags",
  "calloop 0.9.1",
  "cgmath",
+ "chrono",
  "fps_ticker",
  "futures",
  "generational-arena",

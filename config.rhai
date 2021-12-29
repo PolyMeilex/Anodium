@@ -89,6 +89,8 @@ anodize.system.add_timeout(|| {
     output.shell.add_box(box);
 
     output.shell.add_box(logger_box);
+
+    logger_box.w = output.w-110;
     return false;
 }, 500);
 
