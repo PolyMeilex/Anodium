@@ -1,5 +1,8 @@
 use smithay::{
-    backend::input::{ButtonState, MouseButton},
+    backend::{
+        input::{ButtonState, MouseButton},
+        SwapBuffersError,
+    },
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point, Rectangle},
     wayland::{
@@ -8,8 +11,8 @@ use smithay::{
     },
 };
 
-use crate::framework::surface_data::ResizeEdge;
 use crate::window::{Window, WindowSurface};
+use crate::{framework::surface_data::ResizeEdge, render::renderer::RenderFrame};
 
 pub mod floating;
 pub mod tiling;
@@ -65,6 +68,26 @@ pub trait Positioner: std::fmt::Debug {
 
     fn send_frames(&self, time: u32) {}
     fn update(&mut self, delta: f64) {}
+
+    fn draw_windows(
+        &self,
+        frame: &mut RenderFrame,
+        output_rect: Rectangle<i32, Logical>,
+        output_scale: f64,
+    ) -> Result<(), SwapBuffersError> {
+        let mut render = move |window: &Window| {
+            // skip windows that do not overlap with a given output
+            if !output_rect.overlaps(window.bbox_in_comp_space()) {
+                return;
+            }
+
+            window.render(frame, output_rect.loc, output_scale);
+        };
+
+        self.with_windows_rev(&mut render);
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

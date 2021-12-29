@@ -122,7 +122,7 @@ anodize.keyboard.callbacks.register(|| {
 
 anodize.keyboard.callbacks.register(|| {
     for output in anodize.outputs {
-        output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+        output.set_wallpaper("./resources/anocube.png");
     }
 }, "Control_L", ["r"]);
 
@@ -135,7 +135,7 @@ anodize.keyboard.callbacks.register(|| {
         mode_index = 0;
     } else {
         output.update_mode(mode);
-        output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+        output.set_wallpaper("./resources/anocube.png");
     }
     mode_index += 1;
 }, "Control_L", ["equal"]);
@@ -165,7 +165,7 @@ anodize.outputs.on_new(|output| {
         }
     }
 
-    output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+    output.set_wallpaper("./resources/anocube.png");
 
     let fps_box = box::new_raw(65, 15, 0, 0, layout::horizontal());
     let fps_widget = widget::fps(output);

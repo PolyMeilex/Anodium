@@ -21,10 +21,7 @@ use smithay::{
     },
 };
 
-use crate::{
-    framework::surface_data::SurfaceData, render::renderer::RenderFrame, state::Anodium,
-    window::Window,
-};
+use crate::{framework::surface_data::SurfaceData, render::renderer::RenderFrame, state::Anodium};
 
 struct BufferTextures<T> {
     buffer: Option<wl_buffer::WlBuffer>,
@@ -187,22 +184,16 @@ impl Anodium {
         output_rect: Rectangle<i32, Logical>,
         output_scale: f64,
     ) -> Result<(), SwapBuffersError> {
-        let mut render = move |window: &Window| {
-            // skip windows that do not overlap with a given output
-            if !output_rect.overlaps(window.bbox_in_comp_space()) {
-                return;
-            }
-
-            window.render(frame, output_rect.loc, output_scale);
-        };
-
         // redraw the frame, in a simple but inneficient way
         for workspace in self.visible_workspaces() {
-            workspace.with_windows_rev(&mut |window| render(window))
+            workspace.draw_windows(frame, output_rect, output_scale)?;
         }
 
         if let Some(window) = self.grabed_window.as_ref() {
-            render(window);
+            // skip windows that do not overlap with a given output
+            if output_rect.overlaps(window.bbox_in_comp_space()) {
+                window.render(frame, output_rect.loc, output_scale);
+            }
         }
 
         Ok(())

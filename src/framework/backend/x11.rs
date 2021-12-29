@@ -349,8 +349,6 @@ where
                 }
 
                 cb(BackendEvent::SendFrames, ddata);
-
-                timer_handle.add_timeout(Duration::from_millis(16), ());
             }
         })
         .unwrap();
@@ -407,6 +405,7 @@ where
                     );
 
                     surface_data.rerender = true;
+                    timer_handle.add_timeout(Duration::ZERO, ());
                 }
 
                 X11Event::PresentCompleted { window_id, .. }
@@ -417,6 +416,7 @@ where
                         .unwrap();
 
                     surface_data.rerender = true;
+                    timer_handle.add_timeout(Duration::ZERO, ());
                 }
 
                 X11Event::Input(event) => {
