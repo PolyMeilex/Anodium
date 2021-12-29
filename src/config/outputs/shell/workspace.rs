@@ -34,6 +34,6 @@ pub mod workspace {
 pub fn register(engine: &mut Engine) {
     let workspace_module = exported_module!(workspace);
     engine
-        .register_static_module("workspace", workspace_module.into())
+        .register_global_module(workspace_module.into())
         .register_type::<CurrentWorkspace>();
 }
