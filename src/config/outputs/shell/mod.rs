@@ -54,6 +54,7 @@ pub fn register(engine: &mut Engine) {
         .register_static_module("shell", shell_module.into())
         .register_type::<Shell>();
 
+    widget::register(engine);
     r#box::register(engine);
     text::register(engine);
     logger::register(engine);

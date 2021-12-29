@@ -25,10 +25,6 @@ impl Widget for Fps {
 
 #[export_module]
 pub mod fps {
-    pub fn widget(output: Output) -> Fps {
-        Fps::new(output)
-    }
-
     #[rhai_fn(global)]
     pub fn convert(fps: &mut Fps) -> Rc<dyn Widget> {
         Rc::new(fps.clone())

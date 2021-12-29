@@ -56,10 +56,10 @@ anodize.keyboard.callbacks.register(|| {
 
 }, "Control_L", ["k"]);
 
-let weather = text::widget("");
-let date = text::widget("");
+let weather = widget::text("");
+let date = widget::text("");
 let logger_box = box::new_raw(700, 330, 5, 65, layout::vertical());
-let logger = logger::widget();
+let logger = widget::logger();
 //logger.c_debug = [1.0, 0.1, 1.0, 0.5];
 
 logger_box.background = false;
@@ -171,7 +171,7 @@ anodize.outputs.on_new(|output| {
     output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
 
     let fps_box = box::new_raw(65, 15, 0, 0, layout::horizontal());
-    let fps_widget = fps::widget(output);
+    let fps_widget = widget::fps(output);
 
     fps_box.add_widget(fps_widget.convert());
 

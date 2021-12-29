@@ -18,7 +18,7 @@ use smithay::{
 
 use super::{BackendEvent, BackendRequest};
 
-use crate::{output_map::Output, render::renderer::RenderFrame, render::*, state::Anodium};
+use crate::{output_map::Output, render::renderer::RenderFrame, state::Anodium};
 
 pub const OUTPUT_NAME: &str = "winit";
 

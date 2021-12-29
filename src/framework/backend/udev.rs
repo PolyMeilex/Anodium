@@ -59,7 +59,6 @@ use crate::{
     framework,
     output_map::Output,
     render::renderer::{import_bitmap, RenderFrame},
-    render::*,
     state::Anodium,
 };
 

@@ -10,8 +10,6 @@ use std::collections::VecDeque;
 use std::io;
 use std::sync::Mutex;
 
-use chrono::prelude::*;
-
 use lazy_static::lazy_static;
 
 const BUFFER_SIZE: usize = 16;

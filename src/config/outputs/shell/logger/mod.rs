@@ -85,10 +85,6 @@ impl Widget for Logger {
 
 #[export_module]
 pub mod logger {
-    pub fn widget() -> Logger {
-        Logger::new()
-    }
-
     #[rhai_fn(global)]
     pub fn convert(logger: &mut Logger) -> Rc<dyn Widget> {
         Rc::new(logger.clone())

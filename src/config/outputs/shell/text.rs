@@ -24,10 +24,6 @@ impl Widget for Text {
 
 #[export_module]
 pub mod text {
-    pub fn widget(text: String) -> Text {
-        Text::new(text)
-    }
-
     #[rhai_fn(global)]
     pub fn update(text: &mut Text, new_text: String) {
         *text.0.borrow_mut() = new_text;
