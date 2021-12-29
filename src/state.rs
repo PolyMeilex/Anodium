@@ -354,11 +354,12 @@ impl Anodium {
         }
 
         {
-            let (ui, pipeline, transform) = frame.imgui.take().unwrap();
+            let (ui, pipeline) = frame.imgui.take().unwrap();
 
             output.render_shell(&ui);
 
             let draw_data = ui.render();
+            let transform = frame.transform;
 
             frame
                 .renderer

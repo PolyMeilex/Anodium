@@ -841,7 +841,7 @@ fn render_output_surface(
                         transform: Transform::Flipped180,
                         renderer,
                         frame,
-                        imgui: Some((ui, &surface.imgui_pipeline, Transform::Flipped180)),
+                        imgui: Some((ui, &surface.imgui_pipeline)),
                     };
 
                     output.update_fps(surface.fps.avg());
