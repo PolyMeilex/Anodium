@@ -320,18 +320,6 @@ where
                                     ddata.reborrow(),
                                 );
                             }
-
-                            /*let draw_data = ui.render();
-
-                            renderer
-                                .with_context(|_renderer, gles| {
-                                    surface_data.imgui_pipeline.render(
-                                        Transform::Flipped180,
-                                        gles,
-                                        draw_data,
-                                    );
-                                })
-                                .unwrap();*/
                         },
                     );
 

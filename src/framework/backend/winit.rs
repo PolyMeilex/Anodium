@@ -207,14 +207,6 @@ where
                                     ddata.reborrow(),
                                 );
                             }
-
-                            /*let draw_data = ui.render();
-
-                            renderer
-                                .with_context(|_renderer, gles| {
-                                    imgui_pipeline.render(Transform::Normal, gles, draw_data);
-                                })
-                                .unwrap();*/
                         })
                         .unwrap();
 
