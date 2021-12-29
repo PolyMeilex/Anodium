@@ -167,19 +167,20 @@ anodize.outputs.on_new(|output| {
 
     output.set_wallpaper("./resources/anocube.png");
 
-    let fps_box = box::new_raw(65, 15, 0, 0, layout::horizontal());
+    let top_box = box::new_raw(output.w, 15, 0, 0, layout::horizontal());
     let fps_widget = widget::fps(output);
 
-    fps_box.add_widget(fps_widget.convert());
+    top_box.add_widget(fps_widget.convert());
 
-    let current_workspace_box = box::new_raw(100, 15, 0, 30, layout::horizontal());
     let current_workspace_widget = widget::current_workspace(output);
 
-    current_workspace_box.add_widget(current_workspace_widget.convert());
+    top_box.add_widget(current_workspace_widget.convert());
 
-    output.shell.add_box(fps_box);
-    output.shell.add_box(current_workspace_box);
+    let output_geometry_widget = widget::output_geometry(output);
 
+    top_box.add_widget(output_geometry_widget.convert());
+
+    output.shell.add_box(top_box);
 });
 
 

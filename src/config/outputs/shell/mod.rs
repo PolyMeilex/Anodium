@@ -8,6 +8,7 @@ use rhai::Engine;
 pub mod r#box;
 mod fps;
 pub mod logger;
+mod output;
 mod text;
 mod widget;
 mod workspace;
@@ -61,4 +62,5 @@ pub fn register(engine: &mut Engine) {
     logger::register(engine);
     fps::register(engine);
     workspace::register(engine);
+    output::register(engine);
 }

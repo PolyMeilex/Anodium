@@ -20,7 +20,7 @@ impl Clone for Box<dyn Widget> {
 #[export_module]
 pub mod widget {
     use crate::config::outputs::shell::{
-        fps::Fps, logger::Logger, text::Text, workspace::CurrentWorkspace,
+        fps::Fps, logger::Logger, output::OutputGeometry, text::Text, workspace::CurrentWorkspace,
     };
     use crate::output_map::Output;
 
@@ -38,6 +38,10 @@ pub mod widget {
 
     pub fn current_workspace(output: Output) -> CurrentWorkspace {
         CurrentWorkspace::new(output)
+    }
+
+    pub fn output_geometry(output: Output) -> OutputGeometry {
+        OutputGeometry::new(output)
     }
 }
 
