@@ -58,45 +58,44 @@ impl Window {
         let mut render_location = self.render_location();
         render_location.x -= initial_location.x;
 
-        if let Some(wl_surface) = self.surface().as_ref() {
-            // this surface is a root of a subsurface tree that needs to be drawn
-            if let Err(err) =
-                render::draw_surface_tree(frame, wl_surface, render_location, output_scale)
-            {
-                error!("{:?}", err);
-            }
-            // furthermore, draw its popups
-            let toplevel_geometry_offset = self.geometry().loc;
-            let render_location = render_location + toplevel_geometry_offset;
-
-            let window = self.borrow();
-            for popup in window.popups().iter() {
-                popup.render(frame, render_location, output_scale);
-            }
-        }
-
-        // TODO: Figure out why this is broken both in anvil and anodium.
-        // let inner = self.inner.borrow();
         // if let Some(wl_surface) = self.surface().as_ref() {
-        //     let damage = [smithay::desktop::utils::bbox_from_surface_tree(
-        //         wl_surface,
-        //         (0, 0),
-        //     )];
+        //     // this surface is a root of a subsurface tree that needs to be drawn
+        //     if let Err(err) =
+        //         render::draw_surface_tree(frame, wl_surface, render_location, output_scale)
+        //     {
+        //         error!("{:?}", err);
+        //     }
+        //     // furthermore, draw its popups
+        //     let toplevel_geometry_offset = self.geometry().loc;
+        //     let render_location = render_location + toplevel_geometry_offset;
 
-        //     let renderer = &mut *frame.renderer;
-        //     let frame = &mut *frame.frame;
-
-        //     smithay::desktop::draw_window(
-        //         renderer,
-        //         frame,
-        //         &inner.window,
-        //         output_scale,
-        //         render_location,
-        //         &damage,
-        //         &slog_scope::logger(),
-        //     )
-        //     .unwrap();
+        //     let window = self.borrow();
+        //     for popup in window.popups().iter() {
+        //         popup.render(frame, render_location, output_scale);
+        //     }
         // }
+
+        let inner = self.inner.borrow();
+        if let Some(wl_surface) = self.surface().as_ref() {
+            let damage = [smithay::desktop::utils::bbox_from_surface_tree(
+                wl_surface,
+                (0, 0),
+            )];
+
+            let renderer = &mut *frame.renderer;
+            let frame = &mut *frame.frame;
+
+            smithay::desktop::draw_window(
+                renderer,
+                frame,
+                &inner.window,
+                output_scale,
+                render_location,
+                &damage,
+                &slog_scope::logger(),
+            )
+            .unwrap();
+        }
     }
 }
 

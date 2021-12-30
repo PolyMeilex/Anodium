@@ -299,7 +299,7 @@ impl ShellManager {
             windows: Default::default(),
             layers: Default::default(),
 
-            popup_manager: PopupManager::new(),
+            popup_manager: PopupManager::new(slog_scope::logger()),
         }));
 
         // Create the compositor

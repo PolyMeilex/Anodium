@@ -3,13 +3,14 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 use smithay::{
     backend::{
         input::InputEvent,
-        renderer::{ImportDma, ImportEgl, Transform},
+        renderer::{Frame, ImportDma, ImportEgl, Renderer, Transform},
         winit::{self, WinitEvent, WinitInput},
     },
     reexports::{
         calloop::{channel, timer::Timer, EventLoop},
         wayland_server::{protocol::wl_output, DispatchData, Display},
     },
+    utils::Rectangle,
     wayland::{
         dmabuf::init_dmabuf_global,
         output::{Mode, PhysicalProperties},
@@ -50,25 +51,25 @@ where
         })
         .unwrap();
 
-    let (renderer, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
+    let (backend, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
         crit!("Failed to initialize Winit backend: {}", err);
     })?;
-    let renderer = Rc::new(RefCell::new(renderer));
+    let backend = Rc::new(RefCell::new(backend));
 
-    if renderer
+    if backend
         .borrow_mut()
         .renderer()
         .bind_wl_display(&display.borrow())
         .is_ok()
     {
         info!("EGL hardware-acceleration enabled");
-        let dmabuf_formats = renderer
+        let dmabuf_formats = backend
             .borrow_mut()
             .renderer()
             .dmabuf_formats()
             .cloned()
             .collect::<Vec<_>>();
-        let renderer = renderer.clone();
+        let renderer = backend.clone();
         init_dmabuf_global(
             &mut *display.borrow_mut(),
             dmabuf_formats,
@@ -83,7 +84,7 @@ where
         );
     };
 
-    let size = renderer.borrow().window_size().physical_size;
+    let size = backend.borrow().window_size().physical_size;
 
     /*
      * Initialize the globals
@@ -129,7 +130,7 @@ where
         io.display_size = [size.w as f32, size.h as f32];
     }
 
-    let imgui_pipeline = renderer
+    let imgui_pipeline = backend
         .borrow_mut()
         .renderer()
         .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
@@ -176,40 +177,48 @@ where
 
             match res {
                 Ok(()) => {
-                    let mut renderer = renderer.borrow_mut();
+                    let mut backend = backend.borrow_mut();
+                    let mode = output.current_mode();
+                    let mut size = mode.size;
+                    let damage = Rectangle::from_loc_and_size((0, 0), size);
 
-                    renderer
-                        .render(|renderer, frame| {
-                            let ui = imgui.frame();
+                    if backend.bind().is_ok() {
+                        backend
+                            .renderer()
+                            .render(mode.size, Transform::Flipped180, |renderer, frame| {
+                                let ui = imgui.frame();
 
-                            {
-                                let mut frame = RenderFrame {
-                                    renderer,
-                                    frame,
-                                    imgui: &ui,
-                                };
+                                {
+                                    let mut frame = RenderFrame {
+                                        renderer,
+                                        frame,
+                                        imgui: &ui,
+                                    };
 
-                                cb(
-                                    BackendEvent::OutputRender {
-                                        frame: &mut frame,
-                                        output: &output,
-                                        pointer_image: None,
-                                    },
-                                    ddata.reborrow(),
-                                );
-                            }
+                                    cb(
+                                        BackendEvent::OutputRender {
+                                            frame: &mut frame,
+                                            output: &output,
+                                            pointer_image: None,
+                                        },
+                                        ddata.reborrow(),
+                                    );
+                                }
 
-                            draw_fps(&ui, 1.0, fps.avg());
+                                draw_fps(&ui, 1.0, fps.avg());
 
-                            let draw_data = ui.render();
+                                let draw_data = ui.render();
 
-                            renderer
-                                .with_context(|_renderer, gles| {
-                                    imgui_pipeline.render(Transform::Normal, gles, draw_data);
-                                })
-                                .unwrap();
-                        })
-                        .unwrap();
+                                renderer
+                                    .with_context(|_renderer, gles| {
+                                        imgui_pipeline.render(Transform::Normal, gles, draw_data);
+                                    })
+                                    .unwrap();
+                            })
+                            .unwrap();
+                    }
+
+                    backend.submit(Some(&[damage.to_logical(1)]), 1.0);
 
                     cb(BackendEvent::SendFrames, ddata);
 
