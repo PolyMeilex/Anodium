@@ -37,8 +37,6 @@ struct OutputSurface {
     window: smithay::backend::x11::Window,
 
     fps: fps_ticker::Fps,
-    imgui: Option<imgui::SuspendedContext>,
-    imgui_pipeline: imgui_smithay_renderer::Renderer,
 
     output_name: String,
     output: Output,
@@ -89,22 +87,6 @@ impl OutputSurfaceBuilder {
             refresh: 60_000,
         };
 
-        let output = Output::new(
-            OUTPUT_NAME,
-            Default::default(),
-            display,
-            PhysicalProperties {
-                size: (0, 0).into(),
-                subpixel: wl_output::Subpixel::Unknown,
-                make: "Smithay".into(),
-                model: "Winit".into(),
-            },
-            mode.clone(),
-            vec![mode],
-            // TODO: output should always have a workspace
-            "Unknown".into(),
-            slog_scope::logger(),
-        );
         let mut imgui = imgui::Context::create();
         {
             imgui.set_ini_filename(None);
@@ -117,13 +99,30 @@ impl OutputSurfaceBuilder {
             .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
             .unwrap();
 
+        let output = Output::new(
+            OUTPUT_NAME,
+            Default::default(),
+            display,
+            PhysicalProperties {
+                size: (0, 0).into(),
+                subpixel: wl_output::Subpixel::Unknown,
+                make: "Smithay".into(),
+                model: "Winit".into(),
+            },
+            mode.clone(),
+            vec![mode],
+            imgui,
+            imgui_pipeline,
+            // TODO: output should always have a workspace
+            "Unknown".into(),
+            slog_scope::logger(),
+        );
+
         OutputSurface {
             surface: self.surface,
             window: self.window,
 
             fps: fps_ticker::Fps::default(),
-            imgui: Some(imgui.suspend()),
-            imgui_pipeline,
             mode,
             output_name: "X11(1)".into(),
             output,
@@ -296,33 +295,26 @@ where
                         error!("Error while binding buffer: {}", err);
                     }
 
-                    let mut imgui = surface_data.imgui.take().unwrap().activate().unwrap();
-
                     let res = renderer.render(
                         surface_data.mode.size,
                         Transform::Flipped180,
                         |renderer, frame| {
-                            let ui = imgui.frame();
+                            let mut frame = RenderFrame {
+                                transform: Transform::Flipped180,
+                                renderer,
+                                frame,
+                            };
 
-                            {
-                                let mut frame = RenderFrame {
-                                    transform: Transform::Flipped180,
-                                    renderer,
-                                    frame,
-                                    imgui: Some((ui, &surface_data.imgui_pipeline)),
-                                };
+                            surface_data.output.update_fps(surface_data.fps.avg());
 
-                                surface_data.output.update_fps(surface_data.fps.avg());
-
-                                cb(
-                                    BackendEvent::OutputRender {
-                                        frame: &mut frame,
-                                        output: &surface_data.output,
-                                        pointer_image: None,
-                                    },
-                                    ddata.reborrow(),
-                                );
-                            }
+                            cb(
+                                BackendEvent::OutputRender {
+                                    frame: &mut frame,
+                                    output: &surface_data.output,
+                                    pointer_image: None,
+                                },
+                                ddata.reborrow(),
+                            );
                         },
                     );
 
@@ -347,7 +339,6 @@ where
                     }
 
                     surface_data.fps.tick();
-                    surface_data.imgui = Some(imgui.suspend());
                 }
 
                 cb(BackendEvent::SendFrames, ddata);
@@ -385,14 +376,6 @@ where
                         size,
                         refresh: 60_000,
                     };
-
-                    {
-                        let mut imgui = surface_data.imgui.take().unwrap().activate().unwrap();
-                        let io = imgui.io_mut();
-                        io.display_framebuffer_scale = [scale_factor as f32, scale_factor as f32];
-                        io.display_size = [size.w as f32, size.h as f32];
-                        surface_data.imgui = Some(imgui.suspend());
-                    }
 
                     surface_data.mode = mode;
                     surface_data.output.update_mode(mode);

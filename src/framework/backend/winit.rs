@@ -94,6 +94,21 @@ where
         refresh: 60_000,
     };
 
+    info!("imgui!");
+    let mut imgui = imgui::Context::create();
+    {
+        imgui.set_ini_filename(None);
+        let io = imgui.io_mut();
+        io.display_framebuffer_scale = [1.0f32, 1.0f32];
+        io.display_size = [size.w as f32, size.h as f32];
+    }
+
+    let imgui_pipeline = renderer
+        .borrow_mut()
+        .renderer()
+        .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
+        .unwrap();
+
     let mut output = Output::new(
         OUTPUT_NAME,
         Default::default(),
@@ -106,6 +121,8 @@ where
         },
         mode.clone(),
         vec![mode],
+        imgui,
+        imgui_pipeline,
         // TODO: output should always have a workspace
         "Unknown".into(),
         slog_scope::logger(),
@@ -125,21 +142,6 @@ where
 
     cb(BackendEvent::StartCompositor, ddata.reborrow());
 
-    info!("imgui!");
-    let mut imgui = imgui::Context::create();
-    {
-        imgui.set_ini_filename(None);
-        let io = imgui.io_mut();
-        io.display_framebuffer_scale = [1.0f32, 1.0f32];
-        io.display_size = [size.w as f32, size.h as f32];
-    }
-
-    let imgui_pipeline = renderer
-        .borrow_mut()
-        .renderer()
-        .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
-        .unwrap();
-
     info!("Initialization completed, starting the main loop.");
 
     let timer = Timer::new().unwrap();
@@ -154,12 +156,6 @@ where
 
             let res = input.dispatch_new_events(|event| match event {
                 WinitEvent::Resized { size, scale_factor } => {
-                    {
-                        let io = imgui.io_mut();
-                        io.display_framebuffer_scale = [scale_factor as f32, scale_factor as f32];
-                        io.display_size = [size.w as f32, size.h as f32];
-                    }
-
                     let mode = Mode {
                         size,
                         refresh: 60_000,
@@ -185,27 +181,22 @@ where
 
                     renderer
                         .render(|renderer, frame| {
-                            let ui = imgui.frame();
+                            let mut frame = RenderFrame {
+                                transform: Transform::Normal,
+                                renderer,
+                                frame,
+                            };
 
-                            {
-                                let mut frame = RenderFrame {
-                                    transform: Transform::Normal,
-                                    renderer,
-                                    frame,
-                                    imgui: Some((ui, &imgui_pipeline)),
-                                };
+                            output.update_fps(fps.avg());
 
-                                output.update_fps(fps.avg());
-
-                                cb(
-                                    BackendEvent::OutputRender {
-                                        frame: &mut frame,
-                                        output: &output,
-                                        pointer_image: None,
-                                    },
-                                    ddata.reborrow(),
-                                );
-                            }
+                            cb(
+                                BackendEvent::OutputRender {
+                                    frame: &mut frame,
+                                    output: &output,
+                                    pointer_image: None,
+                                },
+                                ddata.reborrow(),
+                            );
                         })
                         .unwrap();
 

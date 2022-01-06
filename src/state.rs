@@ -354,7 +354,8 @@ impl Anodium {
         }
 
         {
-            let (ui, pipeline) = frame.imgui.take().unwrap();
+            let (mut context, pipeline) = output.take_imgui();
+            let ui = context.frame();
 
             output.render_shell(&ui);
 
@@ -367,6 +368,8 @@ impl Anodium {
                     pipeline.render(transform, gles, draw_data);
                 })
                 .unwrap();
+
+            output.restore_imgui((context, pipeline));
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;

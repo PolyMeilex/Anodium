@@ -1,7 +1,8 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
-use imgui::Ui;
+use imgui::{Context, SuspendedContext, Ui};
+use imgui_smithay_renderer::Renderer;
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
@@ -34,6 +35,7 @@ struct Inner {
 
     wallpaper: Option<DynamicImage>,
     wallpaper_texture: Option<Gles2Texture>,
+    imgui: Option<(SuspendedContext, Renderer)>,
     shell: Shell,
     fps: f64,
 }
@@ -53,6 +55,14 @@ impl Inner {
 
         self.current_mode = mode;
         self.pending_mode_change = true;
+
+        let (imgui, pipeline) = self.imgui.take().unwrap();
+        let mut imgui = imgui.activate().unwrap();
+
+        let io = imgui.io_mut();
+        io.display_size = [mode.size.w as f32, mode.size.h as f32];
+
+        self.imgui = Some((imgui.suspend(), pipeline));
     }
 
     pub fn update_scale(&mut self, scale: f64) {
@@ -60,6 +70,14 @@ impl Inner {
             let current_mode = self.current_mode;
 
             self.scale = scale;
+
+            let (imgui, pipeline) = self.imgui.take().unwrap();
+            let mut imgui = imgui.activate().unwrap();
+
+            let io = imgui.io_mut();
+            io.display_framebuffer_scale = [scale as f32, scale as f32];
+
+            self.imgui = Some((imgui.suspend(), pipeline));
 
             self.output.change_current_state(
                 Some(current_mode),
@@ -112,6 +130,8 @@ impl Output {
         physical: PhysicalProperties,
         mode: Mode,
         possible_modes: Vec<Mode>,
+        imgui_context: Context,
+        imgui_pipeline: Renderer,
         active_workspace: String,
         logger: slog::Logger,
     ) -> Self
@@ -142,6 +162,7 @@ impl Output {
                 layer_map: Default::default(),
                 wallpaper: None,
                 wallpaper_texture: None,
+                imgui: Some((imgui_context.suspend(), imgui_pipeline)),
                 shell: Shell::new(),
                 fps: 0.0,
             })),
@@ -275,6 +296,15 @@ impl Output {
 
     pub fn update_fps(&self, fps: f64) {
         self.inner.borrow_mut().fps = fps;
+    }
+
+    pub fn take_imgui(&self) -> (Context, Renderer) {
+        let (context, pipeline) = self.inner.borrow_mut().imgui.take().unwrap();
+        (context.activate().unwrap(), pipeline)
+    }
+
+    pub fn restore_imgui(&self, (context, pipeline): (Context, Renderer)) {
+        self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
     }
 }
 
