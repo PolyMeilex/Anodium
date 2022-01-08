@@ -29,15 +29,18 @@ impl Anodium {
             output_holder_if_missing.as_ref().unwrap()
         });
 
-        match &event {
+        let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
-                self.shortcut_handler(action)
+                self.shortcut_handler(action);
+                false
             }
             InputEvent::PointerMotion { event, .. } => {
                 self.input_state.pointer_location =
                     self.clamp_coords(self.input_state.pointer_location + event.delta());
                 self.on_pointer_move(event.time());
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output_size = output.size();
@@ -46,13 +49,27 @@ impl Anodium {
                 self.input_state.pointer_location =
                     event.position_transformed(output_size) + output_pos;
                 self.on_pointer_move(event.time());
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
-            InputEvent::PointerButton { event, .. } => self.on_pointer_button::<I>(event),
-            InputEvent::PointerAxis { event, .. } => self.on_pointer_axis::<I>(event),
-            _ => {}
-        }
+            InputEvent::PointerButton { event, .. } => {
+                self.on_pointer_button::<I>(event);
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
+            }
+            InputEvent::PointerAxis { event, .. } => {
+                self.on_pointer_axis::<I>(event);
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
+            }
+            _ => false,
+        };
 
-        output.input_imgui(event);
+        if captured {
+            output.input_imgui(event);
+        } else {
+            output.reset_imgui();
+        }
     }
 
     fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {
@@ -126,7 +143,7 @@ impl Anodium {
         self.input_state.keyboard.set_focus(None, serial);
     }
 
-    fn on_pointer_button<I: InputBackend>(&mut self, evt: &I::PointerButtonEvent) {
+    fn on_pointer_button<I: InputBackend>(&mut self, evt: &I::PointerButtonEvent) -> bool {
         let serial = SCOUNTER.next_serial();
 
         debug!("Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
@@ -201,9 +218,10 @@ impl Anodium {
                 w.on_pointer_button(button, evt.state());
             }
         }
+        false
     }
 
-    fn on_pointer_axis<I: InputBackend>(&mut self, evt: &I::PointerAxisEvent) {
+    fn on_pointer_axis<I: InputBackend>(&mut self, evt: &I::PointerAxisEvent) -> bool {
         let source = match evt.source() {
             input::AxisSource::Continuous => wl_pointer::AxisSource::Continuous,
             input::AxisSource::Finger => wl_pointer::AxisSource::Finger,
@@ -240,6 +258,7 @@ impl Anodium {
             }
             self.input_state.pointer.clone().axis(frame, self);
         }
+        false
     }
 
     fn on_pointer_move(&mut self, time: u32) {

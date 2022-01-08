@@ -314,6 +314,12 @@ impl Output {
         imgui_input::handle_event(context.io_mut(), evt);
         self.restore_imgui((context, pipeline));
     }
+
+    pub fn reset_imgui(&self) {
+        let (mut context, pipeline) = self.take_imgui();
+        context.io_mut().mouse_pos = [f32::MAX, f32::MAX];
+        self.restore_imgui((context, pipeline));
+    }
 }
 
 impl Drop for Inner {
