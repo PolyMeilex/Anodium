@@ -11,6 +11,7 @@ use smithay::{
 
 use crate::{framework::surface_data::SurfaceData, window::WindowSurface};
 
+pub mod imgui_input;
 mod iterators;
 
 pub use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};

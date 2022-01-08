@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use imgui::{Context, SuspendedContext, Ui};
 use imgui_smithay_renderer::Renderer;
+use smithay::backend::input::{InputBackend, InputEvent};
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
@@ -14,6 +15,7 @@ use image::{self, DynamicImage};
 
 use crate::config::outputs::shell::Shell;
 use crate::render::renderer::import_bitmap;
+use crate::utils::imgui_input;
 
 use super::layer_map::LayerMap;
 
@@ -305,6 +307,12 @@ impl Output {
 
     pub fn restore_imgui(&self, (context, pipeline): (Context, Renderer)) {
         self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
+    }
+
+    pub fn input_imgui<I: InputBackend>(&self, evt: InputEvent<I>) {
+        let (mut context, pipeline) = self.take_imgui();
+        imgui_input::handle_event(context.io_mut(), evt);
+        self.restore_imgui((context, pipeline));
     }
 }
 

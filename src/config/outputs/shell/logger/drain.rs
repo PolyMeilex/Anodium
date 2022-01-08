@@ -12,7 +12,7 @@ use std::sync::Mutex;
 
 use lazy_static::lazy_static;
 
-const BUFFER_SIZE: usize = 16;
+const BUFFER_SIZE: usize = 32;
 
 lazy_static! {
     pub static ref BUFFER: Mutex<VecDeque<(Level, String)>> =

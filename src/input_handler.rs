@@ -23,7 +23,13 @@ impl Anodium {
         event: InputEvent<I>,
         output: Option<&Output>,
     ) {
-        match event {
+        let mut output_holder_if_missing = None;
+        let output = output.unwrap_or_else(|| {
+            output_holder_if_missing = self.output_map.find_by_index(0);
+            output_holder_if_missing.as_ref().unwrap()
+        });
+
+        match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
                 self.shortcut_handler(action)
@@ -34,12 +40,6 @@ impl Anodium {
                 self.on_pointer_move(event.time());
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let mut output_holder_if_missing = None;
-                let output = output.unwrap_or_else(|| {
-                    output_holder_if_missing = self.output_map.find_by_index(0);
-                    output_holder_if_missing.as_ref().unwrap()
-                });
-
                 let output_size = output.size();
                 let output_pos = output.location().to_f64();
 
@@ -51,14 +51,16 @@ impl Anodium {
             InputEvent::PointerAxis { event, .. } => self.on_pointer_axis::<I>(event),
             _ => {}
         }
+
+        output.input_imgui(event);
     }
 
-    fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: I::KeyboardKeyEvent) -> KeyAction {
+    fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {
         let keycode = evt.key_code();
         let state = evt.state();
         debug!("key"; "keycode" => keycode, "state" => format!("{:?}", state));
         let serial = SCOUNTER.next_serial();
-        let time = Event::time(&evt);
+        let time = Event::time(evt);
 
         let modifiers_state = &mut self.input_state.modifiers_state;
         let suppressed_keys = &mut self.input_state.suppressed_keys;
@@ -124,7 +126,7 @@ impl Anodium {
         self.input_state.keyboard.set_focus(None, serial);
     }
 
-    fn on_pointer_button<I: InputBackend>(&mut self, evt: I::PointerButtonEvent) {
+    fn on_pointer_button<I: InputBackend>(&mut self, evt: &I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
 
         debug!("Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
@@ -201,7 +203,7 @@ impl Anodium {
         }
     }
 
-    fn on_pointer_axis<I: InputBackend>(&mut self, evt: I::PointerAxisEvent) {
+    fn on_pointer_axis<I: InputBackend>(&mut self, evt: &I::PointerAxisEvent) {
         let source = match evt.source() {
             input::AxisSource::Continuous => wl_pointer::AxisSource::Continuous,
             input::AxisSource::Finger => wl_pointer::AxisSource::Finger,
