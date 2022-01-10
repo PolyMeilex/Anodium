@@ -32,8 +32,16 @@ impl Anodium {
         let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
-                self.shortcut_handler(action);
-                false
+                if action == KeyAction::Filtred {
+                    true
+                } else {
+                    if action != KeyAction::None {
+                        self.shortcut_handler(action);
+                        self.input_state.keyboard.is_focused()
+                    } else {
+                        true
+                    }
+                }
             }
             InputEvent::PointerMotion { event, .. } => {
                 self.input_state.pointer_location =
@@ -118,7 +126,7 @@ impl Anodium {
                     } else {
                         if configvm.key_action(keysym, state, pressed_keys) {
                             suppressed_keys.push(keysym);
-                            return FilterResult::Intercept(KeyAction::None);
+                            return FilterResult::Intercept(KeyAction::Filtred);
                         }
                     }
 
@@ -129,7 +137,7 @@ impl Anodium {
                     let suppressed = suppressed_keys.contains(&keysym);
                     if suppressed {
                         suppressed_keys.retain(|k| *k != keysym);
-                        FilterResult::Intercept(KeyAction::None)
+                        FilterResult::Intercept(KeyAction::Filtred)
                     } else {
                         FilterResult::Forward
                     }
@@ -306,7 +314,7 @@ impl Anodium {
 }
 
 /// Possible results of a keyboard action
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum KeyAction {
     /// Quit the compositor
     Quit,
@@ -317,6 +325,8 @@ enum KeyAction {
     MoveToWorkspace(usize),
     /// Do nothing more
     None,
+    /// Do nothing more
+    Filtred,
 }
 
 fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Option<KeyAction> {
@@ -339,7 +349,7 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
 impl Anodium {
     fn shortcut_handler(&mut self, action: KeyAction) {
         match action {
-            KeyAction::None => {}
+            KeyAction::None | KeyAction::Filtred => {}
             KeyAction::Quit => {
                 info!("Quitting.");
                 self.running.store(false, Ordering::SeqCst);
