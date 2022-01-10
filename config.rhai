@@ -77,9 +77,10 @@ anodize.system.add_timeout(|| {
     let output = anodize.outputs[0];
     //output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     
-    let box = box::new_raw(output.w, 25, 0, output.h - 25, layout::horizontal());
+    let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
     box.alpha = 0.0;
     box.background = false;
+    box.scroll = false;
     let button = widget::button("Test");
     button.click(|| {
         anodize.log.info("button clicked!");
