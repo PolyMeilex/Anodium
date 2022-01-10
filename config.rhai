@@ -80,8 +80,16 @@ anodize.system.add_timeout(|| {
     let box = box::new_raw(output.w, 25, 0, output.h - 25, layout::horizontal());
     box.alpha = 0.0;
     box.background = false;
+    let button = widget::button("Test");
+    button.click(|| {
+        anodize.log.info("button clicked!");
+    });
+
+    box.add_widget(button.convert());
     box.add_widget(weather.convert());
     box.add_widget(date.convert());
+    
+
 
     output.shell.add_box(box);
 

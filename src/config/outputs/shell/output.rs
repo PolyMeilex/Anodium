@@ -6,7 +6,7 @@ use rhai::Engine;
 
 use crate::output_map::Output;
 
-use super::widget::Widget;
+use super::widget::*;
 
 #[derive(Debug, Clone)]
 pub struct OutputGeometry(Output);
@@ -18,7 +18,7 @@ impl OutputGeometry {
 }
 
 impl Widget for OutputGeometry {
-    fn render(&self, ui: &Ui) {
+    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
         ui.text(format!("Geometry: {:?}", self.0.geometry()));
     }
 }

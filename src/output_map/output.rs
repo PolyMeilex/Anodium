@@ -1,6 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use calloop::channel::Sender;
 use imgui::{Context, SuspendedContext, Ui};
 use imgui_smithay_renderer::Renderer;
 use smithay::backend::input::{InputBackend, InputEvent};
@@ -13,6 +14,7 @@ use smithay::{
 
 use image::{self, DynamicImage};
 
+use crate::config::eventloop::ConfigEvent;
 use crate::config::outputs::shell::Shell;
 use crate::render::renderer::import_bitmap;
 use crate::utils::imgui_input;
@@ -274,8 +276,8 @@ impl Output {
         self.inner.borrow_mut().get_wallpaper(renderer)
     }
 
-    pub fn render_shell(&self, ui: &Ui) {
-        self.inner.borrow().shell.render(ui);
+    pub fn render_shell(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
+        self.inner.borrow().shell.render(ui, config_tx);
     }
 
     pub fn pending_mode_change(&self) -> bool {

@@ -17,6 +17,9 @@ impl Anodium {
             ConfigEvent::OutputsRearrange => {
                 self.config.output_rearrange();
             }
+            ConfigEvent::Shell(fnptr) => {
+                self.config.execute_fnptr(fnptr, ());
+            }
         }
     }
 }

@@ -1,3 +1,5 @@
+use rhai::FnPtr;
+
 use crate::window::Window;
 
 #[derive(Debug)]
@@ -7,4 +9,5 @@ pub enum ConfigEvent {
     Maximize(Window),
     Unmaximize(Window),
     OutputsRearrange,
+    Shell(FnPtr),
 }

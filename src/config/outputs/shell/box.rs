@@ -1,9 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use calloop::channel::Sender;
 use imgui::Ui;
 use rhai::Engine;
 use rhai::{plugin::*, FLOAT, INT};
+
+use crate::config::eventloop::ConfigEvent;
 
 use super::widget::Widget;
 
@@ -69,7 +72,7 @@ impl Box {
         })
     }
 
-    pub fn render(&self, ui: &Ui) {
+    pub fn render(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
         let inner = self.inner.borrow();
         if inner.visable {
             imgui::Window::new(&inner.id)
@@ -81,7 +84,7 @@ impl Box {
                 .draw_background(inner.background)
                 .build(&ui, || {
                     for widget in &inner.widgets {
-                        widget.render(ui);
+                        widget.render(ui, config_tx);
                         inner.layout.render(ui);
                     }
                 });

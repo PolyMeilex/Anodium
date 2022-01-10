@@ -82,6 +82,7 @@ pub struct Anodium {
     pub xwayland: XWayland<Self>,
 
     pub backend_tx: Sender<BackendRequest>,
+    pub config_tx: Sender<ConfigEvent>,
 }
 
 impl Anodium {
@@ -236,10 +237,10 @@ impl Anodium {
         #[cfg(feature = "xwayland")]
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
-        let event_sender = Self::init_config_channel(&handle);
-        let output_map = OutputMap::new(event_sender.clone());
+        let config_tx = Self::init_config_channel(&handle);
+        let output_map = OutputMap::new(config_tx.clone());
 
-        let config = ConfigVM::new(event_sender, output_map.clone(), handle.clone()).unwrap();
+        let config = ConfigVM::new(config_tx.clone(), output_map.clone(), handle.clone()).unwrap();
 
         Self {
             handle,
@@ -279,6 +280,7 @@ impl Anodium {
             #[cfg(feature = "xwayland")]
             xwayland,
             backend_tx,
+            config_tx,
         }
     }
 
@@ -357,7 +359,7 @@ impl Anodium {
             let (mut context, pipeline) = output.take_imgui();
             let ui = context.frame();
 
-            output.render_shell(&ui);
+            output.render_shell(&ui, &self.config_tx);
 
             let draw_data = ui.render();
             let transform = frame.transform;
