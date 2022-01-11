@@ -5,10 +5,13 @@ use smithay::backend::input::{
     MouseButton, PointerAxisEvent, PointerButtonEvent, PointerMotionAbsoluteEvent,
 };
 
-pub fn handle_event<I: InputBackend>(io: &mut Io, evt: InputEvent<I>) {
+use crate::output_map::Output;
+
+pub fn handle_event<I: InputBackend>(io: &mut Io, evt: InputEvent<I>, output: &Output) {
     match evt {
         InputEvent::PointerMotionAbsolute { event, .. } => {
-            let position = event.position();
+            let output_size = output.size();
+            let position = event.position_transformed(output_size);
             io.mouse_pos = [position.x as f32, position.y as f32];
         }
 

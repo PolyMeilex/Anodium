@@ -74,7 +74,7 @@ impl Anodium {
         };
 
         if captured {
-            output.input_imgui(event);
+            output.input_imgui(event, output);
         } else {
             output.reset_imgui();
         }

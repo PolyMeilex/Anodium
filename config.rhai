@@ -97,6 +97,23 @@ anodize.system.add_timeout(|| {
     output.shell.add_box(logger_box);
 
     logger_box.w = output.w - 15;
+
+    let output = anodize.outputs[1];
+    if output != () {
+        let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
+        box.alpha = 0.0;
+        box.background = false;
+        box.scroll = false;
+        let button = widget::button("Test2");
+        button.click(|| {
+            anodize.log.info("button2 clicked!");
+        });
+
+        box.add_widget(button.convert());
+
+        output.shell.add_box(box);
+    }
+
     return false;
 }, 500);
 

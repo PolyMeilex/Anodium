@@ -311,9 +311,9 @@ impl Output {
         self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
     }
 
-    pub fn input_imgui<I: InputBackend>(&self, evt: InputEvent<I>) {
+    pub fn input_imgui<I: InputBackend>(&self, evt: InputEvent<I>, output: &Output) {
         let (mut context, pipeline) = self.take_imgui();
-        imgui_input::handle_event(context.io_mut(), evt);
+        imgui_input::handle_event(context.io_mut(), evt, output);
         self.restore_imgui((context, pipeline));
     }
 
