@@ -113,6 +113,11 @@ impl OutputMap {
         self.outputs.borrow().get(index).cloned()
     }
 
+    #[allow(dead_code)]
+    pub fn find_last(&self) -> Option<Output> {
+        self.outputs.borrow().last().cloned()
+    }
+
     pub fn iter(&self) -> std::vec::IntoIter<Output> {
         self.outputs.borrow().clone().into_iter()
     }

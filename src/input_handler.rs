@@ -74,7 +74,11 @@ impl Anodium {
         };
 
         if captured {
-            output.input_imgui(event, output);
+            let output = self
+                .output_map
+                .find_by_position(self.input_state.pointer_location.to_i32_floor())
+                .unwrap_or_else(|| self.output_map.find_last().unwrap());
+            output.input_imgui(event, &output, self.input_state.pointer_location);
         } else {
             output.reset_imgui();
         }

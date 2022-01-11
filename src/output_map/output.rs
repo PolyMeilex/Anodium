@@ -311,9 +311,14 @@ impl Output {
         self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
     }
 
-    pub fn input_imgui<I: InputBackend>(&self, evt: InputEvent<I>, output: &Output) {
+    pub fn input_imgui<I: InputBackend>(
+        &self,
+        evt: InputEvent<I>,
+        output: &Output,
+        mouse_location: Point<f64, Logical>,
+    ) {
         let (mut context, pipeline) = self.take_imgui();
-        imgui_input::handle_event(context.io_mut(), evt, output);
+        imgui_input::handle_event(context.io_mut(), evt, output, mouse_location);
         self.restore_imgui((context, pipeline));
     }
 
