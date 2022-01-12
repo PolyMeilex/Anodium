@@ -123,8 +123,14 @@ impl Anodium {
 
             InputEvent::PointerAxis { event, .. } => match event.source() {
                 input::AxisSource::Wheel => {
-                    let amount_discrete = event.amount_discrete(input::Axis::Vertical).unwrap();
-                    io.mouse_wheel += amount_discrete as f32;
+                    let amount_discrete =
+                        event.amount_discrete(input::Axis::Vertical).unwrap() * 0.3;
+                    // TODO - find a better way to handle this, why does it scrool on wayland in opposite direction?!
+                    if self.seat_name == "x11" || self.seat_name == "winit" {
+                        io.mouse_wheel += amount_discrete as f32;
+                    } else {
+                        io.mouse_wheel -= amount_discrete as f32;
+                    }
                 }
                 _ => {}
             },
@@ -205,7 +211,7 @@ impl Anodium {
         self.input_state.keyboard.set_focus(None, serial);
     }
 
-    fn on_pointer_button<I: InputBackend>(&mut self, evt: &I::PointerButtonEvent) -> bool {
+    fn on_pointer_button<I: InputBackend>(&mut self, evt: &I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
 
         debug!("Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
@@ -280,10 +286,9 @@ impl Anodium {
                 w.on_pointer_button(button, evt.state());
             }
         }
-        false
     }
 
-    fn on_pointer_axis<I: InputBackend>(&mut self, evt: &I::PointerAxisEvent) -> bool {
+    fn on_pointer_axis<I: InputBackend>(&mut self, evt: &I::PointerAxisEvent) {
         let source = match evt.source() {
             input::AxisSource::Continuous => wl_pointer::AxisSource::Continuous,
             input::AxisSource::Finger => wl_pointer::AxisSource::Finger,
@@ -320,7 +325,6 @@ impl Anodium {
             }
             self.input_state.pointer.clone().axis(frame, self);
         }
-        false
     }
 
     fn on_pointer_move(&mut self, time: u32) {
