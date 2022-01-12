@@ -1,5 +1,4 @@
 use image::{ImageBuffer, Rgba};
-use imgui_smithay_renderer::Renderer;
 use smithay::{
     backend::renderer::{
         gles2::{Gles2Error, Gles2Frame, Gles2Renderer, Gles2Texture},

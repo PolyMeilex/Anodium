@@ -23,12 +23,6 @@ impl Anodium {
         event: InputEvent<I>,
         output: Option<&Output>,
     ) {
-        let mut output_holder_if_missing = None;
-        let output = output.unwrap_or_else(|| {
-            output_holder_if_missing = self.output_map.find_by_index(0);
-            output_holder_if_missing.as_ref().unwrap()
-        });
-
         let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
@@ -51,6 +45,12 @@ impl Anodium {
                     .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
+                let mut output_holder_if_missing = None;
+                let output = output.unwrap_or_else(|| {
+                    output_holder_if_missing = self.output_map.find_by_index(0);
+                    output_holder_if_missing.as_ref().unwrap()
+                });
+
                 let output_size = output.size();
                 let output_pos = output.location().to_f64();
 
@@ -73,15 +73,65 @@ impl Anodium {
             _ => false,
         };
 
-        if captured {
-            let output = self
-                .output_map
-                .find_by_position(self.input_state.pointer_location.to_i32_floor())
-                .unwrap_or_else(|| self.output_map.find_last().unwrap());
-            output.input_imgui(event, &output, self.input_state.pointer_location);
-        } else {
-            output.reset_imgui();
+        if let Some(output) = self
+            .output_map
+            .find_by_position(self.input_state.pointer_location.to_i32_round())
+        {
+            if captured {
+                self.process_imgui_event(event, &output);
+            } else {
+                self.reset_imgui_event(&output);
+            }
         }
+    }
+
+    fn reset_imgui_event(&self, output: &Output) {
+        let (mut imgui, pipeline) = output.take_imgui();
+        imgui.io_mut().mouse_pos = [f32::MAX, f32::MAX];
+        output.restore_imgui((imgui, pipeline));
+    }
+
+    fn process_imgui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
+        let mouse_location = self.input_state.pointer_location - output.location().to_f64();
+        let (mut imgui, pipeline) = output.take_imgui();
+        let mut io = imgui.io_mut();
+
+        io.mouse_pos[0] = mouse_location.x as f32;
+        io.mouse_pos[1] = mouse_location.y as f32;
+
+        match event {
+            InputEvent::Keyboard { event, .. } => {
+                let keycode = event.key_code();
+                let state = event.state();
+                match state {
+                    KeyState::Pressed => io.keys_down[keycode as usize] = true,
+                    KeyState::Released => io.keys_down[keycode as usize] = false,
+                }
+            }
+
+            InputEvent::PointerButton { event, .. } => {
+                let button = event.button().unwrap();
+                let state = event.state() == input::ButtonState::Pressed;
+
+                match button {
+                    input::MouseButton::Left => io.mouse_down[0] = state,
+                    input::MouseButton::Right => io.mouse_down[1] = state,
+                    input::MouseButton::Middle => io.mouse_down[2] = state,
+                    _ => {}
+                };
+            }
+
+            InputEvent::PointerAxis { event, .. } => match event.source() {
+                input::AxisSource::Wheel => {
+                    let amount_discrete = event.amount_discrete(input::Axis::Vertical).unwrap();
+                    io.mouse_wheel += amount_discrete as f32;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+
+        output.restore_imgui((imgui, pipeline));
     }
 
     fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {

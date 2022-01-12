@@ -4,7 +4,6 @@ use std::rc::Rc;
 use calloop::channel::Sender;
 use imgui::{Context, SuspendedContext, Ui};
 use imgui_smithay_renderer::Renderer;
-use smithay::backend::input::{InputBackend, InputEvent};
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
@@ -17,7 +16,6 @@ use image::{self, DynamicImage};
 use crate::config::eventloop::ConfigEvent;
 use crate::config::outputs::shell::Shell;
 use crate::render::renderer::import_bitmap;
-use crate::utils::imgui_input;
 
 use super::layer_map::LayerMap;
 
@@ -309,23 +307,6 @@ impl Output {
 
     pub fn restore_imgui(&self, (context, pipeline): (Context, Renderer)) {
         self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
-    }
-
-    pub fn input_imgui<I: InputBackend>(
-        &self,
-        evt: InputEvent<I>,
-        output: &Output,
-        mouse_location: Point<f64, Logical>,
-    ) {
-        let (mut context, pipeline) = self.take_imgui();
-        imgui_input::handle_event(context.io_mut(), evt, output, mouse_location);
-        self.restore_imgui((context, pipeline));
-    }
-
-    pub fn reset_imgui(&self) {
-        let (mut context, pipeline) = self.take_imgui();
-        context.io_mut().mouse_pos = [f32::MAX, f32::MAX];
-        self.restore_imgui((context, pipeline));
     }
 }
 
