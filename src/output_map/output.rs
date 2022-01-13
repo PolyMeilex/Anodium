@@ -79,22 +79,20 @@ impl Inner {
     pub fn get_wallpaper(&mut self, renderer: &mut Gles2Renderer) -> Option<Gles2Texture> {
         if let Some(wallpaper_texture) = &self.wallpaper_texture {
             Some(wallpaper_texture.clone())
-        } else {
-            if let Some(wallpaper) = &self.wallpaper {
-                if let Ok(wallpaper_texture) = import_bitmap(
-                    renderer,
-                    &wallpaper.to_rgba8(),
-                    Some(self.current_mode.size.into()),
-                ) {
-                    self.wallpaper_texture = Some(wallpaper_texture.clone());
-                    self.wallpaper = None;
-                    Some(wallpaper_texture)
-                } else {
-                    None
-                }
+        } else if let Some(wallpaper) = &self.wallpaper {
+            if let Ok(wallpaper_texture) = import_bitmap(
+                renderer,
+                &wallpaper.to_rgba8(),
+                Some(self.current_mode.size.into()),
+            ) {
+                self.wallpaper_texture = Some(wallpaper_texture.clone());
+                self.wallpaper = None;
+                Some(wallpaper_texture)
             } else {
                 None
             }
+        } else {
+            None
         }
     }
 }

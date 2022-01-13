@@ -44,9 +44,7 @@ impl<'a> VisibleWorkspaceIterMut<'a> {
         workspaces: &'a mut HashMap<String, Box<dyn Positioner>>,
     ) -> Self {
         let mut keys = std::collections::HashSet::new();
-        let all_unique = outputs
-            .iter()
-            .all(|o| keys.insert(o.active_workspace().to_owned()));
+        let all_unique = outputs.iter().all(|o| keys.insert(o.active_workspace()));
 
         if !all_unique {
             slog_scope::error!(

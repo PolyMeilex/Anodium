@@ -79,7 +79,7 @@ impl Box {
                 .resizable(false)
                 .bg_alpha(inner.alpha)
                 .draw_background(inner.background)
-                .build(&ui, || {
+                .build(ui, || {
                     for widget in &inner.widgets {
                         widget.render(ui);
                         inner.layout.render(ui);

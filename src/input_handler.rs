@@ -96,11 +96,9 @@ impl Anodium {
 
                     if action.is_some() {
                         suppressed_keys.push(keysym);
-                    } else {
-                        if configvm.key_action(keysym, state, pressed_keys) {
-                            suppressed_keys.push(keysym);
-                            return FilterResult::Intercept(KeyAction::None);
-                        }
+                    } else if configvm.key_action(keysym, state, pressed_keys) {
+                        suppressed_keys.push(keysym);
+                        return FilterResult::Intercept(KeyAction::None);
                     }
 
                     action

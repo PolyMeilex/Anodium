@@ -156,6 +156,7 @@ where
                 InputEvent::DeviceAdded { device } => {
                     device.config_tap_set_enabled(true).ok();
                 }
+                InputEvent::DeviceRemoved { .. } => {}
                 _ => {}
             }
 
@@ -273,10 +274,10 @@ struct OutputSurfaceData {
     imgui: Option<imgui::SuspendedContext>,
     imgui_pipeline: imgui_smithay_renderer::Renderer,
 
-    output_name: String,
+    _output_name: String,
     mode: Mode,
     modes: Vec<DrmMode>,
-    connector_info: connector::Info,
+    _connector_info: connector::Info,
     crtc: crtc::Handle,
 }
 
@@ -291,6 +292,12 @@ pub struct UdevDeviceData {
     dev_id: u64,
 }
 
+struct ConnectorScanResult {
+    backends: HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
+    outputs: HashMap<crtc::Handle, Output>,
+    backends_order: Vec<crtc::Handle>,
+}
+
 fn scan_connectors<D: 'static>(
     inner: InnerRc,
     handle: LoopHandle<'static, D>,
@@ -299,11 +306,7 @@ fn scan_connectors<D: 'static>(
     renderer: &mut Gles2Renderer,
     signaler: &Signaler<SessionSignal>,
     mut ddata: DispatchData,
-) -> (
-    HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
-    HashMap<crtc::Handle, Output>,
-    Vec<crtc::Handle>,
-) {
+) -> ConnectorScanResult {
     // Get a set of all modesetting resource handles (excluding planes):
     let res_handles = drm.resource_handles().unwrap();
 
@@ -469,10 +472,10 @@ fn scan_connectors<D: 'static>(
                         imgui: Some(imgui.suspend()),
                         imgui_pipeline,
 
-                        output_name,
+                        _output_name: output_name,
                         mode: output_mode,
                         modes: modes.to_owned(),
-                        connector_info,
+                        _connector_info: connector_info,
                         crtc,
                     })));
                     backends_order.push(crtc);
@@ -495,7 +498,11 @@ fn scan_connectors<D: 'static>(
         }
     }
 
-    (backends, outputs_map, backends_order)
+    ConnectorScanResult {
+        backends,
+        outputs: outputs_map,
+        backends_order,
+    }
 }
 
 /// Try to open the device
@@ -586,7 +593,11 @@ fn device_added<D: 'static>(
             }
         }
 
-        let (outputs, outputs_map, outputs_order) = scan_connectors(
+        let ConnectorScanResult {
+            backends: outputs,
+            outputs: outputs_map,
+            backends_order: outputs_order,
+        } = scan_connectors(
             inner.clone(),
             handle.clone(),
             &mut drm,
@@ -822,7 +833,7 @@ fn render_output_surface(
             if let Err(err) = surface.surface.use_mode(*drm_mode) {
                 error!("pending mode: {:?} failed: {:?}", current_mode, err);
             } else {
-                surface.mode = current_mode.clone();
+                surface.mode = current_mode;
             }
         } else {
             error!("pending mode: {:?} not found in drm", current_mode);

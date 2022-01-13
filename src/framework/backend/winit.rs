@@ -104,7 +104,7 @@ where
             make: "Smithay".into(),
             model: "Winit".into(),
         },
-        mode.clone(),
+        mode,
         vec![mode],
         // TODO: output should always have a workspace
         "Unknown".into(),

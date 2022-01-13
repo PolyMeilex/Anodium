@@ -57,9 +57,10 @@ impl Logger {
                 }
             }
 
-            return Some(parsed_color);
+            Some(parsed_color)
+        } else {
+            None
         }
-        return None;
     }
 }
 

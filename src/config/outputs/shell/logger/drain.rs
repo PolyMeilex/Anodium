@@ -30,7 +30,7 @@ impl ShellDrain {
         ShellDrainBuilder::new()
             .default_tags()
             .build()
-            .parse(&std::env::var("RUST_LOG").unwrap_or("".to_owned()))
+            .parse(&std::env::var("RUST_LOG").unwrap_or_else(|_| String::new()))
     }
 
     pub fn parse(mut self, filters: &str) -> Self {

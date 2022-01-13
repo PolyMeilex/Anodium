@@ -100,7 +100,7 @@ impl OutputMap {
     where
         N: AsRef<str>,
     {
-        self.find(|o| &o.name() == name.as_ref())
+        self.find(|o| o.name() == name.as_ref())
     }
 
     #[allow(dead_code)]

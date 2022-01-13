@@ -89,10 +89,9 @@ impl WindowSurface {
     }
 
     pub fn notify_move(&self, pos: Point<i32, Logical>) {
-        match self {
-            #[cfg(feature = "xwayland")]
-            WindowSurface::X11(t) => t.move_to(pos.x as i32, pos.y as i32),
-            _ => {}
-        };
+        #[cfg(feature = "xwayland")]
+        if let WindowSurface::X11(t) = self {
+            t.move_to(pos.x as i32, pos.y as i32)
+        }
     }
 }

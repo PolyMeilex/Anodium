@@ -447,21 +447,19 @@ impl Anodium {
                             relative_ptr_location,
                             output_scale,
                         )?;
-                    } else {
-                        if let Some(pointer_image) = pointer_image {
-                            frame.render_texture_at(
-                                pointer_image,
-                                relative_ptr_location
-                                    .to_f64()
-                                    .to_physical(output_scale as f64)
-                                    .to_i32_round(),
-                                1,
-                                output_scale as f64,
-                                Transform::Normal,
-                                &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-                                1.0,
-                            )?;
-                        }
+                    } else if let Some(pointer_image) = pointer_image {
+                        frame.render_texture_at(
+                            pointer_image,
+                            relative_ptr_location
+                                .to_f64()
+                                .to_physical(output_scale as f64)
+                                .to_i32_round(),
+                            1,
+                            output_scale as f64,
+                            Transform::Normal,
+                            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+                            1.0,
+                        )?;
                     }
                 }
             }
@@ -527,7 +525,7 @@ impl Anodium {
     }
 
     pub fn switch_workspace(&mut self, key: &str) {
-        let already_active = self.output_map.iter().any(|o| &o.active_workspace() == key);
+        let already_active = self.output_map.iter().any(|o| o.active_workspace() == key);
 
         if already_active {
             if let Some(workspace) = self.workspaces.get(key) {

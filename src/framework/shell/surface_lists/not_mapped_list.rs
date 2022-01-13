@@ -22,7 +22,7 @@ pub struct NotMappedList {
 /// Toplevel Windows
 impl NotMappedList {
     pub fn insert_window(&mut self, toplevel: WindowSurface, location: Point<i32, Logical>) {
-        let mut window = Window::new(toplevel.clone(), location);
+        let mut window = Window::new(toplevel, location);
         window.self_update();
         self.windows.push(window);
     }

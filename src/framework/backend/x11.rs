@@ -40,7 +40,7 @@ struct OutputSurface {
     imgui: Option<imgui::SuspendedContext>,
     imgui_pipeline: imgui_smithay_renderer::Renderer,
 
-    output_name: String,
+    _output_name: String,
     output: Output,
     mode: Mode,
 
@@ -60,7 +60,7 @@ impl OutputSurfaceBuilder {
     ) -> Self {
         let window = WindowBuilder::new()
             .title("Anodium")
-            .build(&handle)
+            .build(handle)
             .expect("Failed to create first window");
 
         // Create the surface for the window.
@@ -99,7 +99,7 @@ impl OutputSurfaceBuilder {
                 make: "Smithay".into(),
                 model: "Winit".into(),
             },
-            mode.clone(),
+            mode,
             vec![mode],
             // TODO: output should always have a workspace
             "Unknown".into(),
@@ -125,7 +125,7 @@ impl OutputSurfaceBuilder {
             imgui: Some(imgui.suspend()),
             imgui_pipeline,
             mode,
-            output_name: "X11(1)".into(),
+            _output_name: "X11(1)".into(),
             output,
 
             rerender: true,
@@ -181,7 +181,7 @@ where
 
     let x11_outputs = vec![
         OutputSurfaceBuilder::new(&handle, device.clone(), &context),
-        OutputSurfaceBuilder::new(&handle, device.clone(), &context),
+        OutputSurfaceBuilder::new(&handle, device, &context),
     ];
 
     let renderer = unsafe { Gles2Renderer::new(context, slog_scope::logger()) }
@@ -189,14 +189,14 @@ where
     let renderer = Rc::new(RefCell::new(renderer));
 
     new_x11_window(
-        display.clone(),
+        display,
         event_loop,
         state,
         backend,
-        renderer.clone(),
+        renderer,
         x11_outputs,
-        cb.clone(),
-        input_cb.clone(),
+        cb,
+        input_cb,
     )
 }
 

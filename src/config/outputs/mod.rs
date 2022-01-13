@@ -94,7 +94,7 @@ pub mod modes {
         if let Some(mode) = modes.0.iter().find(|m| {
             m.size.w as i64 == w && m.size.h as i64 == h && m.refresh as i64 == refresh * 1000
         }) {
-            rhai::Dynamic::from(mode.clone())
+            rhai::Dynamic::from(*mode)
         } else {
             rhai::Dynamic::UNIT
         }

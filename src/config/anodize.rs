@@ -35,7 +35,7 @@ impl Anodize {
             keyboard: Keyboard::new(),
             system: System::new(event_sender.clone(), loop_handle),
             workspace: Workspace::new(event_sender.clone()),
-            windows: Windows::new(event_sender.clone()),
+            windows: Windows::new(event_sender),
             log: Log::new(),
             outputs: Outputs::new(output_map),
         }
