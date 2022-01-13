@@ -47,7 +47,10 @@ use smithay::{
         nix::{fcntl::OFlag, sys::stat::dev_t},
         wayland_server::{protocol::wl_output, DispatchData, Display},
     },
-    utils::signaling::{Linkable, SignalToken, Signaler},
+    utils::{
+        signaling::{Linkable, SignalToken, Signaler},
+        Rectangle,
+    },
     wayland::{
         dmabuf::init_dmabuf_global,
         output::{Mode, PhysicalProperties},
@@ -831,42 +834,38 @@ fn render_output_surface(
 
     // and draw to our buffer
     match renderer
-        .render(
-            surface.mode.size,
-            Transform::Flipped180, // Scanout is rotated
-            |renderer, frame| {
-                let imgui = surface.imgui.take().unwrap();
-                let mut imgui = imgui.activate().unwrap();
-                let ui = imgui.frame();
+        .render(surface.mode.size, Transform::Normal, |renderer, frame| {
+            let imgui = surface.imgui.take().unwrap();
+            let mut imgui = imgui.activate().unwrap();
+            let ui = imgui.frame();
 
-                {
-                    let mut frame = RenderFrame {
-                        transform: Transform::Flipped180,
-                        renderer,
-                        frame,
-                        imgui: Some((ui, &surface.imgui_pipeline)),
-                    };
+            {
+                let mut frame = RenderFrame {
+                    transform: Transform::Normal,
+                    renderer,
+                    frame,
+                    imgui: Some((ui, &surface.imgui_pipeline)),
+                };
 
-                    output.update_fps(surface.fps.avg());
+                output.update_fps(surface.fps.avg());
 
-                    cb(
-                        BackendEvent::OutputRender {
-                            frame: &mut frame,
-                            output,
-                            pointer_image: Some(pointer_image),
-                        },
-                        ddata,
-                    );
-                }
+                cb(
+                    BackendEvent::OutputRender {
+                        frame: &mut frame,
+                        output,
+                        pointer_image: Some(pointer_image),
+                    },
+                    ddata,
+                );
+            }
 
-                {
-                    surface.imgui = Some(imgui.suspend());
-                }
+            {
+                surface.imgui = Some(imgui.suspend());
+            }
 
-                surface.fps.tick();
-                Ok(())
-            },
-        )
+            surface.fps.tick();
+            Ok(())
+        })
         .map_err(Into::<SwapBuffersError>::into)
         .and_then(|x| x)
         .map_err(Into::<SwapBuffersError>::into)
@@ -889,7 +888,10 @@ fn initial_render(
     renderer
         .render((1, 1).into(), Transform::Normal, |_renderer, frame| {
             frame
-                .clear([0.8, 0.8, 0.9, 1.0])
+                .clear(
+                    [0.8, 0.8, 0.9, 1.0],
+                    &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+                )
                 .map_err(Into::<SwapBuffersError>::into)
         })
         .map_err(Into::<SwapBuffersError>::into)

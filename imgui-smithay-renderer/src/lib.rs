@@ -225,6 +225,7 @@ impl Renderer {
 
         let transform3 = transform.matrix();
         let mut transform = cgmath::Matrix4::identity();
+        let flip180 = cgmath::Matrix4::from_angle_x(cgmath::Deg(180.0));
 
         {
             let mut row = &mut transform.x;
@@ -248,7 +249,7 @@ impl Renderer {
             row.z = row3.z;
         }
 
-        let matrix_src = transform * matrix;
+        let matrix_src = flip180 * transform * matrix;
 
         let matrix: &[f32; 16] = matrix_src.as_ref();
 

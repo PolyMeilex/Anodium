@@ -274,7 +274,7 @@ where
         .insert_source(timer, {
             let surface_datas = surface_datas.clone();
             let cb = cb.clone();
-            move |_: (), timer_handle, state| {
+            move |_: (), _timer_handle, state| {
                 let mut ddata = DispatchData::wrap(state);
 
                 let mut renderer = renderer.borrow_mut();
@@ -300,13 +300,13 @@ where
 
                     let res = renderer.render(
                         surface_data.mode.size,
-                        Transform::Flipped180,
+                        Transform::Normal,
                         |renderer, frame| {
                             let ui = imgui.frame();
 
                             {
                                 let mut frame = RenderFrame {
-                                    transform: Transform::Flipped180,
+                                    transform: Transform::Normal,
                                     renderer,
                                     frame,
                                     imgui: Some((ui, &surface_data.imgui_pipeline)),
