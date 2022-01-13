@@ -59,6 +59,10 @@ features = ["composite"]
 version = "0.9.0"
 features = ["executor", "futures-io"]
 
+[dependencies.smithay-egui]
+git = "https://github.com/Smithay/smithay-egui"
+commit = "baa131d77b2fc2e3c2e87e881bba3ee18b315d14"
+
 
 [features]
 default = ["udev", "winit", "x11"]
@@ -80,3 +84,6 @@ udev = [
 ]
 
 xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
+
+[patch."https://github.com/Smithay/smithay.git"]
+smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }
