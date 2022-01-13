@@ -1,4 +1,5 @@
 use smithay::{
+    desktop::Kind,
     reexports::wayland_server::{
         protocol::{wl_pointer::ButtonState, wl_surface},
         DispatchData,
@@ -10,14 +11,14 @@ use smithay::{
     },
 };
 
-use crate::{state::Anodium, window::WindowSurface};
+use crate::state::Anodium;
 
 use crate::framework::surface_data::{MoveAfterResizeState, SurfaceData};
 
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,
 
-    pub toplevel: WindowSurface,
+    pub toplevel: Kind,
     pub initial_window_location: Point<i32, Logical>,
 }
 

@@ -1,4 +1,5 @@
 #![allow(clippy::too_many_arguments)]
+#![allow(irrefutable_let_patterns)]
 
 #[macro_use]
 extern crate slog_scope;

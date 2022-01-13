@@ -33,22 +33,6 @@ impl WindowSurface {
         }
     }
 
-    /// Activate/Deactivate this window
-    pub fn set_activated(&self, active: bool) {
-        if let WindowSurface::Xdg(ref t) = self {
-            let changed = t.with_pending_state(|state| {
-                if active {
-                    state.states.set(xdg_toplevel::State::Activated)
-                } else {
-                    state.states.unset(xdg_toplevel::State::Activated)
-                }
-            });
-            if let Ok(true) = changed {
-                t.send_configure();
-            }
-        }
-    }
-
     pub fn maximize(&self, size: Size<i32, Logical>) {
         if let WindowSurface::Xdg(ref t) = self {
             let res = t.with_pending_state(|state| {
@@ -88,7 +72,7 @@ impl WindowSurface {
         };
     }
 
-    pub fn notify_move(&self, pos: Point<i32, Logical>) {
+    pub fn notify_move(&self, _pos: Point<i32, Logical>) {
         #[cfg(feature = "xwayland")]
         if let WindowSurface::X11(t) = self {
             t.move_to(pos.x as i32, pos.y as i32)

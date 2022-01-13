@@ -1,5 +1,6 @@
 use std::sync::Mutex;
 
+use smithay::desktop::Kind;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor;
@@ -7,7 +8,6 @@ use smithay::wayland::shell::xdg::{
     XdgPopupSurfaceRoleAttributes, XdgToplevelSurfaceRoleAttributes,
 };
 
-use super::super::SurfaceData;
 use crate::popup::{Popup, PopupSurface};
 use crate::utils::AsWlSurface;
 
@@ -72,7 +72,7 @@ impl NotMappedList {
 
             let toplevel = win.toplevel();
             // send the initial configure if relevant
-            if let WindowSurface::Xdg(ref toplevel) = toplevel {
+            if let Kind::Xdg(ref toplevel) = toplevel {
                 let initial_configure_sent = compositor::with_states(surface, |states| {
                     states
                         .data_map
@@ -88,12 +88,14 @@ impl NotMappedList {
                 }
             }
 
-            let has_buffer =
-                SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+            // TODO: this is not true
+            let has_buffer = true;
+            // let has_buffer =
+            //     SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
 
             if has_buffer {
                 match toplevel {
-                    WindowSurface::Xdg(_) => {
+                    Kind::Xdg(_) => {
                         let configured = compositor::with_states(surface, |states| {
                             states
                                 .data_map
@@ -122,7 +124,7 @@ impl NotMappedList {
         toplevel.and_then(|toplevel| self.remove_window(&toplevel))
     }
 
-    pub fn remove_window(&mut self, kind: &WindowSurface) -> Option<Window> {
+    pub fn remove_window(&mut self, kind: &Kind) -> Option<Window> {
         let id = self.windows.iter().enumerate().find_map(|(id, win)| {
             if &win.toplevel() == kind {
                 Some(id)
@@ -211,8 +213,10 @@ impl NotMappedList {
                 }
             }
 
-            let has_buffer =
-                SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
+            // TODO: this is not true
+            let has_buffer = true;
+            // let has_buffer =
+            // SurfaceData::try_with(surface, |data| data.buffer.is_some()).unwrap_or(false);
 
             if has_buffer {
                 match popup {

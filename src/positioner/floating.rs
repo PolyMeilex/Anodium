@@ -1,5 +1,6 @@
 use smithay::{
     backend::input,
+    desktop::Kind,
     reexports::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
         wayland_server::protocol::wl_surface::WlSurface,
@@ -16,7 +17,7 @@ use crate::{
         MoveAfterResizeData, MoveAfterResizeState, ResizeData, ResizeEdge, ResizeState, SurfaceData,
     },
     grabs::ResizeSurfaceGrab,
-    window::{Window, WindowList, WindowSurface},
+    window::{Window, WindowList},
 };
 
 use super::{MoveResponse, Positioner};
@@ -41,7 +42,7 @@ impl Floating {
 impl Positioner for Floating {
     fn map_toplevel(&mut self, mut window: Window, mut reposition: bool) {
         match window.toplevel() {
-            WindowSurface::Xdg(toplevel) => {
+            Kind::Xdg(toplevel) => {
                 if let Some(state) = toplevel.current_state() {
                     if state.states.contains(xdg_toplevel::State::Maximized)
                         || state.states.contains(xdg_toplevel::State::Fullscreen)
@@ -69,13 +70,13 @@ impl Positioner for Floating {
         self.windows.insert(window);
     }
 
-    fn unmap_toplevel(&mut self, toplevel: &WindowSurface) -> Option<Window> {
+    fn unmap_toplevel(&mut self, toplevel: &Kind) -> Option<Window> {
         self.windows.remove(toplevel)
     }
 
     fn move_request(
         &mut self,
-        toplevel: &WindowSurface,
+        toplevel: &Kind,
         seat: &Seat,
         _serial: Serial,
         _start_data: &GrabStartData,
@@ -86,7 +87,7 @@ impl Positioner for Floating {
             let mut target_window_location = window.location();
 
             // If surface is maximized then unmaximize it
-            if let WindowSurface::Xdg(ref surface) = toplevel {
+            if let Kind::Xdg(ref surface) = toplevel {
                 if let Some(current_state) = surface.current_state() {
                     if current_state
                         .states
@@ -159,7 +160,7 @@ impl Positioner for Floating {
 
     fn resize_request(
         &mut self,
-        toplevel: &WindowSurface,
+        toplevel: &Kind,
         seat: &Seat,
         serial: Serial,
         start_data: GrabStartData,
@@ -190,13 +191,13 @@ impl Positioner for Floating {
         };
     }
 
-    fn maximize_request(&mut self, toplevle: &WindowSurface) {
+    fn maximize_request(&mut self, toplevle: &Kind) {
         if let Some(window) = self.windows.find_mut(toplevle) {
             window.maximize(self.geometry);
         }
     }
 
-    fn unmaximize_request(&mut self, toplevle: &WindowSurface) {
+    fn unmaximize_request(&mut self, toplevle: &Kind) {
         if let Some(window) = self.windows.find_mut(toplevle) {
             window.unmaximize();
         }

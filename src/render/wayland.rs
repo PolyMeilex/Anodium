@@ -1,40 +1,19 @@
 #![allow(clippy::too_many_arguments)]
 
-use std::{cell::RefCell, sync::Mutex};
+use std::sync::Mutex;
 
-#[cfg(feature = "image")]
-use smithay::backend::renderer::gles2::Gles2Texture;
 use smithay::{
-    backend::{
-        renderer::{buffer_type, BufferType, Frame, ImportAll, Transform},
-        SwapBuffersError,
-    },
-    reexports::wayland_server::protocol::{wl_buffer, wl_surface},
+    backend::SwapBuffersError,
+    reexports::wayland_server::protocol::wl_surface,
     utils::{Logical, Point, Rectangle},
     wayland::{
-        compositor::{
-            get_role, with_states, with_surface_tree_upward, Damage, SubsurfaceCachedState,
-            SurfaceAttributes, TraversalAction,
-        },
+        compositor::{get_role, with_states},
         seat::CursorImageAttributes,
         shell::wlr_layer::Layer,
     },
 };
 
-use crate::{framework::surface_data::SurfaceData, render::renderer::RenderFrame, state::Anodium};
-
-struct BufferTextures<T> {
-    buffer: Option<wl_buffer::WlBuffer>,
-    texture: T,
-}
-
-impl<T> Drop for BufferTextures<T> {
-    fn drop(&mut self) {
-        if let Some(buffer) = self.buffer.take() {
-            buffer.release();
-        }
-    }
-}
+use crate::{render::renderer::RenderFrame, state::Anodium};
 
 pub fn draw_cursor(
     frame: &mut RenderFrame,
@@ -70,112 +49,21 @@ pub fn draw_surface_tree(
     frame: &mut RenderFrame,
     root: &wl_surface::WlSurface,
     location: Point<i32, Logical>,
-    output_scale: f64,
+    scale: f64,
 ) -> Result<(), SwapBuffersError> {
-    let mut result = Ok(());
+    let renderer = &mut *frame.renderer;
+    let frame = &mut *frame.frame;
 
-    let renderer = &mut frame.renderer;
-    let frame = &mut frame.frame;
-    with_surface_tree_upward(
+    smithay::backend::renderer::utils::draw_surface_tree(
+        renderer,
+        frame,
         root,
+        scale,
         location,
-        |_surface, states, location| {
-            let mut location = *location;
-            // Pull a new buffer if available
-            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
-                let mut data = data.borrow_mut();
-                let attributes = states.cached_state.current::<SurfaceAttributes>();
-                if data.texture.is_none() {
-                    if let Some(buffer) = data.buffer.take() {
-                        let damage = attributes
-                            .damage
-                            .iter()
-                            .map(|dmg| match dmg {
-                                Damage::Buffer(rect) => *rect,
-                                // TODO also apply transformations
-                                Damage::Surface(rect) => rect.to_buffer(attributes.buffer_scale),
-                            })
-                            .collect::<Vec<_>>();
-
-                        match renderer.import_buffer(&buffer, Some(states), &damage) {
-                            Some(Ok(m)) => {
-                                let texture_buffer =
-                                    if let Some(BufferType::Shm) = buffer_type(&buffer) {
-                                        buffer.release();
-                                        None
-                                    } else {
-                                        Some(buffer)
-                                    };
-                                data.texture = Some(Box::new(BufferTextures {
-                                    buffer: texture_buffer,
-                                    texture: m,
-                                }))
-                            }
-                            Some(Err(err)) => {
-                                warn!("Error loading buffer: {:?}", err);
-                                buffer.release();
-                            }
-                            None => {
-                                error!("Unknown buffer format for: {:?}", buffer);
-                                buffer.release();
-                            }
-                        }
-                    }
-                }
-                // Now, should we be drawn ?
-                if data.texture.is_some() {
-                    // if yes, also process the children
-                    if states.role == Some("subsurface") {
-                        let current = states.cached_state.current::<SubsurfaceCachedState>();
-                        location += current.location;
-                    }
-                    TraversalAction::DoChildren(location)
-                } else {
-                    // we are not displayed, so our children are neither
-                    TraversalAction::SkipChildren
-                }
-            } else {
-                // we are not displayed, so our children are neither
-                TraversalAction::SkipChildren
-            }
-        },
-        |_surface, states, location| {
-            let mut location = *location;
-            if let Some(data) = states.data_map.get::<RefCell<SurfaceData>>() {
-                let mut data = data.borrow_mut();
-                let buffer_scale = data.buffer_scale;
-                if let Some(texture) = data
-                    .texture
-                    .as_mut()
-                    .and_then(|x| x.downcast_mut::<BufferTextures<Gles2Texture>>())
-                {
-                    // we need to re-extract the subsurface offset, as the previous closure
-                    // only passes it to our children
-                    if states.role == Some("subsurface") {
-                        let current = states.cached_state.current::<SubsurfaceCachedState>();
-                        location += current.location;
-                    }
-                    if let Err(err) = frame.render_texture_at(
-                        &texture.texture,
-                        location
-                            .to_f64()
-                            .to_physical(output_scale as f64)
-                            .to_i32_round(),
-                        buffer_scale,
-                        output_scale as f64,
-                        Transform::Normal, /* TODO */
-                        &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-                        1.0,
-                    ) {
-                        result = Err(err.into());
-                    }
-                }
-            }
-        },
-        |_, _, _| true,
-    );
-
-    result
+        &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+        &slog_scope::logger(),
+    )
+    .map_err(SwapBuffersError::from)
 }
 
 impl Anodium {

@@ -1,6 +1,7 @@
 use std::sync::Mutex;
 
 use smithay::{
+    desktop::Kind,
     reexports::{wayland_protocols::xdg_shell::server::xdg_toplevel, wayland_server::DispatchData},
     wayland::{
         compositor,
@@ -37,7 +38,7 @@ impl super::Inner {
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
                     (self.cb)(
                         ShellEvent::WindowMove {
-                            toplevel: WindowSurface::Xdg(surface),
+                            toplevel: Kind::Xdg(surface),
                             start_data,
                             seat,
                             serial,
@@ -57,7 +58,7 @@ impl super::Inner {
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
                     (self.cb)(
                         ShellEvent::WindowResize {
-                            toplevel: WindowSurface::Xdg(surface),
+                            toplevel: Kind::Xdg(surface),
                             start_data,
                             seat,
                             edges: edges.into(),
@@ -71,7 +72,7 @@ impl super::Inner {
             XdgRequest::Maximize { surface } => {
                 (self.cb)(
                     ShellEvent::WindowMaximize {
-                        toplevel: WindowSurface::Xdg(surface),
+                        toplevel: Kind::Xdg(surface),
                     },
                     ddata,
                 );
@@ -79,7 +80,7 @@ impl super::Inner {
             XdgRequest::UnMaximize { surface } => {
                 (self.cb)(
                     ShellEvent::WindowUnMaximize {
-                        toplevel: WindowSurface::Xdg(surface),
+                        toplevel: Kind::Xdg(surface),
                     },
                     ddata,
                 );
@@ -88,7 +89,7 @@ impl super::Inner {
             XdgRequest::Fullscreen { surface, output } => {
                 (self.cb)(
                     ShellEvent::WindowFullscreen {
-                        toplevel: WindowSurface::Xdg(surface),
+                        toplevel: Kind::Xdg(surface),
                         output,
                     },
                     ddata,
@@ -97,7 +98,7 @@ impl super::Inner {
             XdgRequest::UnFullscreen { surface } => {
                 (self.cb)(
                     ShellEvent::WindowUnFullscreen {
-                        toplevel: WindowSurface::Xdg(surface),
+                        toplevel: Kind::Xdg(surface),
                     },
                     ddata,
                 );
@@ -106,7 +107,7 @@ impl super::Inner {
             XdgRequest::Minimize { surface } => {
                 (self.cb)(
                     ShellEvent::WindowMinimize {
-                        toplevel: WindowSurface::Xdg(surface),
+                        toplevel: Kind::Xdg(surface),
                     },
                     ddata,
                 );
@@ -153,7 +154,7 @@ impl super::Inner {
             } => {
                 (self.cb)(
                     ShellEvent::ShowWindowMenu {
-                        toplevel: WindowSurface::Xdg(surface),
+                        toplevel: Kind::Xdg(surface),
                         seat: Seat::from_resource(&seat).unwrap(),
                         serial,
                         location,

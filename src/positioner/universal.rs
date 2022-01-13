@@ -1,4 +1,5 @@
 use smithay::{
+    desktop::Kind,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point, Rectangle},
 };
@@ -6,7 +7,7 @@ use smithay::{
 use super::{floating::Floating, tiling::Tiling, MoveResponse, Positioner};
 
 use crate::framework::surface_data::ResizeEdge;
-use crate::window::{Window, WindowSurface};
+use crate::window::Window;
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -41,7 +42,7 @@ impl Positioner for Universal {
         }
     }
 
-    fn unmap_toplevel(&mut self, toplevel: &WindowSurface) -> Option<Window> {
+    fn unmap_toplevel(&mut self, toplevel: &Kind) -> Option<Window> {
         if let Some(win) = self.floating.unmap_toplevel(toplevel) {
             Some(win)
         } else {
@@ -51,7 +52,7 @@ impl Positioner for Universal {
 
     fn move_request(
         &mut self,
-        toplevel: &WindowSurface,
+        toplevel: &Kind,
         seat: &smithay::wayland::seat::Seat,
         serial: smithay::wayland::Serial,
         start_data: &smithay::wayland::seat::GrabStartData,
@@ -68,7 +69,7 @@ impl Positioner for Universal {
 
     fn resize_request(
         &mut self,
-        toplevel: &WindowSurface,
+        toplevel: &Kind,
         seat: &smithay::wayland::seat::Seat,
         serial: smithay::wayland::Serial,
         start_data: smithay::wayland::seat::GrabStartData,
@@ -80,12 +81,12 @@ impl Positioner for Universal {
             .resize_request(toplevel, seat, serial, start_data, edges);
     }
 
-    fn maximize_request(&mut self, toplevel: &WindowSurface) {
+    fn maximize_request(&mut self, toplevel: &Kind) {
         self.floating.maximize_request(toplevel);
         self.tiling.maximize_request(toplevel);
     }
 
-    fn unmaximize_request(&mut self, toplevel: &WindowSurface) {
+    fn unmaximize_request(&mut self, toplevel: &Kind) {
         self.floating.unmaximize_request(toplevel);
         self.tiling.unmaximize_request(toplevel);
     }

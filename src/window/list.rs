@@ -41,11 +41,13 @@ impl WindowList {
 
         // Take activation away from all the windows
         for window in self.windows.iter() {
-            window.toplevel().set_activated(false);
+            window.set_activated(false);
+            window.configure();
         }
 
         // Give activation to our winner
-        winner.toplevel().set_activated(true);
+        winner.set_activated(true);
+        winner.configure();
         self.windows.insert(0, winner);
     }
 

@@ -1,4 +1,5 @@
 use smithay::{
+    desktop::Kind,
     reexports::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
         wayland_server::{
@@ -15,13 +16,11 @@ use smithay::{
     },
 };
 
-use crate::window::WindowSurface;
-
 use crate::framework::surface_data::{ResizeEdge, ResizeState, SurfaceData};
 
 pub struct ResizeSurfaceGrab {
     pub start_data: GrabStartData,
-    pub toplevel: WindowSurface,
+    pub toplevel: Kind,
     pub edges: ResizeEdge,
     pub initial_window_size: Size<i32, Logical>,
     pub last_window_size: Size<i32, Logical>,
@@ -92,7 +91,7 @@ impl PointerGrab for ResizeSurfaceGrab {
         self.last_window_size = (new_window_width, new_window_height).into();
 
         match &self.toplevel {
-            WindowSurface::Xdg(xdg) => {
+            Kind::Xdg(xdg) => {
                 let ret = xdg.with_pending_state(|state| {
                     state.states.set(xdg_toplevel::State::Resizing);
                     state.size = Some(self.last_window_size);
@@ -127,7 +126,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                 return;
             }
 
-            if let WindowSurface::Xdg(xdg) = &self.toplevel {
+            if let Kind::Xdg(xdg) = &self.toplevel {
                 let ret = xdg.with_pending_state(|state| {
                     state.states.unset(xdg_toplevel::State::Resizing);
                     state.size = Some(self.last_window_size);

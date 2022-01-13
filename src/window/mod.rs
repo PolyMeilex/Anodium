@@ -1,25 +1,20 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
-use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::{
-    reexports::wayland_server::protocol::wl_surface,
-    utils::{Logical, Point, Rectangle},
-    wayland::{
-        compositor::{
-            with_states, with_surface_tree_downward, SubsurfaceCachedState, TraversalAction,
-        },
-        shell::xdg::SurfaceCachedState,
+    desktop::Kind,
+    reexports::{
+        wayland_protocols::xdg_shell::server::xdg_toplevel,
+        wayland_server::protocol::wl_surface::{self, WlSurface},
     },
+    utils::{Logical, Point, Rectangle},
 };
 
-use crate::render;
-use crate::render::renderer::RenderFrame;
 use crate::{
     animations::enter_exit::EnterExitAnimation,
     framework::surface_data::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
     popup::Popup,
-    utils,
+    render::renderer::RenderFrame,
 };
 
 mod list;
@@ -35,14 +30,18 @@ pub struct Window {
 
 impl Window {
     pub fn new(toplevel: WindowSurface, location: Point<i32, Logical>) -> Self {
+        let kind = match &toplevel {
+            WindowSurface::Xdg(xdg) => Kind::Xdg(xdg.clone()),
+        };
+
         let mut window = Window {
             inner: Rc::new(RefCell::new(Inner {
                 location,
-                bbox: Default::default(),
-                toplevel,
 
                 animation: EnterExitAnimation::Enter(0.0),
                 popups: Vec::new(),
+
+                window: smithay::desktop::Window::new(kind),
             })),
         };
         window.self_update();
@@ -58,38 +57,45 @@ impl Window {
         let mut render_location = self.render_location();
         render_location.x -= initial_location.x;
 
-        if let Some(wl_surface) = self.surface().as_ref() {
-            // this surface is a root of a subsurface tree that needs to be drawn
-            if let Err(err) =
-                render::draw_surface_tree(frame, wl_surface, render_location, output_scale)
-            {
-                error!("{:?}", err);
-            }
-            // furthermore, draw its popups
-            let toplevel_geometry_offset = self.geometry().loc;
-            let render_location = render_location + toplevel_geometry_offset;
+        let renderer = &mut *frame.renderer;
+        let frame = &mut *frame.frame;
 
-            let window = self.borrow();
-            for popup in window.popups().iter() {
-                popup.render(frame, render_location, output_scale);
-            }
-        }
+        let inner = self.inner.borrow();
+
+        smithay::desktop::draw_window(
+            renderer,
+            frame,
+            &inner.window,
+            output_scale,
+            render_location,
+            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+            &slog_scope::logger(),
+        )
+        .unwrap();
+    }
+
+    pub fn set_activated(&self, activated: bool) {
+        self.inner.borrow().window.set_activated(activated);
+    }
+
+    pub fn configure(&self) {
+        self.inner.borrow().window.configure();
+    }
+
+    pub fn toplevel(&self) -> Kind {
+        self.inner.borrow().window.toplevel().clone()
     }
 }
 
 #[derive(Debug)]
 pub struct Inner {
     location: Point<i32, Logical>,
-    /// A bounding box over this window and its children.
-    ///
-    /// Used for the fast path of the check in `matching`, and as the fall-back for the window
-    /// geometry if that's not set explicitly.
-    bbox: Rectangle<i32, Logical>,
-    toplevel: WindowSurface,
 
     animation: EnterExitAnimation,
 
     popups: Vec<Popup>,
+
+    window: smithay::desktop::Window,
 }
 
 impl Inner {
@@ -109,18 +115,19 @@ impl Inner {
 
     pub fn set_location(&mut self, location: Point<i32, Logical>) {
         self.location = location;
-        self.toplevel.notify_move(location);
+        // TODO: XWayland
+        // self.toplevel.notify_move(location);
         self.self_update();
     }
 
     pub fn bbox_in_comp_space(&self) -> Rectangle<i32, Logical> {
-        let mut bbox = self.bbox;
+        let mut bbox = self.window.bbox();
         bbox.loc += self.location;
         bbox
     }
 
     pub fn bbox_in_window_space(&self) -> Rectangle<i32, Logical> {
-        self.bbox
+        self.window.bbox()
     }
 }
 
@@ -142,7 +149,7 @@ impl Inner {
             target_window_location.x -= geometry.loc.x;
         }
 
-        if let Some(surface) = self.toplevel.get_surface() {
+        if let Some(surface) = self.window.toplevel().get_surface() {
             SurfaceData::with_mut(surface, |data| {
                 data.move_after_resize_state =
                     MoveAfterResizeState::WaitingForAck(MoveAfterResizeData {
@@ -154,7 +161,15 @@ impl Inner {
                     });
             });
 
-            self.toplevel.maximize(target_geometry.size);
+            if let Kind::Xdg(ref t) = self.window.toplevel() {
+                let res = t.with_pending_state(|state| {
+                    state.states.set(xdg_toplevel::State::Maximized);
+                    state.size = Some(target_geometry.size);
+                });
+                if res.is_ok() {
+                    t.send_configure();
+                }
+            }
         }
     }
 
@@ -162,7 +177,7 @@ impl Inner {
         let initial_window_location = self.location;
         let initial_size = self.geometry().size;
 
-        let size = if let Some(surface) = self.toplevel.get_surface() {
+        let size = if let Some(surface) = self.window.toplevel().get_surface() {
             let fullscreen_state = SurfaceData::with_mut(surface, |data| {
                 let fullscreen_state = data.move_after_resize_state;
 
@@ -189,7 +204,15 @@ impl Inner {
             None
         };
 
-        self.toplevel.unmaximize(size);
+        if let Kind::Xdg(ref t) = self.window.toplevel() {
+            let ret = t.with_pending_state(|state| {
+                state.states.unset(xdg_toplevel::State::Maximized);
+                state.size = size;
+            });
+            if ret.is_ok() {
+                t.send_configure();
+            }
+        }
     }
 
     /// Finds the topmost surface under this point if any and returns it together with the location of this
@@ -198,7 +221,7 @@ impl Inner {
         &self,
         point: Point<f64, Logical>,
     ) -> Option<(wl_surface::WlSurface, Point<i32, Logical>)> {
-        if !self.toplevel.alive() {
+        if !self.window.toplevel().alive() {
             return None;
         }
 
@@ -213,50 +236,15 @@ impl Inner {
             return None;
         }
 
-        // need to check more carefully
-        let found = RefCell::new(None);
-        if let Some(wl_surface) = self.toplevel.get_surface() {
-            with_surface_tree_downward(
-                wl_surface,
-                self.location,
-                |wl_surface, states, location| {
-                    let mut location = *location;
-                    let data = states.data_map.get::<RefCell<SurfaceData>>();
+        let wl_surface = self.window.toplevel().get_surface()?;
+        smithay::desktop::utils::under_from_surface_tree(wl_surface, point, self.location)
 
-                    if states.role == Some("subsurface") {
-                        let current = states.cached_state.current::<SubsurfaceCachedState>();
-                        location += current.location;
-                    }
-
-                    let contains_the_point = data
-                        .map(|data| {
-                            data.borrow().contains_point(
-                                &*states.cached_state.current(),
-                                point - location.to_f64(),
-                            )
-                        })
-                        .unwrap_or(false);
-                    if contains_the_point {
-                        *found.borrow_mut() = Some((wl_surface.clone(), location));
-                    }
-
-                    TraversalAction::DoChildren(location)
-                },
-                |_, _, _| {},
-                |_, _, _| {
-                    // only continue if the point is not found
-                    found.borrow().is_none()
-                },
-            );
-        }
-
-        found.into_inner()
+        // TODO:
+        // self.window.surface_under(point - self.location.to_f64())
     }
 
     pub fn self_update(&mut self) {
-        if let Some(surface) = self.toplevel.get_surface() {
-            self.bbox = utils::surface_bounding_box(surface);
-        }
+        self.window.refresh();
 
         self.popups.retain(|popup| popup.popup_surface().alive());
 
@@ -267,33 +255,17 @@ impl Inner {
 
     /// Returns the geometry of this window.
     pub fn geometry(&self) -> Rectangle<i32, Logical> {
-        if let Some(surface) = self.toplevel.get_surface() {
-            // It's the set geometry with the full bounding box as the fallback.
-            with_states(surface, |states| {
-                states.cached_state.current::<SurfaceCachedState>().geometry
-                // .and_then(|g| if g.size.w == 0 { None } else { Some(g) })
-            })
-            .unwrap()
-            .unwrap_or_else(|| self.bbox_in_window_space())
-        } else {
-            self.bbox_in_window_space()
-        }
+        self.window.geometry()
     }
 
     /// Sends the frame callback to all the subsurfaces in this
     /// window that requested it
     pub fn send_frame(&self, time: u32) {
-        if let Some(surface) = self.toplevel.get_surface() {
-            utils::surface_send_frame(surface, time)
-        }
-
-        for popup in self.popups.iter() {
-            popup.send_frame(time);
-        }
+        self.window.send_frame(time);
     }
 
     pub fn update_animation(&mut self, delta: f64) {
-        self.animation.update(delta, self.toplevel.alive());
+        self.animation.update(delta, self.window.toplevel().alive());
     }
 
     pub fn render_location(&self) -> Point<i32, Logical> {
@@ -336,12 +308,8 @@ impl Window {
         self.inner.borrow().bbox_in_window_space()
     }
 
-    pub fn toplevel(&self) -> WindowSurface {
-        self.inner.borrow().toplevel.clone()
-    }
-
     pub fn surface(&self) -> Option<wl_surface::WlSurface> {
-        self.inner.borrow().toplevel.get_surface().cloned()
+        self.inner.borrow().window.toplevel().get_surface().cloned()
     }
 
     pub fn animation(&self) -> EnterExitAnimation {

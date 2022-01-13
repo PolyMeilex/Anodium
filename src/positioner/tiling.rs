@@ -1,7 +1,8 @@
 use smithay::{
     backend::input,
+    desktop::Kind,
     reexports::{
-        wayland_protocols::xdg_shell::server::xdg_toplevel::{self},
+        wayland_protocols::xdg_shell::server::xdg_toplevel,
         wayland_server::protocol::wl_surface::WlSurface,
     },
     utils::{Logical, Point, Rectangle},
@@ -13,7 +14,7 @@ use smithay::{
 
 use crate::{
     framework::surface_data::{MoveAfterResizeState, SurfaceData},
-    window::{Window, WindowList, WindowSurface},
+    window::{Window, WindowList},
 };
 
 use super::{MoveResponse, Positioner};
@@ -53,7 +54,8 @@ impl Tiling {
                     self.geometry.size.h / (len - 1) as i32
                 };
 
-                window.toplevel().resize((w - 20, h - 20).into());
+                //TODO: XWayland
+                //window.toplevel().resize((w - 20, h - 20).into());
                 window.set_location(
                     (
                         loc.x - window.geometry().loc.x + 10,
@@ -74,7 +76,7 @@ impl Tiling {
 
 impl Positioner for Tiling {
     fn map_toplevel(&mut self, window: Window, mut reposition: bool) {
-        if let WindowSurface::Xdg(toplevel) = window.toplevel() {
+        if let Kind::Xdg(toplevel) = window.toplevel() {
             if let Some(state) = toplevel.current_state() {
                 if state.states.contains(xdg_toplevel::State::Maximized)
                     || state.states.contains(xdg_toplevel::State::Fullscreen)
@@ -91,13 +93,13 @@ impl Positioner for Tiling {
         }
     }
 
-    fn unmap_toplevel(&mut self, toplevel: &WindowSurface) -> Option<Window> {
+    fn unmap_toplevel(&mut self, toplevel: &Kind) -> Option<Window> {
         self.windows.remove(toplevel)
     }
 
     fn move_request(
         &mut self,
-        toplevel: &WindowSurface,
+        toplevel: &Kind,
         seat: &Seat,
         _serial: Serial,
         _start_data: &GrabStartData,
@@ -108,7 +110,7 @@ impl Positioner for Tiling {
             let mut initial_window_location = window.location();
 
             // If surface is maximized then unmaximize it
-            if let WindowSurface::Xdg(ref surface) = toplevel {
+            if let Kind::Xdg(ref surface) = toplevel {
                 if let Some(current_state) = surface.current_state() {
                     if current_state
                         .states
@@ -177,13 +179,13 @@ impl Positioner for Tiling {
 
                 // TODO: other positioners should deactivate their windows too?
                 for w in windows.iter() {
-                    w.toplevel().set_activated(false);
+                    w.set_activated(false);
                 }
 
                 let under = windows.surface_under(self.pointer_position);
                 if let Some(under) = under {
                     if let Some(window) = windows.find(&under.0) {
-                        window.toplevel().set_activated(true);
+                        window.set_activated(true);
                     }
                 }
             }

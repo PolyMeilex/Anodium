@@ -1,9 +1,9 @@
-use smithay::reexports::calloop::LoopHandle;
+use smithay::desktop::Kind;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
-use smithay::reexports::wayland_server::{Client, DispatchData, Display};
+use smithay::reexports::wayland_server::{DispatchData, Display};
 use smithay::utils::{Logical, Point};
-use smithay::wayland::compositor::{self, SurfaceAttributes, TraversalAction};
+use smithay::wayland::compositor::{self, TraversalAction};
 use smithay::wayland::seat::{GrabStartData, Seat};
 use smithay::wayland::shell::wlr_layer::{
     wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
@@ -11,15 +11,12 @@ use smithay::wayland::shell::wlr_layer::{
 use smithay::wayland::shell::xdg::xdg_shell_init;
 use smithay::wayland::Serial;
 use std::cell::RefCell;
-use std::os::unix::net::UnixStream;
 use std::rc::Rc;
 use std::sync::Mutex;
 
 use crate::output_map::LayerSurface;
 use crate::popup::PopupSurface;
-use crate::state::Anodium;
-use crate::utils::LogResult;
-use crate::window::{Window, WindowSurface};
+use crate::window::Window;
 
 use super::surface_data::{MoveAfterResizeState, ResizeData, ResizeEdge, ResizeState, SurfaceData};
 
@@ -40,14 +37,14 @@ pub enum ShellEvent {
     },
 
     WindowMove {
-        toplevel: WindowSurface,
+        toplevel: Kind,
         start_data: GrabStartData,
         seat: Seat,
         serial: Serial,
     },
 
     WindowResize {
-        toplevel: WindowSurface,
+        toplevel: Kind,
         start_data: GrabStartData,
         seat: Seat,
         edges: ResizeEdge,
@@ -55,22 +52,22 @@ pub enum ShellEvent {
     },
 
     WindowMaximize {
-        toplevel: WindowSurface,
+        toplevel: Kind,
     },
     WindowUnMaximize {
-        toplevel: WindowSurface,
+        toplevel: Kind,
     },
 
     WindowFullscreen {
-        toplevel: WindowSurface,
+        toplevel: Kind,
         output: Option<WlOutput>,
     },
     WindowUnFullscreen {
-        toplevel: WindowSurface,
+        toplevel: Kind,
     },
 
     WindowMinimize {
-        toplevel: WindowSurface,
+        toplevel: Kind,
     },
 
     //
@@ -91,7 +88,7 @@ pub enum ShellEvent {
     // Misc
     //
     ShowWindowMenu {
-        toplevel: WindowSurface,
+        toplevel: Kind,
         seat: Seat,
         serial: Serial,
         location: Point<i32, Logical>,
@@ -227,6 +224,8 @@ impl Inner {
         #[cfg(feature = "xwayland")]
         self.xwayland_commit_hook(&surface);
 
+        smithay::backend::renderer::utils::on_commit_buffer_handler(&surface);
+
         if !compositor::is_sync_subsurface(&surface) {
             // Update the buffer of all child surfaces
             compositor::with_surface_tree_upward(
@@ -237,12 +236,6 @@ impl Inner {
                     states
                         .data_map
                         .insert_if_missing(|| RefCell::new(SurfaceData::default()));
-                    let mut data = states
-                        .data_map
-                        .get::<RefCell<SurfaceData>>()
-                        .unwrap()
-                        .borrow_mut();
-                    data.update_buffer(&mut *states.cached_state.current::<SurfaceAttributes>());
                 },
                 |_, _, _| true,
             );

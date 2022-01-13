@@ -3,6 +3,7 @@ use smithay::{
         input::{ButtonState, MouseButton},
         SwapBuffersError,
     },
+    desktop::Kind,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point, Rectangle},
     wayland::{
@@ -11,7 +12,7 @@ use smithay::{
     },
 };
 
-use crate::window::{Window, WindowSurface};
+use crate::window::Window;
 use crate::{framework::surface_data::ResizeEdge, render::renderer::RenderFrame};
 
 pub mod floating;
@@ -21,11 +22,11 @@ pub mod universal;
 #[allow(unused)]
 pub trait Positioner: std::fmt::Debug {
     fn map_toplevel(&mut self, window: Window, reposition: bool);
-    fn unmap_toplevel(&mut self, toplevel: &WindowSurface) -> Option<Window>;
+    fn unmap_toplevel(&mut self, toplevel: &Kind) -> Option<Window>;
 
     fn move_request(
         &mut self,
-        toplevel: &WindowSurface,
+        toplevel: &Kind,
         seat: &Seat,
         serial: Serial,
         start_data: &GrabStartData,
@@ -33,7 +34,7 @@ pub trait Positioner: std::fmt::Debug {
 
     fn resize_request(
         &mut self,
-        toplevel: &WindowSurface,
+        toplevel: &Kind,
         seat: &Seat,
         serial: Serial,
         start_data: GrabStartData,
@@ -41,8 +42,8 @@ pub trait Positioner: std::fmt::Debug {
     ) {
     }
 
-    fn maximize_request(&mut self, toplevel: &WindowSurface) {}
-    fn unmaximize_request(&mut self, toplevel: &WindowSurface) {}
+    fn maximize_request(&mut self, toplevel: &Kind) {}
+    fn unmaximize_request(&mut self, toplevel: &Kind) {}
 
     fn with_windows_rev(&self, cb: &mut dyn FnMut(&Window));
 
