@@ -119,8 +119,8 @@ impl Anodium {
                 };
             }
 
-            InputEvent::PointerAxis { event, .. } => match event.source() {
-                input::AxisSource::Wheel => {
+            InputEvent::PointerAxis { event, .. } => {
+                if event.source() == input::AxisSource::Wheel {
                     let amount_discrete =
                         event.amount_discrete(input::Axis::Vertical).unwrap() * 0.3;
                     // TODO - find a better way to handle this, why does it scrool on wayland in opposite direction?!
@@ -130,8 +130,7 @@ impl Anodium {
                         io.mouse_wheel -= amount_discrete as f32;
                     }
                 }
-                _ => {}
-            },
+            }
             _ => {}
         }
 

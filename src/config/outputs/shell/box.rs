@@ -87,7 +87,7 @@ impl Box {
                 .scroll_bar(inner.scroll)
                 .horizontal_scrollbar(inner.scroll)
                 .scrollable(inner.scroll)
-                .build(&ui, || {
+                .build(ui, || {
                     for widget in &inner.widgets {
                         widget.render(ui, config_tx);
                         inner.layout.render(ui);
