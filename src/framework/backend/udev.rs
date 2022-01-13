@@ -267,8 +267,6 @@ struct OutputSurfaceData {
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
     fps: fps_ticker::Fps,
-    //imgui: Option<imgui::SuspendedContext>,
-    //imgui_pipeline: imgui_smithay_renderer::Renderer,
     output_name: String,
     mode: Mode,
     modes: Vec<DrmMode>,
