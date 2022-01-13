@@ -841,32 +841,28 @@ fn render_output_surface(
 
     // and draw to our buffer
     match renderer
-        .render(
-            surface.mode.size,
-            Transform::Normal, // Scanout is rotated
-            |renderer, frame| {
-                {
-                    let mut frame = RenderFrame {
-                        transform: Transform::Normal,
-                        renderer,
-                        frame,
-                    };
+        .render(surface.mode.size, Transform::Normal, |renderer, frame| {
+            {
+                let mut frame = RenderFrame {
+                    transform: Transform::Normal,
+                    renderer,
+                    frame,
+                };
 
-                    output.update_fps(surface.fps.avg());
+                output.update_fps(surface.fps.avg());
 
-                    cb(
-                        BackendEvent::OutputRender {
-                            frame: &mut frame,
-                            output,
-                            pointer_image: Some(pointer_image),
-                        },
-                        ddata,
-                    );
-                }
-                surface.fps.tick();
-                Ok(())
-            },
-        )
+                cb(
+                    BackendEvent::OutputRender {
+                        frame: &mut frame,
+                        output,
+                        pointer_image: Some(pointer_image),
+                    },
+                    ddata,
+                );
+            }
+            surface.fps.tick();
+            Ok(())
+        })
         .map_err(Into::<SwapBuffersError>::into)
         .and_then(|x| x)
         .map_err(Into::<SwapBuffersError>::into)
