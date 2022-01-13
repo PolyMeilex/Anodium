@@ -6,12 +6,15 @@ use rhai::plugin::*;
 use rhai::Engine;
 
 pub mod r#box;
+mod button;
 mod fps;
 pub mod logger;
 mod output;
 mod text;
 mod widget;
 mod workspace;
+
+use widget::*;
 
 #[derive(Clone, Default)]
 pub struct Shell {
@@ -29,9 +32,9 @@ impl Shell {
         self.boxes.borrow_mut().push(r#box);
     }
 
-    pub fn render(&self, ui: &Ui) {
+    pub fn render(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
         for r#box in self.boxes.borrow().iter() {
-            r#box.render(ui);
+            r#box.render(ui, config_tx);
         }
     }
 }
@@ -63,4 +66,5 @@ pub fn register(engine: &mut Engine) {
     fps::register(engine);
     workspace::register(engine);
     output::register(engine);
+    button::register(engine);
 }

@@ -23,15 +23,24 @@ impl Anodium {
         event: InputEvent<I>,
         output: Option<&Output>,
     ) {
-        match event {
+        let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
-                self.shortcut_handler(action)
+                if action == KeyAction::Filtred {
+                    true
+                } else if action != KeyAction::None {
+                    self.shortcut_handler(action);
+                    self.input_state.keyboard.is_focused()
+                } else {
+                    true
+                }
             }
             InputEvent::PointerMotion { event, .. } => {
                 self.input_state.pointer_location =
                     self.clamp_coords(self.input_state.pointer_location + event.delta());
                 self.on_pointer_move(event.time());
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let mut output_holder_if_missing = None;
@@ -46,19 +55,95 @@ impl Anodium {
                 self.input_state.pointer_location =
                     event.position_transformed(output_size) + output_pos;
                 self.on_pointer_move(event.time());
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
-            InputEvent::PointerButton { event, .. } => self.on_pointer_button::<I>(event),
-            InputEvent::PointerAxis { event, .. } => self.on_pointer_axis::<I>(event),
-            _ => {}
+            InputEvent::PointerButton { event, .. } => {
+                self.on_pointer_button::<I>(event);
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
+            }
+            InputEvent::PointerAxis { event, .. } => {
+                self.on_pointer_axis::<I>(event);
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
+            }
+            _ => false,
+        };
+
+        if let Some(output) = self
+            .output_map
+            .find_by_position(self.input_state.pointer_location.to_i32_round())
+        {
+            if captured {
+                self.process_imgui_event(event, &output);
+            } else {
+                self.reset_imgui_event(&output);
+            }
         }
     }
 
-    fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: I::KeyboardKeyEvent) -> KeyAction {
+    fn reset_imgui_event(&self, output: &Output) {
+        let (mut imgui, pipeline) = output.take_imgui();
+        imgui.io_mut().mouse_pos = [f32::MAX, f32::MAX];
+        output.restore_imgui((imgui, pipeline));
+    }
+
+    fn process_imgui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
+        let mouse_location = self.input_state.pointer_location - output.location().to_f64();
+        let (mut imgui, pipeline) = output.take_imgui();
+        let mut io = imgui.io_mut();
+
+        io.mouse_pos[0] = mouse_location.x as f32;
+        io.mouse_pos[1] = mouse_location.y as f32;
+
+        match event {
+            InputEvent::Keyboard { event, .. } => {
+                let keycode = event.key_code();
+                let state = event.state();
+                match state {
+                    KeyState::Pressed => io.keys_down[keycode as usize] = true,
+                    KeyState::Released => io.keys_down[keycode as usize] = false,
+                }
+            }
+
+            InputEvent::PointerButton { event, .. } => {
+                let button = event.button().unwrap();
+                let state = event.state() == input::ButtonState::Pressed;
+
+                match button {
+                    input::MouseButton::Left => io.mouse_down[0] = state,
+                    input::MouseButton::Right => io.mouse_down[1] = state,
+                    input::MouseButton::Middle => io.mouse_down[2] = state,
+                    _ => {}
+                };
+            }
+
+            InputEvent::PointerAxis { event, .. } => match event.source() {
+                input::AxisSource::Wheel => {
+                    let amount_discrete =
+                        event.amount_discrete(input::Axis::Vertical).unwrap() * 0.3;
+                    // TODO - find a better way to handle this, why does it scrool on wayland in opposite direction?!
+                    if self.seat_name == "x11" || self.seat_name == "winit" {
+                        io.mouse_wheel += amount_discrete as f32;
+                    } else {
+                        io.mouse_wheel -= amount_discrete as f32;
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+
+        output.restore_imgui((imgui, pipeline));
+    }
+
+    fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {
         let keycode = evt.key_code();
         let state = evt.state();
         debug!("key"; "keycode" => keycode, "state" => format!("{:?}", state));
         let serial = SCOUNTER.next_serial();
-        let time = Event::time(&evt);
+        let time = Event::time(evt);
 
         let modifiers_state = &mut self.input_state.modifiers_state;
         let suppressed_keys = &mut self.input_state.suppressed_keys;
@@ -98,7 +183,7 @@ impl Anodium {
                         suppressed_keys.push(keysym);
                     } else if configvm.key_action(keysym, state, pressed_keys) {
                         suppressed_keys.push(keysym);
-                        return FilterResult::Intercept(KeyAction::None);
+                        return FilterResult::Intercept(KeyAction::Filtred);
                     }
 
                     action
@@ -108,7 +193,7 @@ impl Anodium {
                     let suppressed = suppressed_keys.contains(&keysym);
                     if suppressed {
                         suppressed_keys.retain(|k| *k != keysym);
-                        FilterResult::Intercept(KeyAction::None)
+                        FilterResult::Intercept(KeyAction::Filtred)
                     } else {
                         FilterResult::Forward
                     }
@@ -122,7 +207,7 @@ impl Anodium {
         self.input_state.keyboard.set_focus(None, serial);
     }
 
-    fn on_pointer_button<I: InputBackend>(&mut self, evt: I::PointerButtonEvent) {
+    fn on_pointer_button<I: InputBackend>(&mut self, evt: &I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
 
         debug!("Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
@@ -199,7 +284,7 @@ impl Anodium {
         }
     }
 
-    fn on_pointer_axis<I: InputBackend>(&mut self, evt: I::PointerAxisEvent) {
+    fn on_pointer_axis<I: InputBackend>(&mut self, evt: &I::PointerAxisEvent) {
         let source = match evt.source() {
             input::AxisSource::Continuous => wl_pointer::AxisSource::Continuous,
             input::AxisSource::Finger => wl_pointer::AxisSource::Finger,
@@ -283,7 +368,7 @@ impl Anodium {
 }
 
 /// Possible results of a keyboard action
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum KeyAction {
     /// Quit the compositor
     Quit,
@@ -294,6 +379,8 @@ enum KeyAction {
     MoveToWorkspace(usize),
     /// Do nothing more
     None,
+    /// Do nothing more
+    Filtred,
 }
 
 fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Option<KeyAction> {
@@ -316,7 +403,7 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
 impl Anodium {
     fn shortcut_handler(&mut self, action: KeyAction) {
         match action {
-            KeyAction::None => {}
+            KeyAction::None | KeyAction::Filtred => {}
             KeyAction::Quit => {
                 info!("Quitting.");
                 self.running.store(false, Ordering::SeqCst);

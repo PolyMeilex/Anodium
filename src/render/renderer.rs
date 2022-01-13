@@ -1,5 +1,4 @@
 use image::{ImageBuffer, Rgba};
-use imgui_smithay_renderer::Renderer;
 use smithay::{
     backend::renderer::{
         gles2::{Gles2Error, Gles2Frame, Gles2Renderer, Gles2Texture},
@@ -10,7 +9,6 @@ use smithay::{
 pub struct RenderFrame<'a> {
     pub transform: Transform,
     pub frame: &'a mut Gles2Frame,
-    pub imgui: Option<(imgui::Ui<'a>, &'a Renderer)>,
 
     pub renderer: &'a mut Gles2Renderer,
 }

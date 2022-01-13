@@ -5,7 +5,7 @@ use imgui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
-use super::widget::Widget;
+use super::widget::*;
 
 #[derive(Debug, Clone)]
 pub struct Text(Rc<RefCell<String>>);
@@ -17,7 +17,7 @@ impl Text {
 }
 
 impl Widget for Text {
-    fn render(&self, ui: &Ui) {
+    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
         ui.text(&*self.0.borrow());
     }
 }
