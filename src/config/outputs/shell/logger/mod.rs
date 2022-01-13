@@ -10,7 +10,7 @@ use rhai::{Array, Engine};
 
 use slog::Level;
 
-use super::widget::Widget;
+use super::widget::*;
 use drain::BUFFER;
 
 use std::cell::RefCell;
@@ -65,7 +65,7 @@ impl Logger {
 }
 
 impl Widget for Logger {
-    fn render(&self, ui: &Ui) {
+    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
         let inner = self.inner.borrow();
         let buffer = BUFFER.lock().unwrap();
         for (level, line) in buffer.iter() {

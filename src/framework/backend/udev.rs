@@ -271,9 +271,6 @@ struct OutputSurfaceData {
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
     fps: fps_ticker::Fps,
-    imgui: Option<imgui::SuspendedContext>,
-    imgui_pipeline: imgui_smithay_renderer::Renderer,
-
     _output_name: String,
     mode: Mode,
     modes: Vec<DrmMode>,
@@ -387,6 +384,20 @@ fn scan_connectors<D: 'static>(
                         })
                         .collect();
 
+                    let mut imgui = imgui::Context::create();
+                    {
+                        imgui.set_ini_filename(None);
+                        let io = imgui.io_mut();
+                        io.display_framebuffer_scale = [1.0f32, 1.0f32];
+                        io.display_size = [size.0 as f32, size.1 as f32];
+                    }
+
+                    let imgui_pipeline = renderer
+                        .with_context(|_, gles| {
+                            imgui_smithay_renderer::Renderer::new(gles, &mut imgui)
+                        })
+                        .unwrap();
+
                     let output = Output::new(
                         &output_name,
                         Default::default(),
@@ -399,6 +410,8 @@ fn scan_connectors<D: 'static>(
                         },
                         output_mode,
                         output_modes,
+                        imgui,
+                        imgui_pipeline,
                         // TODO: output should always have a workspace
                         "Unknown".into(),
                         slog_scope::logger(),
@@ -449,29 +462,12 @@ fn scan_connectors<D: 'static>(
 
                     let timer = Timer::new().unwrap();
 
-                    let mut imgui = imgui::Context::create();
-                    {
-                        imgui.set_ini_filename(None);
-                        let io = imgui.io_mut();
-                        io.display_framebuffer_scale = [1.0f32, 1.0f32];
-                        io.display_size = [size.0 as f32, size.1 as f32];
-                    }
-
-                    let imgui_pipeline = renderer
-                        .with_context(|_, gles| {
-                            imgui_smithay_renderer::Renderer::new(gles, &mut imgui)
-                        })
-                        .unwrap();
-
                     outputs_map.insert(crtc, output);
 
                     entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
                         fps: fps_ticker::Fps::default(),
-                        imgui: Some(imgui.suspend()),
-                        imgui_pipeline,
-
                         _output_name: output_name,
                         mode: output_mode,
                         modes: modes.to_owned(),
@@ -846,16 +842,11 @@ fn render_output_surface(
     // and draw to our buffer
     match renderer
         .render(surface.mode.size, Transform::Normal, |renderer, frame| {
-            let imgui = surface.imgui.take().unwrap();
-            let mut imgui = imgui.activate().unwrap();
-            let ui = imgui.frame();
-
             {
                 let mut frame = RenderFrame {
                     transform: Transform::Normal,
                     renderer,
                     frame,
-                    imgui: Some((ui, &surface.imgui_pipeline)),
                 };
 
                 output.update_fps(surface.fps.avg());
@@ -869,11 +860,6 @@ fn render_output_surface(
                     ddata,
                 );
             }
-
-            {
-                surface.imgui = Some(imgui.suspend());
-            }
-
             surface.fps.tick();
             Ok(())
         })

@@ -1,8 +1,11 @@
+pub use calloop::channel::Sender;
 use imgui::Ui;
 use rhai::plugin::*;
 
+pub use crate::config::eventloop::ConfigEvent;
+
 pub trait Widget {
-    fn render(&self, ui: &Ui);
+    fn render(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>);
 }
 
 impl std::fmt::Debug for Box<dyn Widget> {
@@ -20,12 +23,17 @@ impl Clone for Box<dyn Widget> {
 #[export_module]
 pub mod widget {
     use crate::config::outputs::shell::{
-        fps::Fps, logger::Logger, output::OutputGeometry, text::Text, workspace::CurrentWorkspace,
+        button::Button, fps::Fps, logger::Logger, output::OutputGeometry, text::Text,
+        workspace::CurrentWorkspace,
     };
     use crate::output_map::Output;
 
     pub fn text(text: String) -> Text {
         Text::new(text)
+    }
+
+    pub fn button(text: String) -> Button {
+        Button::new(text)
     }
 
     pub fn fps(output: Output) -> Fps {

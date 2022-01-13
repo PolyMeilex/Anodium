@@ -6,7 +6,7 @@ use rhai::Engine;
 
 use crate::output_map::Output;
 
-use super::widget::Widget;
+use super::widget::*;
 
 #[derive(Debug, Clone)]
 pub struct Fps(Output);
@@ -18,7 +18,7 @@ impl Fps {
 }
 
 impl Widget for Fps {
-    fn render(&self, ui: &Ui) {
+    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
         ui.text(format!("FPS: {}", self.0.get_fps() as u32));
     }
 }
