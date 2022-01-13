@@ -1,4 +1,4 @@
-use smithay::desktop::Kind;
+use smithay::desktop::{Kind, PopupKind, PopupManager};
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{DispatchData, Display};
@@ -118,6 +118,8 @@ struct Inner {
     not_mapped_list: NotMappedList,
     windows: ShellWindowList,
     layers: ShellLayerList,
+
+    popup_manager: PopupManager,
 }
 
 impl Inner {
@@ -189,6 +191,13 @@ impl Inner {
         }
 
         if let Some(popup) = self.not_mapped_list.try_popup_map(surface) {
+            self.popup_manager
+                .track_popup(PopupKind::Xdg({
+                    let PopupSurface::Xdg(xdg) = popup.popup_surface();
+                    xdg
+                }))
+                .unwrap();
+
             if let Some(parent) = popup.popup_surface().parent() {
                 let popup_surface = popup.popup_surface();
 
@@ -225,6 +234,7 @@ impl Inner {
         self.xwayland_commit_hook(&surface);
 
         smithay::backend::renderer::utils::on_commit_buffer_handler(&surface);
+        self.popup_manager.commit(&surface);
 
         if !compositor::is_sync_subsurface(&surface) {
             // Update the buffer of all child surfaces
@@ -301,6 +311,8 @@ impl ShellManager {
             not_mapped_list: Default::default(),
             windows: Default::default(),
             layers: Default::default(),
+
+            popup_manager: PopupManager::new(slog_scope::logger()),
         }));
 
         // Create the compositor
