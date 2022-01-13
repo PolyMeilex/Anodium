@@ -28,13 +28,11 @@ impl Anodium {
                 let action = self.keyboard_key_to_action::<I>(event);
                 if action == KeyAction::Filtred {
                     true
+                } else if action != KeyAction::None {
+                    self.shortcut_handler(action);
+                    self.input_state.keyboard.is_focused()
                 } else {
-                    if action != KeyAction::None {
-                        self.shortcut_handler(action);
-                        self.input_state.keyboard.is_focused()
-                    } else {
-                        true
-                    }
+                    true
                 }
             }
             InputEvent::PointerMotion { event, .. } => {
