@@ -1,12 +1,12 @@
-anodize.log.info("initalizing!!!");
+// anodize.log.info("initalizing!!!");
 
-anodize.keyboard.callbacks.register(|| {
-    anodize.log.info("key called P");
-}, "Super_L", ["p"]);
+// anodize.keyboard.callbacks.register(|| {
+//     anodize.log.info("key called P");
+// }, "Super_L", ["p"]);
 
-anodize.keyboard.callbacks.register(|| {
-    anodize.log.info("key called H");
-}, "Super_L", ["h"]);
+// anodize.keyboard.callbacks.register(|| {
+//     anodize.log.info("key called H");
+// }, "Super_L", ["h"]);
 
 anodize.keyboard.callbacks.register(|| {
     anodize.log.info("starting weston terminal");
@@ -15,52 +15,52 @@ anodize.keyboard.callbacks.register(|| {
 }, "Control_L", ["t"]);
 
 
-anodize.keyboard.callbacks.register(|| {
-    if anodize.windows.focused != () {
-        anodize.windows.focused.close()
-    }
-}, "Control_L", ["y"]);
+// anodize.keyboard.callbacks.register(|| {
+//     if anodize.windows.focused != () {
+//         anodize.windows.focused.close()
+//     }
+// }, "Control_L", ["y"]);
 
-anodize.keyboard.callbacks.register(|| {
-    if anodize.windows.focused != () {
-        anodize.windows.focused.maximize();
-    }
-}, "Control_L", ["w"]);
+// anodize.keyboard.callbacks.register(|| {
+//     if anodize.windows.focused != () {
+//         anodize.windows.focused.maximize();
+//     }
+// }, "Control_L", ["w"]);
 
-anodize.keyboard.callbacks.register(|| {
-    if anodize.windows.focused != () {
-        anodize.windows.focused.unmaximize()
-    }
-}, "Control_L", ["u"]);
-
-
-anodize.keyboard.callbacks.register_capture(|x| {
-    anodize.log.info(x);
-    anodize.workspace.select(x);
-
-}, "Control_L", ["s"], keyboard::numbers());
+// anodize.keyboard.callbacks.register(|| {
+//     if anodize.windows.focused != () {
+//         anodize.windows.focused.unmaximize()
+//     }
+// }, "Control_L", ["u"]);
 
 
+// anodize.keyboard.callbacks.register_capture(|x| {
+//     anodize.log.info(x);
+//     anodize.workspace.select(x);
+
+// }, "Control_L", ["s"], keyboard::numbers());
 
 
-anodize.keyboard.callbacks.register(|| {
-    let j = 0;
-    anodize.system.add_timeout(|| {
-        anodize.log.info("rhai timeout keyboard " + j.to_string());
-        j = j + 1;
-        if j > 20 {
-            return false
-        }
-        return true;
-    }, 20);
 
-}, "Control_L", ["k"]);
+
+// anodize.keyboard.callbacks.register(|| {
+//     let j = 0;
+//     anodize.system.add_timeout(|| {
+//         anodize.log.info("rhai timeout keyboard " + j.to_string());
+//         j = j + 1;
+//         if j > 20 {
+//             return false
+//         }
+//         return true;
+//     }, 20);
+
+// }, "Control_L", ["k"]);
 
 let weather = widget::text("");
 let date = widget::text("");
 let logger_box = box::new_raw(700, 330, 5, 35, layout::vertical());
 let logger = widget::logger();
-//logger.c_debug = [1.0, 0.1, 1.0, 0.5];
+logger.c_debug = [1.0, 0.1, 1.0, 0.5];
 
 logger_box.background = false;
 logger_box.add_widget(logger.convert());
@@ -91,54 +91,54 @@ anodize.system.add_timeout(|| {
     return false;
 }, 500);
 
-anodize.system.add_timeout(|| {
-    anodize.system.exec_read("wget -o /dev/null -O - https://wttr.in/Warsaw?format=3", |o| {
-        if o.status {
-            weather.update(o.output);
-        }
-    });
-    return true;
-}, 10000);
+// anodize.system.add_timeout(|| {
+//     anodize.system.exec_read("wget -o /dev/null -O - https://wttr.in/Warsaw?format=3", |o| {
+//         if o.status {
+//             weather.update(o.output);
+//         }
+//     });
+//     return true;
+// }, 10000);
 
-anodize.system.add_timeout(|| {
-    anodize.system.exec_read("date", |o| {
-        if o.status {
-             date.update(o.output);
-        }
-    });
-    return true;
-}, 1000);
+// anodize.system.add_timeout(|| {
+//     anodize.system.exec_read("date", |o| {
+//         if o.status {
+//              date.update(o.output);
+//         }
+//     });
+//     return true;
+// }, 1000);
 
-let b = 0;
-anodize.keyboard.callbacks.register(|| {
-    b = b + 1;
-    anodize.log.info("rhai b pressed " + b.to_string());
-}, "Control_L", ["b"]);
-
-
-anodize.keyboard.callbacks.register(|| {
-    anodize.log.info("anodize");
-}, "Control_L", ["g"]);
-
-anodize.keyboard.callbacks.register(|| {
-    for output in anodize.outputs {
-        output.set_wallpaper("./resources/anocube.png");
-    }
-}, "Control_L", ["r"]);
+// let b = 0;
+// anodize.keyboard.callbacks.register(|| {
+//     b = b + 1;
+//     anodize.log.info("rhai b pressed " + b.to_string());
+// }, "Control_L", ["b"]);
 
 
-let mode_index = 0;
-anodize.keyboard.callbacks.register(|| {
-    let output = anodize.outputs[0];
-    let mode = output.modes[mode_index];
-    if mode == () {
-        mode_index = 0;
-    } else {
-        output.update_mode(mode);
-        output.set_wallpaper("./resources/anocube.png");
-    }
-    mode_index += 1;
-}, "Control_L", ["equal"]);
+// anodize.keyboard.callbacks.register(|| {
+//     anodize.log.info("anodize");
+// }, "Control_L", ["g"]);
+
+// anodize.keyboard.callbacks.register(|| {
+//     for output in anodize.outputs {
+//         output.set_wallpaper("./resources/anocube.png");
+//     }
+// }, "Control_L", ["r"]);
+
+
+// let mode_index = 0;
+// anodize.keyboard.callbacks.register(|| {
+//     let output = anodize.outputs[0];
+//     let mode = output.modes[mode_index];
+//     if mode == () {
+//         mode_index = 0;
+//     } else {
+//         output.update_mode(mode);
+//         output.set_wallpaper("./resources/anocube.png");
+//     }
+//     mode_index += 1;
+// }, "Control_L", ["equal"]);
 
 
 let rearrange_timeout;
@@ -186,15 +186,15 @@ anodize.outputs.on_new(|output| {
 
 
 
-anodize.system.add_timeout(|| {
-    anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {
-        if o.status {
-             //anodize.log.info("anodize hwmon end, got: " + o.output);
-        }
-    });
-    return true;
-}, 1000);
+// anodize.system.add_timeout(|| {
+//     anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {
+//         if o.status {
+//              //anodize.log.info("anodize hwmon end, got: " + o.output);
+//         }
+//     });
+//     return true;
+// }, 1000);
 
 
 
-anodize.log.info("anodize initalize end");
+// anodize.log.info("anodize initalize end");
