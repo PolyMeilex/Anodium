@@ -4,7 +4,7 @@ use smithay::{
         gles2::{Gles2Error, Gles2Frame, Gles2Renderer, Gles2Texture},
         Frame, Transform,
     },
-    utils::{Buffer, Physical, Point, Rectangle},
+    utils::{Buffer, Physical, Rectangle},
 };
 pub struct RenderFrame<'a> {
     pub transform: Transform,
@@ -17,27 +17,12 @@ impl<'a> Frame for RenderFrame<'a> {
     type Error = Gles2Error;
     type TextureId = Gles2Texture;
 
-    fn clear(&mut self, color: [f32; 4]) -> Result<(), Self::Error> {
-        self.frame.clear(color)
-    }
-
-    fn render_texture_at(
+    fn clear(
         &mut self,
-        texture: &Self::TextureId,
-        pos: Point<f64, Physical>,
-        texture_scale: i32,
-        output_scale: f64,
-        src_transform: Transform,
-        alpha: f32,
+        color: [f32; 4],
+        at: &[Rectangle<i32, Physical>],
     ) -> Result<(), Self::Error> {
-        self.frame.render_texture_at(
-            texture,
-            pos,
-            texture_scale,
-            output_scale,
-            src_transform,
-            alpha,
-        )
+        self.frame.clear(color, at)
     }
 
     fn render_texture_from_to(
@@ -45,11 +30,12 @@ impl<'a> Frame for RenderFrame<'a> {
         texture: &Self::TextureId,
         src: Rectangle<i32, Buffer>,
         dst: Rectangle<f64, Physical>,
+        damage: &[Rectangle<i32, Physical>],
         src_transform: Transform,
         alpha: f32,
     ) -> Result<(), Self::Error> {
         self.frame
-            .render_texture_from_to(texture, src, dst, src_transform, alpha)
+            .render_texture_from_to(texture, src, dst, damage, src_transform, alpha)
     }
 }
 

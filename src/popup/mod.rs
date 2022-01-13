@@ -29,7 +29,7 @@ pub use popup_surface::PopupSurface;
 pub struct Popup {
     pub popup: PopupSurface,
     pub bbox: Rectangle<i32, Logical>,
-    pub children: Vec<Box<Popup>>,
+    pub children: Vec<Popup>,
 }
 
 impl Popup {
@@ -50,10 +50,10 @@ impl Popup {
     }
 
     pub fn add_child(&mut self, popup: Popup) {
-        self.children.push(Box::new(popup));
+        self.children.push(popup);
     }
 
-    pub fn children(&self) -> &[Box<Popup>] {
+    pub fn children(&self) -> &[Popup] {
         &self.children
     }
 

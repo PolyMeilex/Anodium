@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 use smithay::{
     backend::{
         input::InputEvent,
-        renderer::{ImportDma, ImportEgl, Transform},
+        renderer::{ImportDma, ImportEgl, Renderer, Transform},
         winit::{self, WinitEvent, WinitInput},
     },
     reexports::{
@@ -50,30 +50,30 @@ where
         })
         .unwrap();
 
-    let (renderer, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
+    let (backend, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
         crit!("Failed to initialize Winit backend: {}", err);
     })?;
-    let renderer = Rc::new(RefCell::new(renderer));
+    let backend = Rc::new(RefCell::new(backend));
 
-    if renderer
+    if backend
         .borrow_mut()
         .renderer()
         .bind_wl_display(&display.borrow())
         .is_ok()
     {
         info!("EGL hardware-acceleration enabled");
-        let dmabuf_formats = renderer
+        let dmabuf_formats = backend
             .borrow_mut()
             .renderer()
             .dmabuf_formats()
             .cloned()
             .collect::<Vec<_>>();
-        let renderer = renderer.clone();
+        let backend = backend.clone();
         init_dmabuf_global(
             &mut *display.borrow_mut(),
             dmabuf_formats,
             move |buffer, _| {
-                renderer
+                backend
                     .borrow_mut()
                     .renderer()
                     .import_dmabuf(buffer)
@@ -83,7 +83,7 @@ where
         );
     };
 
-    let size = renderer.borrow().window_size().physical_size;
+    let size = backend.borrow().window_size().physical_size;
 
     /*
      * Initialize the globals
@@ -119,7 +119,7 @@ where
             make: "Smithay".into(),
             model: "Winit".into(),
         },
-        mode.clone(),
+        mode,
         vec![mode],
         imgui,
         imgui_pipeline,
@@ -141,6 +141,22 @@ where
     );
 
     cb(BackendEvent::StartCompositor, ddata.reborrow());
+
+
+    info!("imgui!");
+    let mut imgui = imgui::Context::create();
+    {
+        imgui.set_ini_filename(None);
+        let io = imgui.io_mut();
+        io.display_framebuffer_scale = [1.0f32, 1.0f32];
+        io.display_size = [size.w as f32, size.h as f32];
+    }
+
+    let imgui_pipeline = backend
+        .borrow_mut()
+        .renderer()
+        .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
+        .unwrap();
 
     info!("Initialization completed, starting the main loop.");
 
@@ -177,28 +193,38 @@ where
 
             match res {
                 Ok(()) => {
-                    let mut renderer = renderer.borrow_mut();
+                    let mut backend = backend.borrow_mut();
+                    let size = backend.window_size().physical_size;
 
-                    renderer
-                        .render(|renderer, frame| {
-                            let mut frame = RenderFrame {
-                                transform: Transform::Normal,
-                                renderer,
-                                frame,
-                            };
+                    if backend.bind().is_ok() {
+                        backend
+                            .renderer()
+                            .render(size, Transform::Flipped180, |renderer, frame| {
+                                let ui = imgui.frame();
 
-                            output.update_fps(fps.avg());
+                                {
+                                    let mut frame = RenderFrame {
+                                        transform: Transform::Flipped180,
+                                        renderer,
+                                        frame,
+                                    };
 
-                            cb(
-                                BackendEvent::OutputRender {
-                                    frame: &mut frame,
-                                    output: &output,
-                                    pointer_image: None,
-                                },
-                                ddata.reborrow(),
-                            );
-                        })
-                        .unwrap();
+                                    output.update_fps(fps.avg());
+
+                                    cb(
+                                        BackendEvent::OutputRender {
+                                            frame: &mut frame,
+                                            output: &output,
+                                            pointer_image: None,
+                                        },
+                                        ddata.reborrow(),
+                                    );
+                                }
+                            })
+                            .unwrap();
+
+                        backend.submit(None, 1.0).unwrap();
+                    }
 
                     cb(BackendEvent::SendFrames, ddata);
 

@@ -42,9 +42,9 @@ pub fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Filter>) {
         );
         return (dirs, None);
     }
-    mods.map(|m| {
+    if let Some(m) = mods {
         for s in m.split(',') {
-            if s.len() == 0 {
+            if s.is_empty() {
                 continue;
             }
             let mut parts = s.split('=');
@@ -84,9 +84,9 @@ pub fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Filter>) {
                 level: log_level,
             });
         }
-    });
+    }
 
-    let filter = filter.map_or(None, |filter| match Filter::new(filter) {
+    let filter = filter.and_then(|filter| match Filter::new(filter) {
         Ok(re) => Some(re),
         Err(e) => {
             println!("warning: invalid regex filter - {}", e);
@@ -94,5 +94,5 @@ pub fn parse_logging_spec(spec: &str) -> (Vec<LogDirective>, Option<Filter>) {
         }
     });
 
-    return (dirs, filter);
+    (dirs, filter)
 }

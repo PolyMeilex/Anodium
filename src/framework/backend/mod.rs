@@ -142,20 +142,20 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
 }
 
 pub fn auto(event_loop: &mut EventLoop<'static, Anodium>) -> Option<Anodium> {
-    if std::env::args().find(|arg| arg == "--x11").is_some() {
+    if std::env::args().any(|arg| arg == "--x11") {
         #[cfg(feature = "x11")]
         {
-            return Some(x11(event_loop));
+            Some(x11(event_loop))
         }
     } else if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
         #[cfg(feature = "winit")]
         {
-            return Some(winit(event_loop));
+            Some(winit(event_loop))
         }
     } else {
         #[cfg(feature = "udev")]
         {
-            return Some(udev(event_loop));
+            Some(udev(event_loop))
         }
     }
 }

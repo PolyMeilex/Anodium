@@ -109,7 +109,7 @@ impl PopupList {
                 .map(|s| s.as_ref().equals(surface.as_ref()))
                 .unwrap_or(false)
             {
-                Some(p.clone())
+                Some(p)
             } else {
                 None
             }

@@ -16,7 +16,7 @@ mod workspace;
 
 use widget::*;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Shell {
     boxes: Rc<RefCell<Vec<r#box::Box>>>,
 }
@@ -41,7 +41,7 @@ impl Shell {
 
 impl std::fmt::Debug for Shell {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "derp")
+        write!(f, "derp")
     }
 }
 

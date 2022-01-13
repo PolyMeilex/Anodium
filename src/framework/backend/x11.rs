@@ -38,7 +38,7 @@ struct OutputSurface {
 
     fps: fps_ticker::Fps,
 
-    output_name: String,
+    _output_name: String,
     output: Output,
     mode: Mode,
 
@@ -58,7 +58,7 @@ impl OutputSurfaceBuilder {
     ) -> Self {
         let window = WindowBuilder::new()
             .title("Anodium")
-            .build(&handle)
+            .build(handle)
             .expect("Failed to create first window");
 
         // Create the surface for the window.
@@ -109,7 +109,7 @@ impl OutputSurfaceBuilder {
                 make: "Smithay".into(),
                 model: "Winit".into(),
             },
-            mode.clone(),
+            mode,
             vec![mode],
             imgui,
             imgui_pipeline,
@@ -124,7 +124,7 @@ impl OutputSurfaceBuilder {
 
             fps: fps_ticker::Fps::default(),
             mode,
-            output_name: "X11(1)".into(),
+            _output_name: "X11(1)".into(),
             output,
 
             rerender: true,
@@ -180,7 +180,7 @@ where
 
     let x11_outputs = vec![
         OutputSurfaceBuilder::new(&handle, device.clone(), &context),
-        OutputSurfaceBuilder::new(&handle, device.clone(), &context),
+        OutputSurfaceBuilder::new(&handle, device, &context),
     ];
 
     let renderer = unsafe { Gles2Renderer::new(context, slog_scope::logger()) }
@@ -188,14 +188,14 @@ where
     let renderer = Rc::new(RefCell::new(renderer));
 
     new_x11_window(
-        display.clone(),
+        display,
         event_loop,
         state,
         backend,
-        renderer.clone(),
+        renderer,
         x11_outputs,
-        cb.clone(),
-        input_cb.clone(),
+        cb,
+        input_cb,
     )
 }
 
@@ -273,7 +273,7 @@ where
         .insert_source(timer, {
             let surface_datas = surface_datas.clone();
             let cb = cb.clone();
-            move |_: (), timer_handle, state| {
+            move |_: (), _timer_handle, state| {
                 let mut ddata = DispatchData::wrap(state);
 
                 let mut renderer = renderer.borrow_mut();
@@ -297,24 +297,26 @@ where
 
                     let res = renderer.render(
                         surface_data.mode.size,
-                        Transform::Flipped180,
+                        Transform::Normal,
                         |renderer, frame| {
-                            let mut frame = RenderFrame {
-                                transform: Transform::Flipped180,
-                                renderer,
-                                frame,
-                            };
+                            {
+                                let mut frame = RenderFrame {
+                                    transform: Transform::Normal,
+                                    renderer,
+                                    frame,
+                                };
 
-                            surface_data.output.update_fps(surface_data.fps.avg());
+                                surface_data.output.update_fps(surface_data.fps.avg());
 
-                            cb(
-                                BackendEvent::OutputRender {
-                                    frame: &mut frame,
-                                    output: &surface_data.output,
-                                    pointer_image: None,
-                                },
-                                ddata.reborrow(),
-                            );
+                                cb(
+                                    BackendEvent::OutputRender {
+                                        frame: &mut frame,
+                                        output: &surface_data.output,
+                                        pointer_image: None,
+                                    },
+                                    ddata.reborrow(),
+                                );
+                            }
                         },
                     );
 

@@ -15,7 +15,7 @@ use smithay::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point},
+    utils::{Logical, Point, Rectangle},
     wayland::{
         data_device::{self, DataDeviceEvent},
         output::xdg::init_xdg_output_manager,
@@ -337,7 +337,10 @@ impl Anodium {
     ) -> Result<(), smithay::backend::SwapBuffersError> {
         let (output_geometry, output_scale) = (output.geometry(), output.scale());
 
-        frame.clear([0.1, 0.1, 0.1, 1.0])?;
+        frame.clear(
+            [0.1, 0.1, 0.1, 1.0],
+            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+        )?;
 
         // Layers bellow windows
         self.draw_layers(frame, Layer::Background, output_geometry, output_scale)?;
@@ -351,6 +354,7 @@ impl Anodium {
                 1,
                 output_scale as f64,
                 Transform::Normal,
+                &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
                 1.0,
             )?;
         }
@@ -448,20 +452,19 @@ impl Anodium {
                             relative_ptr_location,
                             output_scale,
                         )?;
-                    } else {
-                        if let Some(pointer_image) = pointer_image {
-                            frame.render_texture_at(
-                                pointer_image,
-                                relative_ptr_location
-                                    .to_f64()
-                                    .to_physical(output_scale as f64)
-                                    .to_i32_round(),
-                                1,
-                                output_scale as f64,
-                                Transform::Normal,
-                                1.0,
-                            )?;
-                        }
+                    } else if let Some(pointer_image) = pointer_image {
+                        frame.render_texture_at(
+                            pointer_image,
+                            relative_ptr_location
+                                .to_f64()
+                                .to_physical(output_scale as f64)
+                                .to_i32_round(),
+                            1,
+                            output_scale as f64,
+                            Transform::Normal,
+                            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+                            1.0,
+                        )?;
                     }
                 }
             }
@@ -527,7 +530,7 @@ impl Anodium {
     }
 
     pub fn switch_workspace(&mut self, key: &str) {
-        let already_active = self.output_map.iter().any(|o| &o.active_workspace() == key);
+        let already_active = self.output_map.iter().any(|o| o.active_workspace() == key);
 
         if already_active {
             if let Some(workspace) = self.workspaces.get(key) {

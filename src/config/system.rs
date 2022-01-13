@@ -118,7 +118,7 @@ pub struct Timeout {
 impl Timeout {
     pub fn new(fnptr: FnPtr, millis: u64) -> Self {
         Self {
-            fnptr: fnptr,
+            fnptr,
             duration: Duration::from_millis(millis),
             timeout_handle: Default::default(),
         }
@@ -210,7 +210,7 @@ impl System {
 pub mod system {
     #[rhai_fn(global)]
     pub fn exec(_system: &mut System, command: &str) {
-        let command_split = shell_words::split(&command).unwrap();
+        let command_split = shell_words::split(command).unwrap();
 
         if let Err(e) = Command::new(&command_split[0])
             .args(&command_split[1..])

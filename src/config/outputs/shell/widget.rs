@@ -10,7 +10,7 @@ pub trait Widget {
 
 impl std::fmt::Debug for Box<dyn Widget> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", "derp")
+        write!(f, "derp")
     }
 }
 

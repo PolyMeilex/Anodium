@@ -12,7 +12,7 @@ use xkbcommon::xkb;
 
 use super::ConfigVM;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Keyboard {
     pub callbacks: Callbacks,
 }
@@ -25,7 +25,7 @@ impl Keyboard {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Callbacks {
     callbacks: Rc<RefCell<HashMap<u32, Vec<Callback>>>>,
 }
@@ -63,7 +63,7 @@ impl Callbacks {
     ) -> bool {
         let mut executed = false;
 
-        if keys_pressed.len() > 0 {
+        if !keys_pressed.is_empty() {
             let callbacks = self.callbacks.borrow();
             for (key, callbacks) in callbacks.iter() {
                 if keys_pressed.contains(key) {
@@ -72,17 +72,14 @@ impl Callbacks {
                             if capture.is_captured(current_key)
                                 && current_key != *key
                                 && !callback.keys.contains(&current_key)
+                                && callback.execute(config, keys_pressed, Some(current_key))
                             {
-                                if callback.execute(config, keys_pressed, Some(current_key)) {
-                                    executed = true;
-                                    break;
-                                }
-                            }
-                        } else {
-                            if callback.execute(config, keys_pressed, None) {
                                 executed = true;
                                 break;
                             }
+                        } else if callback.execute(config, keys_pressed, None) {
+                            executed = true;
+                            break;
                         }
                     }
                 }
