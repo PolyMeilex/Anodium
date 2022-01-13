@@ -14,6 +14,7 @@ use smithay::reexports::{
 
 use std::{cell::RefCell, rc::Rc};
 
+use crate::cli::{AnodiumOptions, Backend};
 use crate::output_map::Output;
 use crate::render::renderer::RenderFrame;
 use crate::state::Anodium;
@@ -45,13 +46,19 @@ pub enum BackendRequest {
 }
 
 #[cfg(feature = "winit")]
-pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
+pub fn winit(event_loop: &mut EventLoop<'static, Anodium>, options: AnodiumOptions) -> Anodium {
     info!("Starting Anodium with winit backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
     let (tx, rx) = channel::channel();
 
-    let mut state = Anodium::new(display.clone(), event_loop.handle(), "winit".into(), tx);
+    let mut state = Anodium::new(
+        display.clone(),
+        event_loop.handle(),
+        "winit".into(),
+        tx,
+        options,
+    );
 
     winit::run_winit(
         display,
@@ -75,13 +82,19 @@ pub fn winit(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
 }
 
 #[cfg(feature = "x11")]
-pub fn x11(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
+pub fn x11(event_loop: &mut EventLoop<'static, Anodium>, options: AnodiumOptions) -> Anodium {
     info!("Starting Anodium with x11 backend");
     let display = Rc::new(RefCell::new(Display::new()));
 
     let (tx, rx) = channel::channel();
 
-    let mut state = Anodium::new(display.clone(), event_loop.handle(), "x11".into(), tx);
+    let mut state = Anodium::new(
+        display.clone(),
+        event_loop.handle(),
+        "x11".into(),
+        tx,
+        options,
+    );
 
     x11::run_x11(
         display,
@@ -105,7 +118,7 @@ pub fn x11(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
 }
 
 #[cfg(feature = "udev")]
-pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
+pub fn udev(event_loop: &mut EventLoop<'static, Anodium>, options: AnodiumOptions) -> Anodium {
     info!("Starting Anodium on a tty using udev");
     let display = Rc::new(RefCell::new(Display::new()));
 
@@ -118,7 +131,13 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
 
     let (tx, rx) = channel::channel();
 
-    let mut state = Anodium::new(display.clone(), event_loop.handle(), session.seat(), tx);
+    let mut state = Anodium::new(
+        display.clone(),
+        event_loop.handle(),
+        session.seat(),
+        tx,
+        options,
+    );
 
     udev::run_udev(
         display,
@@ -141,21 +160,20 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>) -> Anodium {
     state
 }
 
-pub fn auto(event_loop: &mut EventLoop<'static, Anodium>) -> Option<Anodium> {
-    if std::env::args().any(|arg| arg == "--x11") {
-        #[cfg(feature = "x11")]
-        {
-            Some(x11(event_loop))
+pub fn auto(
+    event_loop: &mut EventLoop<'static, Anodium>,
+    options: AnodiumOptions,
+) -> Option<Anodium> {
+    match &options.backend {
+        Backend::Auto => {
+            if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
+                Some(winit(event_loop, options))
+            } else {
+                Some(udev(event_loop, options))
+            }
         }
-    } else if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
-        #[cfg(feature = "winit")]
-        {
-            Some(winit(event_loop))
-        }
-    } else {
-        #[cfg(feature = "udev")]
-        {
-            Some(udev(event_loop))
-        }
+        Backend::X11 => Some(x11(event_loop, options)),
+        Backend::Winit => Some(winit(event_loop, options)),
+        Backend::Udev => Some(udev(event_loop, options)),
     }
 }

@@ -29,6 +29,8 @@ mod state;
 mod backend_handler;
 mod shell_handler;
 
+mod cli;
+
 use config::outputs::shell::logger::ShellDrain;
 use state::Anodium;
 
@@ -39,6 +41,8 @@ use smithay::reexports::calloop::EventLoop;
 use std::sync::atomic::Ordering;
 
 fn main() {
+    let options = cli::get_anodium_options();
+
     std::env::set_var("RUST_LOG", "trace,smithay=error");
     let terminal_drain = slog_async::Async::default(slog_envlogger::new(
         slog_term::CompactFormat::new(slog_term::TermDecorator::new().stderr().build())
@@ -65,13 +69,12 @@ fn main() {
 
     let mut event_loop = EventLoop::try_new().unwrap();
 
-    let anodium = framework::backend::auto(&mut event_loop);
+    let anodium = framework::backend::auto(&mut event_loop, options);
     let anodium = anodium.expect("Could not create a backend!");
     run_loop(anodium, event_loop);
 }
 
 fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
-    trace!("trace test");
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {

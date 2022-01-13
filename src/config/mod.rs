@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, Scope, AST};
@@ -43,6 +44,7 @@ impl ConfigVM {
         event_sender: Sender<ConfigEvent>,
         output_map: OutputMap,
         loop_handle: LoopHandle<'static, Anodium>,
+        config: PathBuf,
     ) -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
         engine.set_max_expr_depths(0, 0);
@@ -63,7 +65,7 @@ impl ConfigVM {
             loop_handle,
         );
 
-        let ast = engine.compile_file("config.rhai".into())?;
+        let ast = engine.compile_file(config)?;
 
         engine.eval_ast_with_scope(&mut scope, &ast)?;
 
