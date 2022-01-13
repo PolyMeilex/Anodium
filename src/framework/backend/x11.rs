@@ -299,24 +299,22 @@ where
                         surface_data.mode.size,
                         Transform::Normal,
                         |renderer, frame| {
-                            {
-                                let mut frame = RenderFrame {
-                                    transform: Transform::Normal,
-                                    renderer,
-                                    frame,
-                                };
+                            let mut frame = RenderFrame {
+                                transform: Transform::Normal,
+                                renderer,
+                                frame,
+                            };
 
-                                surface_data.output.update_fps(surface_data.fps.avg());
+                            surface_data.output.update_fps(surface_data.fps.avg());
 
-                                cb(
-                                    BackendEvent::OutputRender {
-                                        frame: &mut frame,
-                                        output: &surface_data.output,
-                                        pointer_image: None,
-                                    },
-                                    ddata.reborrow(),
-                                );
-                            }
+                            cb(
+                                BackendEvent::OutputRender {
+                                    frame: &mut frame,
+                                    output: &surface_data.output,
+                                    pointer_image: None,
+                                },
+                                ddata.reborrow(),
+                            );
                         },
                     );
 

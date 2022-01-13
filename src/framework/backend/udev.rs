@@ -843,7 +843,7 @@ fn render_output_surface(
     match renderer
         .render(
             surface.mode.size,
-            Transform::Flipped180, // Scanout is rotated
+            Transform::Normal, // Scanout is rotated
             |renderer, frame| {
                 {
                     let mut frame = RenderFrame {

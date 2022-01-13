@@ -103,7 +103,7 @@ where
         io.display_size = [size.w as f32, size.h as f32];
     }
 
-    let imgui_pipeline = renderer
+    let imgui_pipeline = backend
         .borrow_mut()
         .renderer()
         .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
@@ -141,22 +141,6 @@ where
     );
 
     cb(BackendEvent::StartCompositor, ddata.reborrow());
-
-
-    info!("imgui!");
-    let mut imgui = imgui::Context::create();
-    {
-        imgui.set_ini_filename(None);
-        let io = imgui.io_mut();
-        io.display_framebuffer_scale = [1.0f32, 1.0f32];
-        io.display_size = [size.w as f32, size.h as f32];
-    }
-
-    let imgui_pipeline = backend
-        .borrow_mut()
-        .renderer()
-        .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
-        .unwrap();
 
     info!("Initialization completed, starting the main loop.");
 
@@ -200,26 +184,22 @@ where
                         backend
                             .renderer()
                             .render(size, Transform::Flipped180, |renderer, frame| {
-                                let ui = imgui.frame();
+                                let mut frame = RenderFrame {
+                                    transform: Transform::Flipped180,
+                                    renderer,
+                                    frame,
+                                };
 
-                                {
-                                    let mut frame = RenderFrame {
-                                        transform: Transform::Flipped180,
-                                        renderer,
-                                        frame,
-                                    };
+                                output.update_fps(fps.avg());
 
-                                    output.update_fps(fps.avg());
-
-                                    cb(
-                                        BackendEvent::OutputRender {
-                                            frame: &mut frame,
-                                            output: &output,
-                                            pointer_image: None,
-                                        },
-                                        ddata.reborrow(),
-                                    );
-                                }
+                                cb(
+                                    BackendEvent::OutputRender {
+                                        frame: &mut frame,
+                                        output: &output,
+                                        pointer_image: None,
+                                    },
+                                    ddata.reborrow(),
+                                );
                             })
                             .unwrap();
 
