@@ -37,6 +37,10 @@ impl<'a> Frame for RenderFrame<'a> {
         self.frame
             .render_texture_from_to(texture, src, dst, damage, src_transform, alpha)
     }
+
+    fn transformation(&self) -> Transform {
+        self.transform
+    }
 }
 
 pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
