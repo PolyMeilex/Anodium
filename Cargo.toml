@@ -8,7 +8,9 @@ bitflags = "1.2.1"
 input = { version = "0.7.0", features = ["udev"], optional = true }
 thiserror = "1"
 xcursor = { version = "0.3.3", optional = true }
-image = { version = "0.23.14", default-features = false, optional = true, features = ["png"] }
+image = { version = "0.23.14", default-features = false, optional = true, features = [
+  "png",
+] }
 fps_ticker = "1.0.0"
 rand = "0.8.4"
 slog = { version = "2.1.1" }
@@ -82,4 +84,4 @@ udev = [
   "xcursor",
 ]
 
-xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
+# xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
