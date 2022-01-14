@@ -2,14 +2,22 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
 use calloop::channel::Sender;
+
 use imgui::{Context, SuspendedContext, Ui};
 use imgui_smithay_renderer::Renderer;
+use smithay_egui::{EguiFrame, EguiState};
+
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
     utils::{Logical, Point, Rectangle, Size},
-    wayland::output::{self, Mode, PhysicalProperties},
+    wayland::{
+        output::{self, Mode, PhysicalProperties},
+        seat::ModifiersState,
+    },
 };
+
+use derivative::Derivative;
 
 use image::{self, DynamicImage};
 
@@ -19,7 +27,8 @@ use crate::render::renderer::import_bitmap;
 
 use super::layer_map::LayerMap;
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct Inner {
     name: String,
     output: output::Output,
@@ -37,8 +46,12 @@ struct Inner {
 
     wallpaper: Option<DynamicImage>,
     wallpaper_texture: Option<Gles2Texture>,
+
     imgui: Option<(SuspendedContext, Renderer)>,
+    #[derivative(Debug = "ignore")]
+    egui: Option<(EguiState, egui_demo_lib::DemoWindows, ModifiersState)>,
     shell: Shell,
+
     fps: f64,
 }
 
@@ -138,6 +151,10 @@ impl Output {
     where
         N: AsRef<str>,
     {
+        let egui = EguiState::new();
+        let demo_ui = egui_demo_lib::DemoWindows::default();
+        let egui_modifiers = ModifiersState::default();
+
         let (output, global) = output::Output::new(display, name.as_ref().into(), physical, logger);
 
         let scale = 1.0f64;
@@ -162,7 +179,9 @@ impl Output {
                 layer_map: Default::default(),
                 wallpaper: None,
                 wallpaper_texture: None,
+
                 imgui: Some((imgui_context.suspend(), imgui_pipeline)),
+                egui: Some((egui, demo_ui, egui_modifiers)),
                 shell: Shell::new(),
                 fps: 0.0,
             })),
@@ -305,6 +324,14 @@ impl Output {
 
     pub fn restore_imgui(&self, (context, pipeline): (Context, Renderer)) {
         self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
+    }
+
+    pub fn get_egui(&self) -> (EguiState, egui_demo_lib::DemoWindows, ModifiersState) {
+        self.inner.borrow_mut().egui.take().unwrap()
+    }
+
+    pub fn restore_egui(&self, egui: (EguiState, egui_demo_lib::DemoWindows, ModifiersState)) {
+        self.inner.borrow_mut().egui = Some(egui);
     }
 }
 

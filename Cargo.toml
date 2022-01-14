@@ -35,6 +35,10 @@ lazy_static = "1.4.0"
 
 chrono = "0.4"
 
+egui_demo_lib = "0.16"
+
+derivative = "2.2.0"
+
 [dependencies.smithay]
 # git = "https://github.com/Smithay/smithay.git"
 git = "https://github.com/PolyMeilex/smithay.git"
@@ -62,6 +66,7 @@ features = ["executor", "futures-io"]
 [dependencies.smithay-egui]
 git = "https://github.com/Smithay/smithay-egui"
 commit = "baa131d77b2fc2e3c2e87e881bba3ee18b315d14"
+
 
 
 [features]

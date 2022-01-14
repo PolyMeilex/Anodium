@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::{Ref, RefCell, RefMut},
     collections::{HashMap, HashSet},
     rc::Rc,
     sync::{
@@ -376,6 +376,29 @@ impl Anodium {
                 .unwrap();
 
             output.restore_imgui((context, pipeline));
+        }
+
+        {
+            let size = output.size().to_physical(1);
+            let (mut egui, mut demo, modifires) = output.get_egui();
+
+            let egui_frame = egui.run(
+                |ctx| demo.ui(ctx),
+                // Just render it over the whole window, but you may limit the area
+                Rectangle::from_loc_and_size((0, 0), size.to_logical(1)),
+                size,
+                // we also completely ignore the scale *everywhere* in this example, but egui is HiDPI-ready
+                1.0,
+                1.0,
+                &self.start_time,
+                modifires.clone(),
+            );
+
+            unsafe {
+                egui_frame.draw(frame.renderer, frame.frame).unwrap();
+            }
+
+            output.restore_egui((egui, demo, modifires));
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;
