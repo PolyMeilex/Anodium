@@ -29,6 +29,7 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use crate::{
+    cli::AnodiumOptions,
     config::{eventloop::ConfigEvent, ConfigVM},
     framework::backend::BackendRequest,
     framework::shell::ShellManager,
@@ -65,6 +66,8 @@ pub struct Anodium {
 
     pub seat_name: String,
     pub seat: Seat,
+
+    pub options: AnodiumOptions,
 
     pub start_time: std::time::Instant,
     last_update: Instant,
@@ -213,6 +216,7 @@ impl Anodium {
         handle: LoopHandle<'static, Self>,
         seat_name: String,
         backend_tx: Sender<BackendRequest>,
+        options: AnodiumOptions,
     ) -> Self {
         let log = slog_scope::logger();
 
@@ -240,7 +244,13 @@ impl Anodium {
         let config_tx = Self::init_config_channel(&handle);
         let output_map = OutputMap::new(config_tx.clone());
 
-        let config = ConfigVM::new(config_tx.clone(), output_map.clone(), handle.clone()).unwrap();
+        let config = ConfigVM::new(
+            config_tx.clone(),
+            output_map.clone(),
+            handle.clone(),
+            options.config.clone(),
+        )
+        .unwrap();
 
         Self {
             handle,
@@ -265,6 +275,8 @@ impl Anodium {
 
             seat_name,
             seat,
+
+            options,
 
             start_time: Instant::now(),
             last_update: Instant::now(),
