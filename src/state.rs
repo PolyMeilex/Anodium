@@ -372,25 +372,6 @@ impl Anodium {
         }
 
         {
-            let (mut context, pipeline) = output.take_imgui();
-            let ui = context.frame();
-
-            output.render_shell(&ui, &self.config_tx);
-
-            let draw_data = ui.render();
-            let transform = frame.transform;
-
-            frame
-                .renderer
-                .with_context(|_renderer, gles| {
-                    pipeline.render(transform, gles, draw_data);
-                })
-                .unwrap();
-
-            output.restore_imgui((context, pipeline));
-        }
-
-        {
             let size = output.size().to_physical(1);
             let mut egui_holder = output.get_egui();
             let egui_frame = egui_holder.run(

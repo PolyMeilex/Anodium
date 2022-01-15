@@ -60,7 +60,6 @@ dependencies = [
  "gumdrop",
  "image",
  "imgui",
- "imgui-smithay-renderer",
  "input",
  "lazy_static",
  "rand",
@@ -807,16 +806,6 @@ dependencies = [
  "bitflags",
  "imgui-sys",
  "parking_lot",
-]
-
-[[package]]
-name = "imgui-smithay-renderer"
-version = "0.1.0"
-dependencies = [
- "cgmath",
- "imgui",
- "memoffset",
- "smithay",
 ]
 
 [[package]]

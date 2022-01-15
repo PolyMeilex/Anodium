@@ -84,13 +84,13 @@ impl Anodium {
     }
 
     fn reset_imgui_event(&self, output: &Output) {
-        let (mut imgui, pipeline) = output.take_imgui();
+        /*let (mut imgui, pipeline) = output.take_imgui();
         imgui.io_mut().mouse_pos = [f32::MAX, f32::MAX];
-        output.restore_imgui((imgui, pipeline));
+        output.restore_imgui((imgui, pipeline));*/
     }
 
     fn process_imgui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
-        let mouse_location = self.input_state.pointer_location - output.location().to_f64();
+        /*let mouse_location = self.input_state.pointer_location - output.location().to_f64();
         let (mut imgui, pipeline) = output.take_imgui();
         let mut io = imgui.io_mut();
 
@@ -134,7 +134,7 @@ impl Anodium {
             _ => {}
         }
 
-        output.restore_imgui((imgui, pipeline));
+        output.restore_imgui((imgui, pipeline));*/
     }
 
     fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {

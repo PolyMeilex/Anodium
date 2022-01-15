@@ -94,21 +94,6 @@ where
         refresh: 60_000,
     };
 
-    info!("imgui!");
-    let mut imgui = imgui::Context::create();
-    {
-        imgui.set_ini_filename(None);
-        let io = imgui.io_mut();
-        io.display_framebuffer_scale = [1.0f32, 1.0f32];
-        io.display_size = [size.w as f32, size.h as f32];
-    }
-
-    let imgui_pipeline = backend
-        .borrow_mut()
-        .renderer()
-        .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
-        .unwrap();
-
     let mut output = Output::new(
         OUTPUT_NAME,
         Default::default(),
@@ -121,8 +106,6 @@ where
         },
         mode,
         vec![mode],
-        imgui,
-        imgui_pipeline,
         // TODO: output should always have a workspace
         "Unknown".into(),
         slog_scope::logger(),

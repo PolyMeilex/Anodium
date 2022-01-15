@@ -384,20 +384,6 @@ fn scan_connectors<D: 'static>(
                         })
                         .collect();
 
-                    let mut imgui = imgui::Context::create();
-                    {
-                        imgui.set_ini_filename(None);
-                        let io = imgui.io_mut();
-                        io.display_framebuffer_scale = [1.0f32, 1.0f32];
-                        io.display_size = [size.0 as f32, size.1 as f32];
-                    }
-
-                    let imgui_pipeline = renderer
-                        .with_context(|_, gles| {
-                            imgui_smithay_renderer::Renderer::new(gles, &mut imgui)
-                        })
-                        .unwrap();
-
                     let output = Output::new(
                         &output_name,
                         Default::default(),
@@ -410,8 +396,6 @@ fn scan_connectors<D: 'static>(
                         },
                         output_mode,
                         output_modes,
-                        imgui,
-                        imgui_pipeline,
                         // TODO: output should always have a workspace
                         "Unknown".into(),
                         slog_scope::logger(),
