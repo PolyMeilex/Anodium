@@ -1,5 +1,6 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
+use std::time::Instant;
 
 use calloop::channel::Sender;
 
@@ -272,8 +273,38 @@ impl Output {
         self.inner.borrow_mut().get_wallpaper(renderer)
     }
 
-    pub fn render_shell(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
-        self.inner.borrow().shell.render(ui, config_tx);
+    pub fn render_shell(
+        &self,
+        start_time: &Instant,
+        modifiers: &ModifiersState,
+        config_tx: &Sender<ConfigEvent>,
+    ) -> EguiFrame {
+        let size = self.size();
+        let scale = self.scale();
+        let mut egui;
+        {
+            let mut inner = self.inner.borrow_mut();
+            egui = inner.egui.take().unwrap();
+        }
+        let frame;
+        {
+            let inner = self.inner.borrow();
+            frame = egui.run(
+                |ctx| {
+                    inner.shell.render(ctx, config_tx);
+                },
+                // Just render it over the whole window, but you may limit the area
+                Rectangle::from_loc_and_size((0, 0), size),
+                size.to_physical(1),
+                scale,
+                scale as f32,
+                start_time,
+                modifiers.clone(),
+            );
+        }
+        let mut inner = self.inner.borrow_mut();
+        inner.egui = Some(egui);
+        frame
     }
 
     pub fn pending_mode_change(&self) -> bool {
@@ -296,14 +327,6 @@ impl Output {
 
     pub fn update_fps(&self, fps: f64) {
         self.inner.borrow_mut().fps = fps;
-    }
-
-    pub fn get_egui(&self) -> EguiState {
-        self.inner.borrow_mut().egui.take().unwrap()
-    }
-
-    pub fn restore_egui(&self, egui: EguiState) {
-        self.inner.borrow_mut().egui = Some(egui);
     }
 }
 

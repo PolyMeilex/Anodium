@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use imgui::Ui;
+use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
@@ -18,8 +18,8 @@ impl CurrentWorkspace {
 }
 
 impl Widget for CurrentWorkspace {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
-        ui.text(format!("Workspace: {}", self.0.active_workspace()));
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
+        ui.label(format!("Workspace: {}", self.0.active_workspace()));
     }
 }
 

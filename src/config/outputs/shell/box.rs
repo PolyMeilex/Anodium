@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use calloop::channel::Sender;
+use egui::{Color32, CtxRef};
 use imgui::Ui;
 use rhai::Engine;
 use rhai::{plugin::*, FLOAT, INT};
@@ -32,10 +33,10 @@ impl Layout {
 //#[derive(Debug)]
 pub struct BoxInner {
     id: String,
-    w: u16,
-    h: u16,
-    x: u32,
-    y: u32,
+    w: f32,
+    h: f32,
+    x: f32,
+    y: f32,
     layout: Layout,
     widgets: Vec<Rc<dyn Widget>>,
     alpha: f32,
@@ -50,7 +51,7 @@ pub struct Box {
 }
 
 impl Box {
-    pub fn new(w: u16, h: u16, x: u32, y: u32, layout: Layout) -> Self {
+    pub fn new(w: f32, h: f32, x: f32, y: f32, layout: Layout) -> Self {
         BOX_ID.with(move |id| {
             let mut id = id.borrow_mut();
             let r#box = Self {
@@ -74,24 +75,35 @@ impl Box {
         })
     }
 
-    pub fn render(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
+    pub fn render(&self, ctx: &CtxRef, config_tx: &Sender<ConfigEvent>) {
         let inner = self.inner.borrow();
         if inner.visable {
-            imgui::Window::new(&inner.id)
-                .size([inner.w as _, inner.h as _], imgui::Condition::Always)
-                .position([inner.x as _, inner.y as _], imgui::Condition::Always)
+            let mut frame = egui::Frame::window(&ctx.style());
+            if !inner.background {
+                frame.fill = Color32::TRANSPARENT;
+                frame.stroke.width = 0.0;
+            } else {
+                frame.fill[3] = (inner.alpha * 255.0) as u8;
+            }
+            egui::containers::Window::new(&inner.id)
+                .resize(|r| r.with_stroke(true)) //BUG : https://github.com/emilk/egui/issues/498, this work arounds it
+                .frame(frame)
+                .fixed_pos([inner.x, inner.y])
+                .fixed_size([inner.w, inner.h])
                 .title_bar(false)
-                .resizable(false)
-                .bg_alpha(inner.alpha)
-                .draw_background(inner.background)
-                .scroll_bar(inner.scroll)
-                .horizontal_scrollbar(inner.scroll)
-                .scrollable(inner.scroll)
-                .build(ui, || {
-                    for widget in &inner.widgets {
-                        widget.render(ui, config_tx);
-                        inner.layout.render(ui);
-                    }
+                .collapsible(false)
+                .scroll2([inner.scroll, inner.scroll])
+                .show(ctx, |ui| match inner.layout {
+                    Layout::Horizontal => ui.horizontal(|ui| {
+                        for widget in &inner.widgets {
+                            widget.render(ui, config_tx);
+                        }
+                    }),
+                    Layout::Vertical => ui.vertical(|ui| {
+                        for widget in &inner.widgets {
+                            widget.render(ui, config_tx);
+                        }
+                    }),
                 });
         }
     }

@@ -1,11 +1,11 @@
 pub use calloop::channel::Sender;
-use imgui::Ui;
+use egui::Ui;
 use rhai::plugin::*;
 
 pub use crate::config::eventloop::ConfigEvent;
 
 pub trait Widget {
-    fn render(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>);
+    fn render(&self, ui: &mut Ui, config_tx: &Sender<ConfigEvent>);
 }
 
 impl std::fmt::Debug for Box<dyn Widget> {

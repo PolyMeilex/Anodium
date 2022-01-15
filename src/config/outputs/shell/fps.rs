@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use imgui::Ui;
+use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
@@ -18,8 +18,8 @@ impl Fps {
 }
 
 impl Widget for Fps {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
-        ui.text(format!("FPS: {}", self.0.get_fps() as u32));
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
+        ui.label(format!("FPS: {}", self.0.get_fps() as u32));
     }
 }
 

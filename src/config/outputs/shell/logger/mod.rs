@@ -4,7 +4,7 @@ mod filter;
 mod serializer;
 pub use drain::ShellDrain;
 
-use imgui::{StyleColor, Ui};
+use egui::Ui;
 use rhai::plugin::*;
 use rhai::{Array, Engine};
 
@@ -65,21 +65,21 @@ impl Logger {
 }
 
 impl Widget for Logger {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
         let inner = self.inner.borrow();
         let buffer = BUFFER.lock().unwrap();
         for (level, line) in buffer.iter() {
-            let token = match level {
+            /*let token = match level {
                 Level::Trace => ui.push_style_color(StyleColor::Text, inner.trace),
                 Level::Debug => ui.push_style_color(StyleColor::Text, inner.debug),
                 Level::Info => ui.push_style_color(StyleColor::Text, inner.info),
                 Level::Warning => ui.push_style_color(StyleColor::Text, inner.warning),
                 Level::Error => ui.push_style_color(StyleColor::Text, inner.error),
                 Level::Critical => ui.push_style_color(StyleColor::Text, inner.critical),
-            };
+            };*/
 
-            ui.text_wrapped(line);
-            token.end();
+            ui.label(line);
+            //token.end();
         }
     }
 }
