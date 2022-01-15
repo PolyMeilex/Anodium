@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use calloop::channel::Sender;
 use egui::{Color32, CtxRef};
-use imgui::Ui;
 use rhai::Engine;
 use rhai::{plugin::*, FLOAT, INT};
 
@@ -19,15 +18,6 @@ thread_local! {
 pub enum Layout {
     Vertical,
     Horizontal,
-}
-
-impl Layout {
-    pub fn render(&self, ui: &Ui) {
-        match self {
-            Layout::Horizontal => ui.same_line(),
-            &Layout::Vertical => {}
-        }
-    }
 }
 
 //#[derive(Debug)]

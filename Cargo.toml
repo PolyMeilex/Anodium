@@ -26,8 +26,6 @@ xkbcommon = "0.4.0"
 generational-arena = "0.2.8"
 cgmath = "0.18.0"
 
-imgui = "0.8.0"
-
 rhai = "1.3.0"
 
 futures = "0.3"
@@ -68,8 +66,8 @@ version = "0.9.0"
 features = ["executor", "futures-io"]
 
 [dependencies.smithay-egui]
-git = "https://github.com/Smithay/smithay-egui"
-commit = "baa131d77b2fc2e3c2e87e881bba3ee18b315d14"
+git = "https://github.com/dragonnn/smithay-egui"
+commit = "1a8a03304eb8fdd5d770144de59f4ea9c0b94d56"
 
 
 

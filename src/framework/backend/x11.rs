@@ -76,7 +76,7 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build(self, display: &mut Display, renderer: &mut Gles2Renderer) -> OutputSurface {
+    fn build(self, display: &mut Display) -> OutputSurface {
         let size = {
             let s = self.window.size();
             (s.w as i32, s.h as i32).into()
@@ -227,7 +227,7 @@ where
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| o.build(&mut display.borrow_mut(), &mut renderer.borrow_mut()))
+        .map(|o| o.build(&mut display.borrow_mut()))
         .collect();
 
     for surface_data in surface_datas.iter() {

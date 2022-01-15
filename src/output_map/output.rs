@@ -4,7 +4,6 @@ use std::time::Instant;
 
 use calloop::channel::Sender;
 
-use imgui::{Context, SuspendedContext, Ui};
 use smithay_egui::{EguiFrame, EguiState};
 
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
@@ -327,6 +326,10 @@ impl Output {
 
     pub fn update_fps(&self, fps: f64) {
         self.inner.borrow_mut().fps = fps;
+    }
+
+    pub fn egui(&self) -> RefMut<EguiState> {
+        RefMut::map(self.inner.borrow_mut(), |o| o.egui.as_mut().unwrap())
     }
 }
 

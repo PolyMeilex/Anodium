@@ -30,9 +30,7 @@ impl ShellSerializer {
     }
 
     pub fn end(self) -> Result<String, slog::Error> {
-        let mut data = self.data;
-        data.write_char('\n')?;
-        Ok(data)
+        Ok(self.data)
     }
 }
 
