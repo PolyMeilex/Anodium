@@ -76,20 +76,21 @@ impl Anodium {
             .find_by_position(self.input_state.pointer_location.to_i32_round())
         {
             if captured {
-                self.process_imgui_event(event, &output);
+                self.process_egui_event(event, &output);
             } else {
-                self.reset_imgui_event(&output);
+                self.reset_egui_event(&output);
             }
         }
     }
 
-    fn reset_imgui_event(&self, output: &Output) {
-        /*let (mut imgui, pipeline) = output.take_imgui();
-        imgui.io_mut().mouse_pos = [f32::MAX, f32::MAX];
-        output.restore_imgui((imgui, pipeline));*/
+    fn reset_egui_event(&self, output: &Output) {
+        let mut max_point = Point::default();
+        max_point.x = i32::MAX;
+        max_point.y = i32::MAX;
+        output.egui().handle_pointer_motion(max_point);
     }
 
-    fn process_imgui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
+    fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
         match event {
             InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
                 let mouse_location = self.input_state.pointer_location - output.location().to_f64();
