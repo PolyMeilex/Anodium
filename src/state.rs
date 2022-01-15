@@ -392,10 +392,20 @@ impl Anodium {
 
         {
             let size = output.size().to_physical(1);
-            let (mut egui, mut demo, modifires) = output.get_egui();
-
-            let egui_frame = egui.run(
-                |ctx| demo.ui(ctx),
+            let mut egui_holder = output.get_egui();
+            let egui_frame = egui_holder.run(
+                |ctx| {
+                    egui::containers::Window::new("test")
+                        .resize(|r| r.with_stroke(true)) //BUG : https://github.com/emilk/egui/issues/498, this work arounds it
+                        .fixed_pos([0.0, 0.0])
+                        .fixed_size([100.0, 100.0])
+                        .title_bar(false)
+                        .collapsible(false)
+                        .show(ctx, |ui| {
+                            ui.label("wtf");
+                            ui.label("wtf");
+                        });
+                },
                 // Just render it over the whole window, but you may limit the area
                 Rectangle::from_loc_and_size((0, 0), size.to_logical(1)),
                 size,
@@ -403,14 +413,14 @@ impl Anodium {
                 1.0,
                 1.0,
                 &self.start_time,
-                modifires.clone(),
+                self.input_state.modifiers_state.clone(),
             );
 
             unsafe {
                 egui_frame.draw(frame.renderer, frame.frame).unwrap();
             }
 
-            output.restore_egui((egui, demo, modifires));
+            output.restore_egui(egui_holder);
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;

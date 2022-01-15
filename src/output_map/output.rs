@@ -49,7 +49,7 @@ struct Inner {
 
     imgui: Option<(SuspendedContext, Renderer)>,
     #[derivative(Debug = "ignore")]
-    egui: Option<(EguiState, egui_demo_lib::DemoWindows, ModifiersState)>,
+    egui: Option<EguiState>,
     shell: Shell,
 
     fps: f64,
@@ -152,8 +152,10 @@ impl Output {
         N: AsRef<str>,
     {
         let egui = EguiState::new();
-        let demo_ui = egui_demo_lib::DemoWindows::default();
-        let egui_modifiers = ModifiersState::default();
+        let mut visuals = egui::style::Visuals::default();
+        visuals.window_corner_radius = 0.0;
+
+        egui.context().set_visuals(visuals);
 
         let (output, global) = output::Output::new(display, name.as_ref().into(), physical, logger);
 
@@ -181,7 +183,7 @@ impl Output {
                 wallpaper_texture: None,
 
                 imgui: Some((imgui_context.suspend(), imgui_pipeline)),
-                egui: Some((egui, demo_ui, egui_modifiers)),
+                egui: Some(egui),
                 shell: Shell::new(),
                 fps: 0.0,
             })),
@@ -326,11 +328,11 @@ impl Output {
         self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
     }
 
-    pub fn get_egui(&self) -> (EguiState, egui_demo_lib::DemoWindows, ModifiersState) {
+    pub fn get_egui(&self) -> EguiState {
         self.inner.borrow_mut().egui.take().unwrap()
     }
 
-    pub fn restore_egui(&self, egui: (EguiState, egui_demo_lib::DemoWindows, ModifiersState)) {
+    pub fn restore_egui(&self, egui: EguiState) {
         self.inner.borrow_mut().egui = Some(egui);
     }
 }
