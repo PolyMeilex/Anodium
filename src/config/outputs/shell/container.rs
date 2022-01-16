@@ -17,12 +17,7 @@ pub enum Layout {
 }
 
 impl Layout {
-    pub fn render(
-        &self,
-        ui: &mut Ui,
-        widgets: &Vec<Rc<dyn Widget>>,
-        config_tx: &Sender<ConfigEvent>,
-    ) {
+    pub fn render(&self, ui: &mut Ui, widgets: &[Rc<dyn Widget>], config_tx: &Sender<ConfigEvent>) {
         match self {
             Layout::Horizontal => ui.horizontal(|ui| {
                 for widget in widgets {
