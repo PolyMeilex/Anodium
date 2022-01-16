@@ -90,8 +90,7 @@ udev = [
   "xcursor",
 ]
 
-xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
+#xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
 
 [patch."https://github.com/Smithay/smithay.git"]
 smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }
-# xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
