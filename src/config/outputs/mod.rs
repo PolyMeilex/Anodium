@@ -163,8 +163,7 @@ pub mod modes {
 pub mod outputs {
     #[rhai_fn(get = "name", pure)]
     pub fn name(output: &mut Output) -> ImmutableString {
-        // output.name().into()
-        todo!();
+        output.name().into()
     }
 
     #[rhai_fn(get = "w", pure)]
@@ -177,22 +176,21 @@ pub mod outputs {
         output.current_mode().unwrap().size.h as _
     }
 
-    #[rhai_fn(get = "x", pure)]
-    pub fn get_x(output: &mut Output) -> INT {
-        // output.geometry().loc.x as _
-        todo!();
-    }
+    // #[rhai_fn(get = "x", pure)]
+    // pub fn get_x(output: &mut Output) -> INT {
+    //     // output.geometry().loc.x as _
+    //     todo!();
+    // }
 
-    #[rhai_fn(get = "y", pure)]
-    pub fn y(output: &mut Output) -> INT {
-        // output.geometry().loc.y as _
-        todo!();
-    }
+    // #[rhai_fn(get = "y", pure)]
+    // pub fn y(output: &mut Output) -> INT {
+    //     // output.geometry().loc.y as _
+    //     todo!();
+    // }
 
     #[rhai_fn(get = "modes", pure)]
     pub fn modes(output: &mut Output) -> Modes {
-        // Modes(output.possible_modes())
-        todo!();
+        Modes(output.possible_modes())
     }
 
     #[rhai_fn(get = "shell", pure)]
@@ -200,25 +198,25 @@ pub mod outputs {
         output.egui_shell().clone()
     }
 
-    #[rhai_fn(set = "x", pure)]
-    pub fn x(output: &mut Output, x: INT) {
-        todo!();
-        // let mut location = output.location();
-        // location.x = x as _;
-        // output.set_location(location);
-        // let geometry = output.geometry();
-        // output.layer_map_mut().arange(geometry);
-    }
+    // #[rhai_fn(set = "x", pure)]
+    // pub fn x(output: &mut Output, x: INT) {
+    //     todo!();
+    //     // let mut location = output.location();
+    //     // location.x = x as _;
+    //     // output.set_location(location);
+    //     // let geometry = output.geometry();
+    //     // output.layer_map_mut().arange(geometry);
+    // }
 
     #[rhai_fn(global)]
     pub fn set_wallpaper(output: &mut Output, path: &str) {
-        todo!();
+        todo!("Let's just spawn sway-bg client, it's better and easier anyway. (maybe implement anobg/anopaper or something like that at some point)");
         // output.set_wallpaper(path);
     }
 
     #[rhai_fn(global)]
     pub fn update_mode(output: &mut Output, mode: Mode) {
-        todo!();
+        todo!("Send event using event emiter");
         // output.update_mode(mode);
     }
 

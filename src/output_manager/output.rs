@@ -109,6 +109,10 @@ impl Output {
         self.data().pending_mode_change.get()
     }
 
+    pub fn possible_modes(&self) -> Vec<Mode> {
+        self.data().possible_modes.borrow().clone()
+    }
+
     pub fn layer_map(&self) -> RefMut<desktop::LayerMap> {
         desktop::layer_map_for_output(&self.output)
     }
