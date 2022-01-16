@@ -3,7 +3,7 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 use smithay::{
     backend::{
         input::InputEvent,
-        renderer::{ImportDma, ImportEgl, Renderer, Transform},
+        renderer::{ImportDma, ImportEgl},
         winit::{self, WinitEvent, WinitInput},
     },
     reexports::{
@@ -18,7 +18,7 @@ use smithay::{
 
 use super::{BackendEvent, BackendRequest};
 
-use crate::{output_map::Output, render::renderer::RenderFrame};
+use crate::output_manager::Output;
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -94,7 +94,7 @@ where
         refresh: 60_000,
     };
 
-    let mut output = Output::new(
+    let output = Output::new(
         OUTPUT_NAME,
         Default::default(),
         &mut *display.borrow_mut(),
@@ -104,11 +104,9 @@ where
             make: "Smithay".into(),
             model: "Winit".into(),
         },
+        wl_output::Transform::Flipped180,
         mode,
         vec![mode],
-        // TODO: output should always have a workspace
-        "Unknown".into(),
-        slog_scope::logger(),
     );
     cb(
         BackendEvent::RequestOutputConfigure {
@@ -138,14 +136,13 @@ where
             let mut ddata = DispatchData::wrap(state);
 
             let res = input.dispatch_new_events(|event| match event {
-                WinitEvent::Resized { size, scale_factor } => {
+                WinitEvent::Resized { size, .. } => {
                     let mode = Mode {
                         size,
                         refresh: 60_000,
                     };
 
-                    output.update_mode(mode);
-                    output.update_scale(scale_factor);
+                    output.change_current_state(Some(mode), None, None, None);
 
                     cb(
                         BackendEvent::OutputModeUpdate { output: &output },
@@ -161,30 +158,16 @@ where
             match res {
                 Ok(()) => {
                     let mut backend = backend.borrow_mut();
-                    let size = backend.window_size().physical_size;
 
                     if backend.bind().is_ok() {
-                        backend
-                            .renderer()
-                            .render(size, Transform::Flipped180, |renderer, frame| {
-                                let mut frame = RenderFrame {
-                                    transform: Transform::Flipped180,
-                                    renderer,
-                                    frame,
-                                };
-
-                                output.update_fps(fps.avg());
-
-                                cb(
-                                    BackendEvent::OutputRender {
-                                        frame: &mut frame,
-                                        output: &output,
-                                        pointer_image: None,
-                                    },
-                                    ddata.reborrow(),
-                                );
-                            })
-                            .unwrap();
+                        cb(
+                            BackendEvent::OutputRender {
+                                renderer: backend.renderer(),
+                                output: &output,
+                                pointer_image: None,
+                            },
+                            ddata.reborrow(),
+                        );
 
                         backend.submit(None, 1.0).unwrap();
                     }

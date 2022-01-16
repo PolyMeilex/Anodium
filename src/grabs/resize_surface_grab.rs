@@ -1,5 +1,5 @@
 use smithay::{
-    desktop::Kind,
+    desktop::{self, Kind},
     reexports::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
         wayland_server::{
@@ -20,7 +20,7 @@ use crate::framework::surface_data::{ResizeEdge, ResizeState, SurfaceData};
 
 pub struct ResizeSurfaceGrab {
     pub start_data: GrabStartData,
-    pub toplevel: Kind,
+    pub window: desktop::Window,
     pub edges: ResizeEdge,
     pub initial_window_size: Size<i32, Logical>,
     pub last_window_size: Size<i32, Logical>,
@@ -36,12 +36,6 @@ impl PointerGrab for ResizeSurfaceGrab {
         time: u32,
         _ddata: DispatchData,
     ) {
-        // It is impossible to get `min_size` and `max_size` of dead toplevel, so we return early.
-        if !self.toplevel.alive() | self.toplevel.get_surface().is_none() {
-            handle.unset_grab(serial, time);
-            return;
-        }
-
         let (mut dx, mut dy) = (location - self.start_data.location).into();
 
         let mut new_window_width = self.initial_window_size.w;
@@ -66,11 +60,12 @@ impl PointerGrab for ResizeSurfaceGrab {
             new_window_height = (self.initial_window_size.h as f64 + dy) as i32;
         }
 
-        let (min_size, max_size) = with_states(self.toplevel.get_surface().unwrap(), |states| {
-            let data = states.cached_state.current::<SurfaceCachedState>();
-            (data.min_size, data.max_size)
-        })
-        .expect("Can't resize surface");
+        let (min_size, max_size) =
+            with_states(self.window.toplevel().get_surface().unwrap(), |states| {
+                let data = states.cached_state.current::<SurfaceCachedState>();
+                (data.min_size, data.max_size)
+            })
+            .expect("Can't resize surface");
 
         let min_width = min_size.w.max(1);
         let min_height = min_size.h.max(1);
@@ -90,7 +85,7 @@ impl PointerGrab for ResizeSurfaceGrab {
 
         self.last_window_size = (new_window_width, new_window_height).into();
 
-        match &self.toplevel {
+        match self.window.toplevel() {
             Kind::Xdg(xdg) => {
                 let ret = xdg.with_pending_state(|state| {
                     state.states.set(xdg_toplevel::State::Resizing);
@@ -121,12 +116,7 @@ impl PointerGrab for ResizeSurfaceGrab {
             // No more buttons are pressed, release the grab.
             handle.unset_grab(serial, time);
 
-            // If toplevel is dead, we can't resize it, so we return early.
-            if !self.toplevel.alive() | self.toplevel.get_surface().is_none() {
-                return;
-            }
-
-            if let Kind::Xdg(xdg) = &self.toplevel {
+            if let Kind::Xdg(xdg) = self.window.toplevel() {
                 let ret = xdg.with_pending_state(|state| {
                     state.states.unset(xdg_toplevel::State::Resizing);
                     state.size = Some(self.last_window_size);
@@ -135,7 +125,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                     xdg.send_configure();
                 }
 
-                SurfaceData::with_mut(self.toplevel.get_surface().unwrap(), |data| {
+                SurfaceData::with_mut(self.window.toplevel().get_surface().unwrap(), |data| {
                     if let ResizeState::Resizing(resize_data) = data.resize_state {
                         data.resize_state = ResizeState::WaitingForFinalAck(resize_data, serial);
                     } else {
@@ -143,7 +133,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                     }
                 });
             } else {
-                SurfaceData::with_mut(self.toplevel.get_surface().unwrap(), |data| {
+                SurfaceData::with_mut(self.window.toplevel().get_surface().unwrap(), |data| {
                     if let ResizeState::Resizing(resize_data) = data.resize_state {
                         data.resize_state = ResizeState::WaitingForCommit(resize_data);
                     } else {

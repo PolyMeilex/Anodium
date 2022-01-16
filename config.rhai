@@ -62,60 +62,60 @@ let logger_box = box::new_raw(700, 330, 5, 35, layout::vertical());
 let logger = widget::logger();
 logger.c_debug = [255, 26, 255, 128];
 
-logger_box.background = false;
-logger_box.add_widget(logger.convert());
+// logger_box.background = false;
+// logger_box.add_widget(logger.convert());
 
-anodize.keyboard.callbacks.register(|| {
-    if logger_box.visable {
-        logger_box.visable = false;
-    } else {
-        logger_box.visable = true;
-    }
-}, "Control_L", ["l"]);
+// anodize.keyboard.callbacks.register(|| {
+//     if logger_box.visable {
+//         logger_box.visable = false;
+//     } else {
+//         logger_box.visable = true;
+//     }
+// }, "Control_L", ["l"]);
 
-anodize.system.add_timeout(|| {
-    let output = anodize.outputs[0];
-    //output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
+// anodize.system.add_timeout(|| {
+//     let output = anodize.outputs[0];
+//     //output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     
-    let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
-    box.alpha = 0.0;
-    box.background = false;
-    box.scroll = false;
-    let button = widget::button("Test");
-    button.click(|| {
-        anodize.log.info("button clicked!");
-    });
+//     let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
+//     box.alpha = 0.0;
+//     box.background = false;
+//     box.scroll = false;
+//     let button = widget::button("Test");
+//     button.click(|| {
+//         anodize.log.info("button clicked!");
+//     });
 
-    box.add_widget(button.convert());
-    box.add_widget(weather.convert());
-    box.add_widget(date.convert());
+//     box.add_widget(button.convert());
+//     box.add_widget(weather.convert());
+//     box.add_widget(date.convert());
     
 
 
-    output.shell.add_box(box);
+//     output.shell.add_box(box);
 
-    output.shell.add_box(logger_box);
+//     output.shell.add_box(logger_box);
 
-    logger_box.w = output.w - 15;
+//     logger_box.w = output.w - 15;
 
-    let output = anodize.outputs[1];
-    if output != () {
-        let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
-        box.alpha = 0.0;
-        box.background = false;
-        box.scroll = false;
-        let button = widget::button("Test2");
-        button.click(|| {
-            anodize.log.info("button2 clicked!");
-        });
+//     let output = anodize.outputs[1];
+//     if output != () {
+//         let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
+//         box.alpha = 0.0;
+//         box.background = false;
+//         box.scroll = false;
+//         let button = widget::button("Test2");
+//         button.click(|| {
+//             anodize.log.info("button2 clicked!");
+//         });
 
-        box.add_widget(button.convert());
+//         box.add_widget(button.convert());
 
-        output.shell.add_box(box);
-    }
+//         output.shell.add_box(box);
+//     }
 
-    return false;
-}, 500);
+//     return false;
+// }, 500);
 
 // anodize.system.add_timeout(|| {
 //     anodize.system.exec_read("wget -o /dev/null -O - https://wttr.in/Warsaw?format=3", |o| {
@@ -167,48 +167,45 @@ anodize.system.add_timeout(|| {
 // }, "Control_L", ["equal"]);
 
 
-let rearrange_timeout;
-anodize.outputs.on_rearrange(|| {
-    anodize.system.clear_timeout(rearrange_timeout);
-    rearrange_timeout = anodize.system.add_timeout(|| {
-        anodize.log.info("anodize rearrange");
-        let output_x = 0;
-        for output in anodize.outputs {
-            output.x = output_x;
-            output_x += output.w;
-            anodize.log.info("searching for mode");
-        }
-        return false;
-    }, 500);
+anodize.outputs.on_rearrange(|outputs| {
+    anodize.log.info("anodize rearrange");
+    let output_x = 0;
+
+    outputs.map(|output| {
+        let x = output_x;
+        output_x += output.w;
+        
+        (x,0)
+    })
 });
 
-anodize.outputs.on_new(|output| {
-    anodize.log.info("anodize on_new");
-    if output.name == "Virtual-1" {
-        let mode = output.modes.filter(1440, 900, 60);
-        if mode != () {
-            output.update_mode(mode);
-        }
-    }
+// anodize.outputs.on_new(|output| {
+    // anodize.log.info("anodize on_new");
+    // if output.name == "Virtual-1" {
+    //     let mode = output.modes.filter(1440, 900, 60);
+    //     if mode != () {
+    //         output.update_mode(mode);
+    //     }
+    // }
 
-    output.set_wallpaper("./resources/anocube.png");
+    // output.set_wallpaper("./resources/anocube.png");
 
     let top_box = box::new_raw(output.w, 15, 0, 0, layout::horizontal());
     top_box.scroll = false;
     let fps_widget = widget::fps(output);
 
-    top_box.add_widget(fps_widget.convert());
+    // top_box.add_widget(fps_widget.convert());
 
-    let current_workspace_widget = widget::current_workspace(output);
+    // let current_workspace_widget = widget::current_workspace(output);
 
-    top_box.add_widget(current_workspace_widget.convert());
+    // top_box.add_widget(current_workspace_widget.convert());
 
-    let output_geometry_widget = widget::output_geometry(output);
+    // let output_geometry_widget = widget::output_geometry(output);
 
-    top_box.add_widget(output_geometry_widget.convert());
+    // top_box.add_widget(output_geometry_widget.convert());
 
-    output.shell.add_box(top_box);
-});
+    // output.shell.add_box(top_box);
+// });
 
 
 

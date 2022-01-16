@@ -1,8 +1,7 @@
 use smithay::{
-    reexports::wayland_server::DispatchData, wayland::shell::wlr_layer::LayerShellRequest,
+    desktop::LayerSurface, reexports::wayland_server::DispatchData,
+    wayland::shell::wlr_layer::LayerShellRequest,
 };
-
-use crate::output_map::LayerSurface;
 
 use super::ShellEvent;
 
@@ -15,7 +14,7 @@ impl super::Inner {
                 layer,
                 namespace,
             } => {
-                let surface = LayerSurface::new(surface, layer);
+                let surface = LayerSurface::new(surface, namespace.clone());
 
                 // TODO: Wait for first commit
                 self.layers.push(surface.clone());

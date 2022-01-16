@@ -4,7 +4,7 @@ use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
-use crate::output_map::Output;
+use crate::output_manager::Output;
 
 use super::widget::*;
 
@@ -18,8 +18,9 @@ impl CurrentWorkspace {
 }
 
 impl Widget for CurrentWorkspace {
-    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
-        ui.label(format!("Workspace: {}", self.0.active_workspace()));
+    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
+        todo!();
+        // ui.text(format!("Workspace: {}", self.0.active_workspace()));
     }
 }
 

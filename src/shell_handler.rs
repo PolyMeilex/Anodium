@@ -1,12 +1,16 @@
 use smithay::{
+    desktop,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
-    wayland::shell::wlr_layer::Layer,
 };
 
 use crate::{
-    framework::shell::ShellEvent,
-    grabs::{MoveSurfaceGrab, PopupGrab},
+    framework::{
+        shell::ShellEvent,
+        surface_data::{ResizeData, ResizeState, SurfaceData},
+    },
+    grabs::{MoveSurfaceGrab, ResizeSurfaceGrab},
+    output_manager::Output,
     state::Anodium,
 };
 
@@ -17,7 +21,8 @@ impl Anodium {
             // Toplevel
             //
             ShellEvent::WindowCreated { window } => {
-                self.active_workspace().map_toplevel(window, true);
+                self.workspace
+                    .map_window(&window.desktop_window(), (0, 0), false);
             }
 
             ShellEvent::WindowMove {
@@ -28,21 +33,23 @@ impl Anodium {
             } => {
                 let pointer = seat.get_pointer().unwrap();
 
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    if let Some(res) = space.move_request(&toplevel, &seat, serial, &start_data) {
-                        if let Some(window) = space.unmap_toplevel(&toplevel) {
-                            self.grabed_window = Some(window);
+                let window = self
+                    .workspace
+                    .window_for_surface(toplevel.get_surface().unwrap());
 
-                            let grab = MoveSurfaceGrab {
-                                start_data,
-                                toplevel,
-                                initial_window_location: res.initial_window_location,
-                            };
-                            pointer.set_grab(grab, serial);
-                        }
-                    }
+                if let Some(window) = window {
+                    let initial_window_location =
+                        self.workspace.window_geometry(&window).unwrap().loc;
+
+                    let grab = MoveSurfaceGrab {
+                        start_data,
+                        window: window.clone(),
+                        initial_window_location,
+                    };
+                    pointer.set_grab(grab, serial);
                 }
             }
+
             ShellEvent::WindowResize {
                 toplevel,
                 start_data,
@@ -50,37 +57,51 @@ impl Anodium {
                 edges,
                 serial,
             } => {
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    space.resize_request(&toplevel, &seat, serial, start_data, edges);
+                let pointer = seat.get_pointer().unwrap();
+                let wl_surface = toplevel.get_surface().unwrap();
+
+                let window = self.workspace.window_for_surface(wl_surface);
+
+                if let Some(window) = window {
+                    let geometry = self.workspace.window_geometry(&window).unwrap();
+                    let (initial_window_location, initial_window_size) =
+                        (geometry.loc, geometry.size);
+
+                    SurfaceData::with_mut(wl_surface, |data| {
+                        data.resize_state = ResizeState::Resizing(ResizeData {
+                            edges: edges.into(),
+                            initial_window_location,
+                            initial_window_size,
+                        });
+                    });
+
+                    let grab = ResizeSurfaceGrab {
+                        start_data,
+                        window: window.clone(),
+                        edges: edges.into(),
+                        initial_window_size,
+                        last_window_size: initial_window_size,
+                    };
+
+                    pointer.set_grab(grab, serial);
                 }
             }
 
-            ShellEvent::WindowMaximize { toplevel } => {
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    space.maximize_request(&toplevel);
-                }
+            ShellEvent::WindowGotResized {
+                window,
+                new_location,
+            } => {
+                self.workspace.map_window(&window, new_location, true);
             }
-            ShellEvent::WindowUnMaximize { toplevel } => {
-                if let Some(space) = self.find_workspace_by_surface_mut(&toplevel) {
-                    space.unmaximize_request(&toplevel);
-                }
-            }
+
+            ShellEvent::WindowMaximize { .. } => {}
+            ShellEvent::WindowUnMaximize { .. } => {}
 
             //
             // Popup
             //
             ShellEvent::PopupCreated { .. } => {}
-            ShellEvent::PopupGrab {
-                popup,
-                start_data,
-                seat,
-                serial,
-            } => {
-                let pointer = seat.get_pointer().unwrap();
-
-                let grab = PopupGrab { start_data, popup };
-                pointer.set_grab(grab, serial);
-            }
+            ShellEvent::PopupGrab { .. } => {}
 
             //
             // Wlr Layer Shell
@@ -88,24 +109,27 @@ impl Anodium {
             ShellEvent::LayerCreated {
                 surface, output, ..
             } => {
-                self.output_map.insert_layer(output, surface);
-                self.update_workspaces_geometry();
+                let output = output
+                    .and_then(|o| Output::from_resource(&o))
+                    .unwrap_or_else(|| {
+                        Output::wrap(self.workspace.outputs().next().unwrap().clone())
+                    });
+
+                let mut map = output.layer_map();
+                map.map_layer(&surface).unwrap();
             }
-            ShellEvent::LayerAckConfigure { .. } => {
-                self.output_map.arrange_layers();
-                self.update_workspaces_geometry();
+            ShellEvent::LayerAckConfigure { surface, .. } => {
+                if let Some(output) = self.workspace.outputs().find(|o| {
+                    let map = desktop::layer_map_for_output(o);
+                    map.layer_for_surface(&surface).is_some()
+                }) {
+                    let mut map = desktop::layer_map_for_output(output);
+                    map.arrange();
+                }
             }
 
             ShellEvent::SurfaceCommit { surface } => {
-                let found = self
-                    .output_map
-                    .iter()
-                    .any(|o| o.layer_map().find(&surface).is_some());
-
-                if found {
-                    self.output_map.arrange_layers();
-                    self.update_workspaces_geometry();
-                }
+                self.workspace.commit(&surface);
             }
             _ => {}
         }
@@ -115,38 +139,11 @@ impl Anodium {
         &self,
         point: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<i32, Logical>)> {
-        // Layers above windows
-        for o in self.output_map.iter() {
-            let overlay = o.layer_map().get_surface_under(&Layer::Overlay, point);
-            if overlay.is_some() {
-                return overlay;
-            }
-            let top = o.layer_map().get_surface_under(&Layer::Top, point);
-            if top.is_some() {
-                return top;
-            }
-        }
+        let window = self.workspace.window_under(point)?;
 
-        // Windows
-        for w in self.visible_workspaces() {
-            let under = w.surface_under(point);
-            if under.is_some() {
-                return under;
-            }
-        }
-
-        // Layers below windows
-        for o in self.output_map.iter() {
-            let bottom = o.layer_map().get_surface_under(&Layer::Bottom, point);
-            if bottom.is_some() {
-                return bottom;
-            }
-            let background = o.layer_map().get_surface_under(&Layer::Background, point);
-            if background.is_some() {
-                return background;
-            }
-        }
-
-        None
+        let window_loc = self.workspace.window_geometry(window).unwrap().loc;
+        window
+            .surface_under(point - window_loc.to_f64())
+            .map(|(s, loc)| (s, loc + window_loc))
     }
 }

@@ -61,46 +61,6 @@ impl PopupList {
         }
     }
 
-    pub fn surface_under(
-        &self,
-        windows: &WindowList,
-        point: Point<f64, Logical>,
-    ) -> Option<(WlSurface, Point<i32, Logical>)> {
-        for w in windows.iter() {
-            let parent = if let Some(parent) = w.surface() {
-                parent
-            } else {
-                continue;
-            };
-
-            let parent_location = w.location();
-            let parent_geometry = w.geometry();
-
-            let mut res = None;
-
-            self.with_child_popups(
-                &parent,
-                parent_location + parent_geometry.loc,
-                |p, initial_place| {
-                    if res.is_none() {
-                        if let Some(out) = p.matching(*initial_place, point) {
-                            res = Some(out);
-                        }
-
-                        let location = p.popup.location();
-                        *initial_place += location;
-                    }
-                },
-            );
-
-            if let Some(res) = res {
-                return Some(res);
-            }
-        }
-
-        None
-    }
-
     /// Finds the popup corresponding to the given `WlSurface`.
     pub fn find(&self, surface: &WlSurface) -> Option<&Popup> {
         self.popups.iter().find_map(|p| {

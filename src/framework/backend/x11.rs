@@ -26,7 +26,7 @@ use smithay::{
     wayland::dmabuf::init_dmabuf_global,
 };
 
-use crate::{output_map::Output, render::renderer::RenderFrame};
+use crate::output_manager::Output;
 
 use super::{BackendEvent, BackendRequest};
 
@@ -97,6 +97,7 @@ impl OutputSurfaceBuilder {
                 make: "Smithay".into(),
                 model: "Winit".into(),
             },
+            wl_output::Transform::Normal,
             mode,
             vec![mode],
             // TODO: output should always have a workspace
@@ -281,28 +282,18 @@ where
                         error!("Error while binding buffer: {}", err);
                     }
 
-                    let res = renderer.render(
-                        surface_data.mode.size,
-                        Transform::Normal,
-                        |renderer, frame| {
-                            let mut frame = RenderFrame {
-                                transform: Transform::Normal,
-                                renderer,
-                                frame,
-                            };
-
-                            surface_data.output.update_fps(surface_data.fps.avg());
-
-                            cb(
-                                BackendEvent::OutputRender {
-                                    frame: &mut frame,
-                                    output: &surface_data.output,
-                                    pointer_image: None,
-                                },
-                                ddata.reborrow(),
-                            );
-                        },
-                    );
+                    let res: Result<(), ()> = {
+                        cb(
+                            BackendEvent::OutputRender {
+                                renderer: &mut renderer,
+                                output: &surface_data.output,
+                                pointer_image: None,
+                            },
+                            ddata.reborrow(),
+                        );
+                        //
+                        Ok(())
+                    };
 
                     match res {
                         Ok(_) => {
@@ -316,11 +307,11 @@ where
                                 error!("Error submitting buffer for display: {}", err);
                             }
                         }
-                        Err(err) => {
-                            if let SwapBuffersError::ContextLost(err) = err.into() {
-                                error!("Critical Rendering Error: {}", err);
-                                cb(BackendEvent::CloseCompositor {}, ddata.reborrow());
-                            }
+                        Err(_) => {
+                            // if let SwapBuffersError::ContextLost(err) = err.into() {
+                            //     error!("Critical Rendering Error: {}", err);
+                            //     cb(BackendEvent::CloseCompositor {}, ddata.reborrow());
+                            // }
                         }
                     }
 
@@ -356,7 +347,6 @@ where
                         .unwrap();
 
                     let size = (new_size.w as i32, new_size.h as i32).into();
-                    let scale_factor = 1.0;
 
                     let mode = Mode {
                         size,
@@ -364,8 +354,9 @@ where
                     };
 
                     surface_data.mode = mode;
-                    surface_data.output.update_mode(mode);
-                    surface_data.output.update_scale(scale_factor);
+                    surface_data
+                        .output
+                        .change_current_state(Some(mode), None, Some(1), None);
 
                     let mut cb = cb.borrow_mut();
                     cb(

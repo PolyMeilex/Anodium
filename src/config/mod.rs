@@ -18,7 +18,7 @@ use smithay::backend::input::KeyState;
 use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::LoopHandle;
 
-use crate::output_map::{Output, OutputMap};
+use crate::output_manager::{Output, OutputManager};
 use crate::state::Anodium;
 
 use self::anodize::Anodize;
@@ -42,7 +42,7 @@ pub struct ConfigVM {
 impl ConfigVM {
     pub fn new(
         event_sender: Sender<ConfigEvent>,
-        output_map: OutputMap,
+        output_map: OutputManager,
         loop_handle: LoopHandle<'static, Anodium>,
         config: PathBuf,
     ) -> Result<ConfigVM, Box<EvalAltResult>> {
@@ -92,9 +92,11 @@ impl ConfigVM {
             .key_action(self, key, state, keys_pressed)
     }
 
-    pub fn output_rearrange(&self) {
+    pub fn output_rearrange(&self, outputs: Vec<Output>) -> Option<Vec<(i32, i32)>> {
         let inner = &*self.inner.borrow();
-        self.anodize.outputs.on_rearrange(&inner.engine, &inner.ast);
+        self.anodize
+            .outputs
+            .on_rearrange(&inner.engine, &inner.ast, outputs)
     }
 
     pub fn output_new(&self, output: Output) {

@@ -1,8 +1,6 @@
 use std::sync::atomic::Ordering;
 
-use crate::{
-    framework::backend::BackendRequest, grabs::MoveSurfaceGrab, output_map::Output, Anodium,
-};
+use crate::{framework::backend::BackendRequest, output_manager::Output, Anodium};
 
 use smithay::{
     backend::input::{
@@ -23,7 +21,7 @@ impl Anodium {
         event: InputEvent<I>,
         output: Option<&Output>,
     ) {
-        let captured = match &event {
+        let _captured = match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
                 if action == KeyAction::Filtred {
@@ -43,14 +41,18 @@ impl Anodium {
                     .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let mut output_holder_if_missing = None;
-                let output = output.unwrap_or_else(|| {
-                    output_holder_if_missing = self.output_map.find_by_index(0);
-                    output_holder_if_missing.as_ref().unwrap()
+                let output = output.cloned().unwrap_or_else(|| {
+                    self.workspace
+                        .outputs()
+                        .next()
+                        .cloned()
+                        .map(|o| Output::wrap(o))
+                        .unwrap()
                 });
 
-                let output_size = output.size();
-                let output_pos = output.location().to_f64();
+                let output_geometry = self.workspace.output_geometry(&output).unwrap();
+                let output_pos = output_geometry.loc.to_f64();
+                let output_size = output_geometry.size;
 
                 self.input_state.pointer_location =
                     event.position_transformed(output_size) + output_pos;
@@ -71,67 +73,16 @@ impl Anodium {
             _ => false,
         };
 
-        if let Some(output) = self
-            .output_map
-            .find_by_position(self.input_state.pointer_location.to_i32_round())
-        {
-            if captured {
-                self.process_egui_event(event, &output);
-            } else {
-                self.reset_egui_event(&output);
-            }
-        }
-    }
-
-    fn reset_egui_event(&self, output: &Output) {
-        let mut max_point = Point::default();
-        max_point.x = i32::MAX;
-        max_point.y = i32::MAX;
-        output.egui().handle_pointer_motion(max_point);
-    }
-
-    fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
-        match event {
-            InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
-                let mouse_location = self.input_state.pointer_location - output.location().to_f64();
-                output
-                    .egui()
-                    .handle_pointer_motion(mouse_location.to_i32_round());
-            }
-
-            InputEvent::PointerButton { event, .. } => {
-                if let Some(button) = event.button() {
-                    output.egui().handle_pointer_button(
-                        button,
-                        event.state() == ButtonState::Pressed,
-                        self.input_state.modifiers_state.clone(),
-                    );
-                }
-            }
-
-            InputEvent::Keyboard { event } => {
-                //TODO - is that enough or do we need the whole code from here https://github.com/Smithay/smithay-egui/blob/main/examples/integrate.rs#L69 ?
-                output.egui().handle_keyboard(
-                    &[event.key_code()],
-                    event.state() == KeyState::Pressed,
-                    self.input_state.modifiers_state.clone(),
-                );
-            }
-
-            InputEvent::PointerAxis { event, .. } => output.egui().handle_pointer_axis(
-                event
-                    .amount_discrete(input::Axis::Horizontal)
-                    .or_else(|| event.amount(input::Axis::Horizontal).map(|x| x * 3.0))
-                    .unwrap_or(0.0)
-                    * 10.0,
-                event
-                    .amount_discrete(input::Axis::Vertical)
-                    .or_else(|| event.amount(input::Axis::Vertical).map(|x| x * 3.0))
-                    .unwrap_or(0.0)
-                    * 10.0,
-            ),
-            _ => {}
-        }
+        // if let Some(output) = self
+        //     .output_map
+        //     .find_by_position(self.input_state.pointer_location.to_i32_round())
+        // {
+        //     if captured {
+        //         self.process_imgui_event(event, &output);
+        //     } else {
+        //         self.reset_imgui_event(&output);
+        //     }
+        // }
     }
 
     fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {
@@ -213,16 +164,25 @@ impl Anodium {
             input::ButtonState::Pressed => {
                 // change the keyboard focus unless the pointer is grabbed
                 if !self.input_state.pointer.is_grabbed() {
-                    let under = self.surface_under(self.input_state.pointer_location);
-                    let surface = under.as_ref().map(|&(ref s, _)| s);
-                    if let Some(surface) = surface {
-                        let mut window = None;
-                        if let Some(space) = self.find_workspace_by_surface_mut(surface) {
-                            window = space.find_window(surface).cloned();
-                        }
-                        self.update_focused_window(window);
-                    }
-                    self.input_state.keyboard.set_focus(surface, serial);
+                    let point = self.input_state.pointer_location;
+                    // let under = self.surface_under(self.input_state.pointer_location);
+                    let window = self.workspace.window_under(point).cloned();
+                    // let surface = under.as_ref().map(|&(ref s, _)| s);
+                    // if let Some(surface) = surface {
+                    //     let mut window = None;
+                    //     if let Some(space) = self.find_workspace_by_surface_mut(surface) {
+                    //         window = space.find_window(surface).cloned();
+                    //     }
+                    //     self.update_focused_window(window);
+                    // }
+
+                    self.update_focused_window(window.as_ref());
+
+                    let surface = window.and_then(|w| w.surface_under(point)).map(|s| s.0);
+
+                    self.input_state
+                        .keyboard
+                        .set_focus(surface.as_ref(), serial);
                 }
                 wl_pointer::ButtonState::Pressed
             }
@@ -233,51 +193,51 @@ impl Anodium {
             .clone()
             .button(button, state, serial, evt.time(), self);
 
-        {
-            if evt.state() == input::ButtonState::Pressed {
-                let under = self.surface_under(self.input_state.pointer_location);
+        // {
+        //     if evt.state() == input::ButtonState::Pressed {
+        //         let under = self.surface_under(self.input_state.pointer_location);
 
-                if self.input_state.modifiers_state.logo {
-                    if let Some((surface, _)) = under {
-                        let pointer = self.input_state.pointer.clone();
-                        let seat = self.seat.clone();
+        //         if self.input_state.modifiers_state.logo {
+        //             if let Some((surface, _)) = under {
+        //                 let pointer = self.input_state.pointer.clone();
+        //                 let seat = self.seat.clone();
 
-                        // Check that this surface has a click grab.
-                        if pointer.has_grab(serial) {
-                            let start_data = pointer.grab_start_data().unwrap();
+        //                 // Check that this surface has a click grab.
+        //                 if pointer.has_grab(serial) {
+        //                     let start_data = pointer.grab_start_data().unwrap();
 
-                            if let Some(space) = self.find_workspace_by_surface_mut(&surface) {
-                                if let Some(window) = space.find_window(&surface) {
-                                    let toplevel = window.toplevel();
+        //                     if let Some(space) = self.find_workspace_by_surface_mut(&surface) {
+        //                         if let Some(window) = space.find_window(&surface) {
+        //                             let toplevel = window.toplevel();
 
-                                    if let Some(res) =
-                                        space.move_request(&toplevel, &seat, serial, &start_data)
-                                    {
-                                        if let Some(window) = space.unmap_toplevel(&toplevel) {
-                                            self.grabed_window = Some(window);
+        //                             if let Some(res) =
+        //                                 space.move_request(&toplevel, &seat, serial, &start_data)
+        //                             {
+        //                                 if let Some(window) = space.unmap_toplevel(&toplevel) {
+        //                                     self.grabed_window = Some(window);
 
-                                            let grab = MoveSurfaceGrab {
-                                                start_data,
-                                                toplevel,
-                                                initial_window_location: res
-                                                    .initial_window_location,
-                                            };
-                                            pointer.set_grab(grab, serial);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //                                     let grab = MoveSurfaceGrab {
+        //                                         start_data,
+        //                                         toplevel,
+        //                                         initial_window_location: res
+        //                                             .initial_window_location,
+        //                                     };
+        //                                     pointer.set_grab(grab, serial);
+        //                                 }
+        //                             }
+        //                         }
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
-        if let Some(button) = evt.button() {
-            for w in self.visible_workspaces_mut() {
-                w.on_pointer_button(button, evt.state());
-            }
-        }
+        // if let Some(button) = evt.button() {
+        // for w in self.visible_workspaces_mut() {
+        //     w.on_pointer_button(button, evt.state());
+        // }
+        // }
     }
 
     fn on_pointer_axis<I: InputBackend>(&mut self, evt: &I::PointerAxisEvent) {
@@ -322,15 +282,15 @@ impl Anodium {
     fn on_pointer_move(&mut self, time: u32) {
         let serial = SCOUNTER.next_serial();
 
-        for (id, w) in self.workspaces.iter_mut() {
-            w.on_pointer_move(self.input_state.pointer_location);
+        // for (id, w) in self.workspaces.iter_mut() {
+        //     w.on_pointer_move(self.input_state.pointer_location);
 
-            if w.geometry()
-                .contains(self.input_state.pointer_location.to_i32_round())
-            {
-                self.active_workspace = Some(id.clone());
-            }
-        }
+        //     if w.geometry()
+        //         .contains(self.input_state.pointer_location.to_i32_round())
+        //     {
+        //         self.active_workspace = Some(id.clone());
+        //     }
+        // }
 
         let under = self.surface_under(self.input_state.pointer_location);
         self.input_state.pointer.clone().motion(
@@ -343,23 +303,21 @@ impl Anodium {
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {
-        if self.output_map.is_empty() {
-            return pos;
-        }
+        // let (pos_x, pos_y) = pos.into();
+        // let output_map = &self.output_map;
+        // let max_x = output_map.width();
+        // let clamped_x = pos_x.max(0.0).min(max_x as f64);
+        // let max_y = output_map.height(clamped_x as i32);
 
-        let (pos_x, pos_y) = pos.into();
-        let output_map = &self.output_map;
-        let max_x = output_map.width();
-        let clamped_x = pos_x.max(0.0).min(max_x as f64);
-        let max_y = output_map.height(clamped_x as i32);
+        // if let Some(max_y) = max_y {
+        //     let clamped_y = pos_y.max(0.0).min(max_y as f64);
 
-        if let Some(max_y) = max_y {
-            let clamped_y = pos_y.max(0.0).min(max_y as f64);
+        //     (clamped_x, clamped_y).into()
+        // } else {
+        //     (clamped_x, pos_y).into()
+        // }
 
-            (clamped_x, clamped_y).into()
-        } else {
-            (clamped_x, pos_y).into()
-        }
+        pos
     }
 }
 
@@ -414,9 +372,9 @@ impl Anodium {
             // let mut window_map = self.window_map.borrow_mut();
             // }
             // TODO:
-            KeyAction::Workspace(num) => {
-                self.switch_workspace(&format!("{}", num));
-            }
+            // KeyAction::Workspace(_num) => {
+            // self.switch_workspace(&format!("{}", num));
+            // }
             action => {
                 warn!("Key action {:?} unsupported on winit backend.", action);
             }

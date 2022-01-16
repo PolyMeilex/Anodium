@@ -26,7 +26,7 @@ pub mod widget {
         button::Button, fps::Fps, logger::Logger, output::OutputGeometry, text::Text,
         workspace::CurrentWorkspace,
     };
-    use crate::output_map::Output;
+    use crate::output_manager::Output;
 
     pub fn text(text: String) -> Text {
         Text::new(text)

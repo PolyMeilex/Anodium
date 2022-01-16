@@ -8,9 +8,8 @@ use smithay::{
 
 use crate::window::WindowSurface;
 
-mod iterators;
-
-pub use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};
+// mod iterators;
+// pub use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};
 
 pub trait AsWlSurface {
     fn as_surface(&self) -> Option<&WlSurface>;

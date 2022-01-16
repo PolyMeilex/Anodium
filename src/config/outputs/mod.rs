@@ -6,7 +6,7 @@ use rhai::{FnPtr, INT};
 
 use smithay::wayland::output::Mode;
 
-use crate::output_map::{Output, OutputMap}; // a "prelude" import for macros
+use crate::output_manager::{Output, OutputManager};
 
 pub mod shell;
 
@@ -34,13 +34,13 @@ impl IntoIterator for Modes {
 
 #[derive(Debug, Clone)]
 pub struct Outputs {
-    output_map: OutputMap,
+    output_map: OutputManager,
     on_rearrange: Rc<RefCell<Option<FnPtr>>>,
     on_new: Rc<RefCell<Option<FnPtr>>>,
 }
 
 impl Outputs {
-    pub fn new(output_map: OutputMap) -> Self {
+    pub fn new(output_map: OutputManager) -> Self {
         Self {
             output_map,
             on_rearrange: Default::default(),
@@ -48,11 +48,17 @@ impl Outputs {
         }
     }
 
-    pub fn on_rearrange(&self, engine: &Engine, ast: &AST) {
+    pub fn on_rearrange(
+        &self,
+        engine: &Engine,
+        ast: &AST,
+        outputs: Vec<Output>,
+    ) -> Option<Vec<(i32, i32)>> {
         if let Some(on_rearrange) = self.on_rearrange.borrow().clone() {
-            let _result: () = on_rearrange.call(engine, ast, ()).unwrap();
+            on_rearrange.call(engine, ast, (outputs,)).ok()
         } else {
             error!("on_rearrange not configured");
+            None
         }
     }
 
@@ -65,11 +71,12 @@ impl Outputs {
     }
 
     pub fn get(&mut self, index: i64) -> Dynamic {
-        if let Some(output) = self.output_map.find_by_index(index as usize) {
-            Dynamic::from(output)
-        } else {
-            Dynamic::from(())
-        }
+        todo!();
+        // if let Some(output) = self.output_map.find_by_index(index as usize) {
+        //     Dynamic::from(output)
+        // } else {
+        //     Dynamic::from(())
+        // }
     }
 }
 #[export_module]
@@ -105,56 +112,66 @@ pub mod modes {
 pub mod outputs {
     #[rhai_fn(get = "name", pure)]
     pub fn name(output: &mut Output) -> ImmutableString {
-        output.name().into()
+        // output.name().into()
+        todo!();
     }
 
     #[rhai_fn(get = "w", pure)]
     pub fn w(output: &mut Output) -> INT {
-        output.geometry().size.w as _
+        // output.geometry().size.w as _
+        todo!();
     }
 
     #[rhai_fn(get = "h", pure)]
     pub fn h(output: &mut Output) -> INT {
-        output.geometry().size.h as _
+        // output.geometry().size.h as _
+        todo!();
     }
 
     #[rhai_fn(get = "x", pure)]
     pub fn get_x(output: &mut Output) -> INT {
-        output.geometry().loc.x as _
+        // output.geometry().loc.x as _
+        todo!();
     }
 
     #[rhai_fn(get = "y", pure)]
     pub fn y(output: &mut Output) -> INT {
-        output.geometry().loc.y as _
+        // output.geometry().loc.y as _
+        todo!();
     }
 
     #[rhai_fn(get = "modes", pure)]
     pub fn modes(output: &mut Output) -> Modes {
-        Modes(output.possible_modes())
+        // Modes(output.possible_modes())
+        todo!();
     }
 
     #[rhai_fn(get = "shell", pure)]
     pub fn shell(output: &mut Output) -> shell::Shell {
-        output.shell()
+        // output.shell()
+        todo!();
     }
 
     #[rhai_fn(set = "x", pure)]
     pub fn x(output: &mut Output, x: INT) {
-        let mut location = output.location();
-        location.x = x as _;
-        output.set_location(location);
-        let geometry = output.geometry();
-        output.layer_map_mut().arange(geometry);
+        todo!();
+        // let mut location = output.location();
+        // location.x = x as _;
+        // output.set_location(location);
+        // let geometry = output.geometry();
+        // output.layer_map_mut().arange(geometry);
     }
 
     #[rhai_fn(global)]
     pub fn set_wallpaper(output: &mut Output, path: &str) {
-        output.set_wallpaper(path);
+        todo!();
+        // output.set_wallpaper(path);
     }
 
     #[rhai_fn(global)]
     pub fn update_mode(output: &mut Output, mode: Mode) {
-        output.update_mode(mode);
+        todo!();
+        // output.update_mode(mode);
     }
 
     #[rhai_fn(global)]
@@ -173,7 +190,8 @@ impl IntoIterator for Outputs {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.output_map.iter()
+        todo!();
+        // self.output_map.iter()
     }
 }
 

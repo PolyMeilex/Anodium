@@ -58,11 +58,7 @@ use smithay::{
 };
 
 use super::{BackendEvent, BackendRequest};
-use crate::{
-    framework,
-    output_map::Output,
-    render::renderer::{import_bitmap, RenderFrame},
-};
+use crate::{framework, output_manager::Output, render::renderer::import_bitmap};
 
 struct Inner {
     cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
@@ -394,11 +390,9 @@ fn scan_connectors<D: 'static>(
                             make: "Smithay".into(),
                             model: "Generic DRM".into(),
                         },
+                        wl_output::Transform::Normal,
                         output_mode,
                         output_modes,
-                        // TODO: output should always have a workspace
-                        "Unknown".into(),
-                        slog_scope::logger(),
                     );
                     (connector_inner.cb)(
                         BackendEvent::RequestOutputConfigure {
@@ -407,7 +401,7 @@ fn scan_connectors<D: 'static>(
                         ddata.reborrow(),
                     );
 
-                    let current_mode = output.current_mode();
+                    let current_mode = output.current_mode().unwrap();
 
                     let mode = modes
                         .iter()
@@ -598,7 +592,7 @@ fn device_added<D: 'static>(
                     let outputsurface = &*outputsurface.borrow();
                     let crtc = outputsurface.crtc;
 
-                    output.userdata().insert_if_missing(|| UdevOutputId {
+                    output.user_data().insert_if_missing(|| UdevOutputId {
                         crtc,
                         device_id: drm.device_id(),
                     });
@@ -795,7 +789,7 @@ fn render_output_surface(
 
     let output = outputs
         .iter()
-        .find(|o| o.userdata().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc }));
+        .find(|o| o.user_data().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc }));
 
     let output = if let Some(output) = output {
         output
@@ -805,7 +799,7 @@ fn render_output_surface(
     };
 
     if output.pending_mode_change() {
-        let current_mode = output.current_mode();
+        let current_mode = output.current_mode().unwrap();
         if let Some(drm_mode) = surface.modes.iter().find(|m| {
             m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
                 && m.vrefresh() == (current_mode.refresh / 1000) as u32
@@ -824,39 +818,21 @@ fn render_output_surface(
     renderer.bind(dmabuf)?;
 
     // and draw to our buffer
-    match renderer
-        .render(surface.mode.size, Transform::Normal, |renderer, frame| {
-            {
-                let mut frame = RenderFrame {
-                    transform: Transform::Normal,
-                    renderer,
-                    frame,
-                };
+    cb(
+        BackendEvent::OutputRender {
+            renderer,
+            output,
+            pointer_image: Some(pointer_image),
+        },
+        ddata,
+    );
 
-                output.update_fps(surface.fps.avg());
+    surface.fps.tick();
 
-                cb(
-                    BackendEvent::OutputRender {
-                        frame: &mut frame,
-                        output,
-                        pointer_image: Some(pointer_image),
-                    },
-                    ddata,
-                );
-            }
-            surface.fps.tick();
-            Ok(())
-        })
+    surface
+        .surface
+        .queue_buffer()
         .map_err(Into::<SwapBuffersError>::into)
-        .and_then(|x| x)
-        .map_err(Into::<SwapBuffersError>::into)
-    {
-        Ok(()) => surface
-            .surface
-            .queue_buffer()
-            .map_err(Into::<SwapBuffersError>::into),
-        Err(err) => Err(err),
-    }
 }
 
 fn initial_render(

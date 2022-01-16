@@ -5,7 +5,7 @@ pub mod winit;
 #[cfg(feature = "x11")]
 pub mod x11;
 
-use smithay::backend::renderer::gles2::Gles2Texture;
+use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::backend::session::{auto::AutoSession, Session};
 use smithay::reexports::{
     calloop::{channel, EventLoop},
@@ -15,8 +15,7 @@ use smithay::reexports::{
 use std::{cell::RefCell, rc::Rc};
 
 use crate::cli::{AnodiumOptions, Backend};
-use crate::output_map::Output;
-use crate::render::renderer::RenderFrame;
+use crate::output_manager::Output;
 use crate::state::Anodium;
 
 pub enum BackendEvent<'a, 'frame> {
@@ -30,7 +29,7 @@ pub enum BackendEvent<'a, 'frame> {
         output: &'a Output,
     },
     OutputRender {
-        frame: &'a mut RenderFrame<'frame>,
+        renderer: &'frame mut Gles2Renderer,
         output: &'a Output,
         pointer_image: Option<&'a Gles2Texture>,
     },

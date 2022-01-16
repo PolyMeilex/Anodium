@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use calloop::channel::Sender;
@@ -11,7 +11,7 @@ use crate::config::eventloop::ConfigEvent;
 use super::widget::Widget;
 
 thread_local! {
-    static BOX_ID: RefCell<i32> = RefCell::new(0);
+    static BOX_ID: Cell<i32> = Cell::new(0);
 }
 
 #[derive(Debug, Clone)]
@@ -41,10 +41,12 @@ pub struct Box {
 }
 
 impl Box {
-    pub fn new(w: f32, h: f32, x: f32, y: f32, layout: Layout) -> Self {
-        BOX_ID.with(move |id| {
-            let mut id = id.borrow_mut();
-            let r#box = Self {
+    pub fn new(w: u16, h: u16, x: u32, y: u32, layout: Layout) -> Self {
+        BOX_ID.with(move |id_cell| {
+            let id = id_cell.get();
+            id_cell.set(id + 1);
+
+            Self {
                 inner: Rc::new(RefCell::new(BoxInner {
                     id: format!("{}", id),
                     w,
@@ -58,10 +60,7 @@ impl Box {
                     visable: true,
                     scroll: true,
                 })),
-            };
-            *id += 1;
-
-            r#box
+            }
         })
     }
 
