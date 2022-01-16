@@ -11,7 +11,7 @@
 anodize.keyboard.callbacks.register(|| {
     anodize.log.info("starting weston terminal");
     anodize.system.exec("weston-terminal");
-    anodize.system.exec("xterm");
+    //anodize.system.exec("xterm");
 }, "Control_L", ["t"]);
 
 

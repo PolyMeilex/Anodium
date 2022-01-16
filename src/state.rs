@@ -381,6 +381,11 @@ impl Anodium {
             unsafe {
                 egui_frame.draw(frame.renderer, frame.frame).unwrap();
             }
+            //TODO - this a bad workaround around egui_frame.draw breaking the next rendered texture, but it works for now
+            frame.clear(
+                [0.1, 0.1, 0.1, 1.0],
+                &[Rectangle::from_loc_and_size((0, 0), (0, 0))],
+            )?;
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;
