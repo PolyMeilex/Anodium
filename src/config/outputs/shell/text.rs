@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use imgui::Ui;
+use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
@@ -17,8 +17,8 @@ impl Text {
 }
 
 impl Widget for Text {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
-        ui.text(&*self.0.borrow());
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
+        ui.label(&*self.0.borrow());
     }
 }
 

@@ -76,7 +76,7 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build(self, display: &mut Display, renderer: &mut Gles2Renderer) -> OutputSurface {
+    fn build(self, display: &mut Display) -> OutputSurface {
         let size = {
             let s = self.window.size();
             (s.w as i32, s.h as i32).into()
@@ -86,18 +86,6 @@ impl OutputSurfaceBuilder {
             size,
             refresh: 60_000,
         };
-
-        let mut imgui = imgui::Context::create();
-        {
-            imgui.set_ini_filename(None);
-            let io = imgui.io_mut();
-            io.display_framebuffer_scale = [1.0f32, 1.0f32];
-            io.display_size = [size.w as f32, size.h as f32];
-        }
-
-        let imgui_pipeline = renderer
-            .with_context(|_, gles| imgui_smithay_renderer::Renderer::new(gles, &mut imgui))
-            .unwrap();
 
         let output = Output::new(
             OUTPUT_NAME,
@@ -111,8 +99,6 @@ impl OutputSurfaceBuilder {
             },
             mode,
             vec![mode],
-            imgui,
-            imgui_pipeline,
             // TODO: output should always have a workspace
             "Unknown".into(),
             slog_scope::logger(),
@@ -241,7 +227,7 @@ where
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| o.build(&mut display.borrow_mut(), &mut renderer.borrow_mut()))
+        .map(|o| o.build(&mut display.borrow_mut()))
         .collect();
 
     for surface_data in surface_datas.iter() {

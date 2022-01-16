@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use imgui::Ui;
+use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
@@ -18,8 +18,8 @@ impl OutputGeometry {
 }
 
 impl Widget for OutputGeometry {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
-        ui.text(format!("Geometry: {:?}", self.0.geometry()));
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
+        ui.label(format!("Geometry: {:?}", self.0.geometry()));
     }
 }
 

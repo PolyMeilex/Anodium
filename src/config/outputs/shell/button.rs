@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use imgui::Ui;
+use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 use rhai::FnPtr;
@@ -24,9 +24,10 @@ impl Button {
 }
 
 impl Widget for Button {
-    fn render(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
+    fn render(&self, ui: &mut Ui, config_tx: &Sender<ConfigEvent>) {
         let button = self.0.borrow();
-        if ui.button(&button.label) {
+        let response = ui.button(&button.label);
+        if response.clicked() {
             if let Some(click) = &button.click {
                 config_tx.send(ConfigEvent::Shell(click.clone())).unwrap();
             }

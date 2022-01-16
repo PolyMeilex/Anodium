@@ -11,7 +11,7 @@
 anodize.keyboard.callbacks.register(|| {
     anodize.log.info("starting weston terminal");
     anodize.system.exec("weston-terminal");
-    anodize.system.exec("xterm");
+    //anodize.system.exec("xterm");
 }, "Control_L", ["t"]);
 
 
@@ -60,7 +60,7 @@ let weather = widget::text("");
 let date = widget::text("");
 let logger_box = box::new_raw(700, 330, 5, 35, layout::vertical());
 let logger = widget::logger();
-logger.c_debug = [1.0, 0.1, 1.0, 0.5];
+logger.c_debug = [255, 26, 255, 128];
 
 logger_box.background = false;
 logger_box.add_widget(logger.convert());
@@ -194,6 +194,7 @@ anodize.outputs.on_new(|output| {
     output.set_wallpaper("./resources/anocube.png");
 
     let top_box = box::new_raw(output.w, 15, 0, 0, layout::horizontal());
+    top_box.scroll = false;
     let fps_widget = widget::fps(output);
 
     top_box.add_widget(fps_widget.convert());

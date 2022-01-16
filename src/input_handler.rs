@@ -6,8 +6,8 @@ use crate::{
 
 use smithay::{
     backend::input::{
-        self, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent,
-        PointerButtonEvent, PointerMotionAbsoluteEvent, PointerMotionEvent,
+        self, ButtonState, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent,
+        PointerAxisEvent, PointerButtonEvent, PointerMotionAbsoluteEvent, PointerMotionEvent,
     },
     reexports::wayland_server::protocol::wl_pointer,
     utils::{Logical, Point},
@@ -76,65 +76,62 @@ impl Anodium {
             .find_by_position(self.input_state.pointer_location.to_i32_round())
         {
             if captured {
-                self.process_imgui_event(event, &output);
+                self.process_egui_event(event, &output);
             } else {
-                self.reset_imgui_event(&output);
+                self.reset_egui_event(&output);
             }
         }
     }
 
-    fn reset_imgui_event(&self, output: &Output) {
-        let (mut imgui, pipeline) = output.take_imgui();
-        imgui.io_mut().mouse_pos = [f32::MAX, f32::MAX];
-        output.restore_imgui((imgui, pipeline));
+    fn reset_egui_event(&self, output: &Output) {
+        let mut max_point = Point::default();
+        max_point.x = i32::MAX;
+        max_point.y = i32::MAX;
+        output.egui().handle_pointer_motion(max_point);
     }
 
-    fn process_imgui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
-        let mouse_location = self.input_state.pointer_location - output.location().to_f64();
-        let (mut imgui, pipeline) = output.take_imgui();
-        let mut io = imgui.io_mut();
-
-        io.mouse_pos[0] = mouse_location.x as f32;
-        io.mouse_pos[1] = mouse_location.y as f32;
-
+    fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
         match event {
-            InputEvent::Keyboard { event, .. } => {
-                let keycode = event.key_code();
-                let state = event.state();
-                match state {
-                    KeyState::Pressed => io.keys_down[keycode as usize] = true,
-                    KeyState::Released => io.keys_down[keycode as usize] = false,
-                }
+            InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
+                let mouse_location = self.input_state.pointer_location - output.location().to_f64();
+                output
+                    .egui()
+                    .handle_pointer_motion(mouse_location.to_i32_round());
             }
 
             InputEvent::PointerButton { event, .. } => {
-                let button = event.button().unwrap();
-                let state = event.state() == input::ButtonState::Pressed;
-
-                match button {
-                    input::MouseButton::Left => io.mouse_down[0] = state,
-                    input::MouseButton::Right => io.mouse_down[1] = state,
-                    input::MouseButton::Middle => io.mouse_down[2] = state,
-                    _ => {}
-                };
-            }
-
-            InputEvent::PointerAxis { event, .. } => {
-                if event.source() == input::AxisSource::Wheel {
-                    let amount_discrete =
-                        event.amount_discrete(input::Axis::Vertical).unwrap() * 0.3;
-                    // TODO - find a better way to handle this, why does it scrool on wayland in opposite direction?!
-                    if self.seat_name == "x11" || self.seat_name == "winit" {
-                        io.mouse_wheel += amount_discrete as f32;
-                    } else {
-                        io.mouse_wheel -= amount_discrete as f32;
-                    }
+                if let Some(button) = event.button() {
+                    output.egui().handle_pointer_button(
+                        button,
+                        event.state() == ButtonState::Pressed,
+                        self.input_state.modifiers_state.clone(),
+                    );
                 }
             }
+
+            InputEvent::Keyboard { event } => {
+                //TODO - is that enough or do we need the whole code from here https://github.com/Smithay/smithay-egui/blob/main/examples/integrate.rs#L69 ?
+                output.egui().handle_keyboard(
+                    &[event.key_code()],
+                    event.state() == KeyState::Pressed,
+                    self.input_state.modifiers_state.clone(),
+                );
+            }
+
+            InputEvent::PointerAxis { event, .. } => output.egui().handle_pointer_axis(
+                event
+                    .amount_discrete(input::Axis::Horizontal)
+                    .or_else(|| event.amount(input::Axis::Horizontal).map(|x| x * 3.0))
+                    .unwrap_or(0.0)
+                    * 10.0,
+                event
+                    .amount_discrete(input::Axis::Vertical)
+                    .or_else(|| event.amount(input::Axis::Vertical).map(|x| x * 3.0))
+                    .unwrap_or(0.0)
+                    * 10.0,
+            ),
             _ => {}
         }
-
-        output.restore_imgui((imgui, pipeline));
     }
 
     fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {

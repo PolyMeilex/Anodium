@@ -1,15 +1,22 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
+use std::time::Instant;
 
 use calloop::channel::Sender;
-use imgui::{Context, SuspendedContext, Ui};
-use imgui_smithay_renderer::Renderer;
+
+use smithay_egui::{EguiFrame, EguiState};
+
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::{
     reexports::wayland_server::{protocol::wl_output::WlOutput, Display, Global, UserDataMap},
     utils::{Logical, Point, Rectangle, Size},
-    wayland::output::{self, Mode, PhysicalProperties},
+    wayland::{
+        output::{self, Mode, PhysicalProperties},
+        seat::ModifiersState,
+    },
 };
+
+use derivative::Derivative;
 
 use image::{self, DynamicImage};
 
@@ -19,7 +26,8 @@ use crate::render::renderer::import_bitmap;
 
 use super::layer_map::LayerMap;
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct Inner {
     name: String,
     output: output::Output,
@@ -37,8 +45,11 @@ struct Inner {
 
     wallpaper: Option<DynamicImage>,
     wallpaper_texture: Option<Gles2Texture>,
-    imgui: Option<(SuspendedContext, Renderer)>,
+
+    #[derivative(Debug = "ignore")]
+    egui: Option<EguiState>,
     shell: Shell,
+
     fps: f64,
 }
 
@@ -57,14 +68,6 @@ impl Inner {
 
         self.current_mode = mode;
         self.pending_mode_change = true;
-
-        let (imgui, pipeline) = self.imgui.take().unwrap();
-        let mut imgui = imgui.activate().unwrap();
-
-        let io = imgui.io_mut();
-        io.display_size = [mode.size.w as f32, mode.size.h as f32];
-
-        self.imgui = Some((imgui.suspend(), pipeline));
     }
 
     pub fn update_scale(&mut self, scale: f64) {
@@ -72,14 +75,6 @@ impl Inner {
             let current_mode = self.current_mode;
 
             self.scale = scale;
-
-            let (imgui, pipeline) = self.imgui.take().unwrap();
-            let mut imgui = imgui.activate().unwrap();
-
-            let io = imgui.io_mut();
-            io.display_framebuffer_scale = [scale as f32, scale as f32];
-
-            self.imgui = Some((imgui.suspend(), pipeline));
 
             self.output.change_current_state(
                 Some(current_mode),
@@ -130,14 +125,20 @@ impl Output {
         physical: PhysicalProperties,
         mode: Mode,
         possible_modes: Vec<Mode>,
-        imgui_context: Context,
-        imgui_pipeline: Renderer,
         active_workspace: String,
         logger: slog::Logger,
     ) -> Self
     where
         N: AsRef<str>,
     {
+        let egui = EguiState::new();
+        let visuals = egui::style::Visuals {
+            window_corner_radius: 0.0,
+            ..Default::default()
+        };
+
+        egui.context().set_visuals(visuals);
+
         let (output, global) = output::Output::new(display, name.as_ref().into(), physical, logger);
 
         let scale = 1.0f64;
@@ -162,7 +163,8 @@ impl Output {
                 layer_map: Default::default(),
                 wallpaper: None,
                 wallpaper_texture: None,
-                imgui: Some((imgui_context.suspend(), imgui_pipeline)),
+
+                egui: Some(egui),
                 shell: Shell::new(),
                 fps: 0.0,
             })),
@@ -272,8 +274,38 @@ impl Output {
         self.inner.borrow_mut().get_wallpaper(renderer)
     }
 
-    pub fn render_shell(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
-        self.inner.borrow().shell.render(ui, config_tx);
+    pub fn render_shell(
+        &self,
+        start_time: &Instant,
+        modifiers: &ModifiersState,
+        config_tx: &Sender<ConfigEvent>,
+    ) -> EguiFrame {
+        let size = self.size();
+        let scale = self.scale();
+        let mut egui;
+        {
+            let mut inner = self.inner.borrow_mut();
+            egui = inner.egui.take().unwrap();
+        }
+        let frame;
+        {
+            let inner = self.inner.borrow();
+            frame = egui.run(
+                |ctx| {
+                    inner.shell.render(ctx, config_tx);
+                },
+                // Just render it over the whole window, but you may limit the area
+                Rectangle::from_loc_and_size((0, 0), size),
+                size.to_physical(1),
+                scale,
+                scale as f32,
+                start_time,
+                modifiers.clone(),
+            );
+        }
+        let mut inner = self.inner.borrow_mut();
+        inner.egui = Some(egui);
+        frame
     }
 
     pub fn pending_mode_change(&self) -> bool {
@@ -298,13 +330,8 @@ impl Output {
         self.inner.borrow_mut().fps = fps;
     }
 
-    pub fn take_imgui(&self) -> (Context, Renderer) {
-        let (context, pipeline) = self.inner.borrow_mut().imgui.take().unwrap();
-        (context.activate().unwrap(), pipeline)
-    }
-
-    pub fn restore_imgui(&self, (context, pipeline): (Context, Renderer)) {
-        self.inner.borrow_mut().imgui = Some((context.suspend(), pipeline));
+    pub fn egui(&self) -> RefMut<EguiState> {
+        RefMut::map(self.inner.borrow_mut(), |o| o.egui.as_mut().unwrap())
     }
 }
 

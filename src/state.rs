@@ -372,22 +372,20 @@ impl Anodium {
         }
 
         {
-            let (mut context, pipeline) = output.take_imgui();
-            let ui = context.frame();
+            let egui_frame = output.render_shell(
+                &self.start_time,
+                &self.input_state.modifiers_state,
+                &self.config_tx,
+            );
 
-            output.render_shell(&ui, &self.config_tx);
-
-            let draw_data = ui.render();
-            let transform = frame.transform;
-
-            frame
-                .renderer
-                .with_context(|_renderer, gles| {
-                    pipeline.render(transform, gles, draw_data);
-                })
-                .unwrap();
-
-            output.restore_imgui((context, pipeline));
+            unsafe {
+                egui_frame.draw(frame.renderer, frame.frame).unwrap();
+            }
+            //TODO - this a bad workaround around egui_frame.draw breaking the next rendered texture, but it works for now
+            frame.clear(
+                [0.1, 0.1, 0.1, 1.0],
+                &[Rectangle::from_loc_and_size((0, 0), (0, 0))],
+            )?;
         }
 
         self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;

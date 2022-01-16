@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use imgui::Ui;
+use egui::CtxRef;
 use rhai::plugin::*;
 use rhai::Engine;
 
@@ -32,9 +32,9 @@ impl Shell {
         self.boxes.borrow_mut().push(r#box);
     }
 
-    pub fn render(&self, ui: &Ui, config_tx: &Sender<ConfigEvent>) {
+    pub fn render(&self, ctx: &CtxRef, config_tx: &Sender<ConfigEvent>) {
         for r#box in self.boxes.borrow().iter() {
-            r#box.render(ui, config_tx);
+            r#box.render(ctx, config_tx);
         }
     }
 }

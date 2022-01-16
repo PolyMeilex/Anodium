@@ -4,7 +4,7 @@ mod filter;
 mod serializer;
 pub use drain::ShellDrain;
 
-use imgui::{StyleColor, Ui};
+use egui::{Color32, Ui};
 use rhai::plugin::*;
 use rhai::{Array, Engine};
 
@@ -18,12 +18,12 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct LoggerInner {
-    trace: [f32; 4],
-    debug: [f32; 4],
-    info: [f32; 4],
-    warning: [f32; 4],
-    error: [f32; 4],
-    critical: [f32; 4],
+    trace: Color32,
+    debug: Color32,
+    info: Color32,
+    warning: Color32,
+    error: Color32,
+    critical: Color32,
 }
 
 #[derive(Debug, Clone)]
@@ -35,29 +35,34 @@ impl Logger {
     pub fn new() -> Self {
         Self {
             inner: Rc::new(RefCell::new(LoggerInner {
-                trace: [0.01, 0.93, 0.98, 1.0],
-                debug: [0.01, 0.93, 0.98, 1.0],
-                info: [0.41, 0.87, 0.67, 1.0],
-                warning: [0.95, 0.48, 0.43, 1.0],
-                error: [0.99, 0.27, 0.31, 1.0],
-                critical: [1.0, 0.49, 0.85, 1.0],
+                trace: Color32::from_rgb(3, 237, 250),
+                debug: Color32::from_rgb(3, 237, 250),
+                info: Color32::from_rgb(105, 222, 171),
+                warning: Color32::from_rgb(242, 122, 110),
+                error: Color32::from_rgb(252, 69, 79),
+                critical: Color32::from_rgb(255, 125, 217),
             })),
         }
     }
 
-    pub fn parse_color(new_color: Array) -> Option<[f32; 4]> {
-        if new_color.len() == 4 {
-            let mut parsed_color = [0.0, 0.0, 0.0, 0.0];
+    pub fn parse_color(new_color: Array) -> Option<Color32> {
+        if new_color.len() == 3 {
+            let mut parsed_color = [0, 0, 0, 255];
             for (i, new_color_part) in new_color.iter().enumerate() {
-                if let Ok(new_color_value) = new_color_part.as_float() {
-                    parsed_color[i] = new_color_value as f32;
+                if let Ok(new_color_value) = new_color_part.as_int() {
+                    parsed_color[i] = new_color_value as u8;
                 } else {
                     warn!("no float value in color, ignoring");
                     return None;
                 }
             }
 
-            Some(parsed_color)
+            Some(Color32::from_rgba_premultiplied(
+                parsed_color[0],
+                parsed_color[1],
+                parsed_color[2],
+                parsed_color[3],
+            ))
         } else {
             None
         }
@@ -65,22 +70,25 @@ impl Logger {
 }
 
 impl Widget for Logger {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
         let inner = self.inner.borrow();
         let buffer = BUFFER.lock().unwrap();
-        for (level, line) in buffer.iter() {
-            let token = match level {
-                Level::Trace => ui.push_style_color(StyleColor::Text, inner.trace),
-                Level::Debug => ui.push_style_color(StyleColor::Text, inner.debug),
-                Level::Info => ui.push_style_color(StyleColor::Text, inner.info),
-                Level::Warning => ui.push_style_color(StyleColor::Text, inner.warning),
-                Level::Error => ui.push_style_color(StyleColor::Text, inner.error),
-                Level::Critical => ui.push_style_color(StyleColor::Text, inner.critical),
-            };
-
-            ui.text_wrapped(line);
-            token.end();
-        }
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for (level, line) in buffer.iter() {
+                    let mut label = egui::RichText::new(line);
+                    label = match level {
+                        Level::Trace => label.color(inner.trace),
+                        Level::Debug => label.color(inner.debug),
+                        Level::Info => label.color(inner.info),
+                        Level::Warning => label.color(inner.warning),
+                        Level::Error => label.color(inner.error),
+                        Level::Critical => label.color(inner.critical),
+                    };
+                    ui.add(egui::Label::new(label).wrap(true));
+                }
+            })
     }
 }
 
