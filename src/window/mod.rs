@@ -16,9 +16,6 @@ use crate::{
     popup::Popup,
 };
 
-mod list;
-pub use list::WindowList;
-
 mod window_surface;
 pub use window_surface::WindowSurface;
 

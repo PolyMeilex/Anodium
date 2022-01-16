@@ -60,7 +60,7 @@ impl Output {
     }
 
     pub fn from_resource(output: &WlOutput) -> Option<Self> {
-        SmithayOutput::from_resource(output).map(|o| Self::wrap(o))
+        SmithayOutput::from_resource(output).map(Self::wrap)
     }
 }
 
@@ -150,7 +150,7 @@ impl Output {
             scale as f64,
             1.0,
             start_time,
-            modifiers.clone(),
+            *modifiers,
         )
     }
 }

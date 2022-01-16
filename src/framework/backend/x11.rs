@@ -10,8 +10,7 @@ use smithay::{
         drm::DrmNode,
         egl::{EGLContext, EGLDisplay},
         renderer::{gles2::Gles2Renderer, Bind, ImportEgl, Unbind},
-        x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Input, X11Surface},
-        SwapBuffersError,
+        x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },
     reexports::{
         calloop::{channel, timer::Timer, EventLoop},
@@ -22,7 +21,6 @@ use smithay::{
 };
 use smithay::{
     backend::{input::InputEvent, renderer::ImportDma},
-    reexports::wayland_server::DispatchData,
     wayland::dmabuf::init_dmabuf_global,
 };
 
@@ -76,12 +74,7 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build<D>(
-        self,
-        handler: &mut D,
-        display: &mut Display,
-        renderer: &mut Gles2Renderer,
-    ) -> OutputSurface
+    fn build<D>(self, handler: &mut D, display: &mut Display) -> OutputSurface
     where
         D: BackendHandler,
     {
@@ -214,13 +207,7 @@ where
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| {
-            o.build(
-                handler,
-                &mut display.borrow_mut(),
-                &mut renderer.borrow_mut(),
-            )
-        })
+        .map(|o| o.build(handler, &mut display.borrow_mut()))
         .collect();
 
     for surface_data in surface_datas.iter() {
@@ -241,8 +228,6 @@ where
         .insert_source(timer, {
             let surface_datas = surface_datas.clone();
             move |_: (), _timer_handle, handler| {
-                let mut ddata = DispatchData::wrap(handler);
-
                 let mut renderer = renderer.borrow_mut();
                 let surface_datas = &mut *surface_datas.borrow_mut();
 
@@ -279,6 +264,7 @@ where
                             }
                         }
                         Err(_) => {
+                            todo!();
                             // if let SwapBuffersError::ContextLost(err) = err.into() {
                             //     error!("Critical Rendering Error: {}", err);
                             //     cb(BackendEvent::CloseCompositor {}, ddata.reborrow());

@@ -29,11 +29,11 @@ pub struct ResizeSurfaceGrab {
 impl PointerGrab for ResizeSurfaceGrab {
     fn motion(
         &mut self,
-        handle: &mut PointerInnerHandle<'_>,
+        _handle: &mut PointerInnerHandle<'_>,
         location: Point<f64, Logical>,
         _focus: Option<(wl_surface::WlSurface, Point<i32, Logical>)>,
-        serial: Serial,
-        time: u32,
+        _serial: Serial,
+        _time: u32,
         _ddata: DispatchData,
     ) {
         let (mut dx, mut dy) = (location - self.start_data.location).into();

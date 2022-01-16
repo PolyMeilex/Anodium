@@ -26,7 +26,7 @@ impl OutputHandler for Anodium {
 
         if let Some(layout) = self
             .config
-            .output_rearrange(self.output_map.outputs().into())
+            .output_rearrange(self.output_map.outputs().clone())
         {
             for (output, pos) in self.output_map.outputs().iter().zip(layout.iter()) {
                 let scale = self.workspace.output_scale(output).unwrap_or(1.0);

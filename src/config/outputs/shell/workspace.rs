@@ -18,7 +18,7 @@ impl CurrentWorkspace {
 }
 
 impl Widget for CurrentWorkspace {
-    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
+    fn render(&self, _ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
         todo!();
         // ui.text(format!("Workspace: {}", self.0.active_workspace()));
     }

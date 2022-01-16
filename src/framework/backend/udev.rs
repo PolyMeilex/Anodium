@@ -220,23 +220,20 @@ where
     let handle = event_loop.handle();
     let _udev_event_source = event_loop
         .handle()
-        .insert_source(udev_backend, {
-            let inner = inner.clone();
-            move |event, _, handler| match event {
-                UdevEvent::Added { device_id, path } => device_added(
-                    handler,
-                    handle.clone(),
-                    inner.clone(),
-                    device_id,
-                    path,
-                    &session_signal,
-                ),
-                UdevEvent::Changed { device_id } => {
-                    error!("Udev device ({:?}) changed: unimplemented", device_id);
-                }
-                UdevEvent::Removed { device_id } => {
-                    error!("Udev device ({:?}) removed: unimplemented", device_id);
-                }
+        .insert_source(udev_backend, move |event, _, handler| match event {
+            UdevEvent::Added { device_id, path } => device_added(
+                handler,
+                handle.clone(),
+                inner.clone(),
+                device_id,
+                path,
+                &session_signal,
+            ),
+            UdevEvent::Changed { device_id } => {
+                error!("Udev device ({:?}) changed: unimplemented", device_id);
+            }
+            UdevEvent::Removed { device_id } => {
+                error!("Udev device ({:?}) removed: unimplemented", device_id);
             }
         })
         .map_err(|e| -> IoError { e.into() })
@@ -356,10 +353,6 @@ where
                     let drm_modes = connector_info.modes();
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
-
-                    let connector_inner = inner.borrow();
-                    let display = connector_inner.display.clone();
-                    let display = &mut *display.borrow_mut();
 
                     let wl_modes: Vec<Mode> = drm_modes
                         .iter()

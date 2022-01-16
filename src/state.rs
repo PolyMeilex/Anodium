@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -10,24 +10,20 @@ use std::{
 };
 
 use smithay::{
-    backend::renderer::{
-        gles2::{Gles2Renderer, Gles2Texture},
-        Frame, Transform,
-    },
+    backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     desktop::{
         self,
-        space::{DynamicRenderElements, RenderElement, SurfaceTree},
+        space::{DynamicRenderElements, SurfaceTree},
     },
     reexports::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point, Rectangle},
+    utils::{Logical, Point},
     wayland::{
         data_device::{self, DataDeviceEvent},
         output::xdg::init_xdg_output_manager,
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
-        shell::wlr_layer::Layer,
         shm::init_shm_global,
     },
 };
@@ -385,10 +381,13 @@ impl Anodium {
             if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
                 elems.push(Box::new(wl_dnd));
             }
+
+            // TODO:
+            let _todo = pointer_image;
         }
 
         self.workspace
-            .render_output(renderer, &output, 0, [0.1, 0.1, 0.1, 1.0], &elems)
+            .render_output(renderer, output, 0, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
 
         Ok(())

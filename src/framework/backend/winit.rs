@@ -2,13 +2,12 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use smithay::{
     backend::{
-        input::InputEvent,
         renderer::{ImportDma, ImportEgl},
-        winit::{self, WinitEvent, WinitInput},
+        winit::{self, WinitEvent},
     },
     reexports::{
         calloop::{channel, timer::Timer, EventLoop},
-        wayland_server::{protocol::wl_output, DispatchData, Display},
+        wayland_server::{protocol::wl_output, Display},
     },
     wayland::{
         dmabuf::init_dmabuf_global,

@@ -1,5 +1,5 @@
 use smithay::{
-    desktop::{self, Kind},
+    desktop::{self},
     reexports::wayland_server::{
         protocol::{wl_pointer::ButtonState, wl_surface},
         DispatchData,
@@ -12,8 +12,6 @@ use smithay::{
 };
 
 use crate::state::Anodium;
-
-use crate::framework::surface_data::{MoveAfterResizeState, SurfaceData};
 
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,
@@ -89,7 +87,7 @@ impl PointerGrab for MoveSurfaceGrab {
         state: ButtonState,
         serial: Serial,
         time: u32,
-        mut ddata: DispatchData,
+        _ddata: DispatchData,
     ) {
         handle.button(button, state, serial, time);
         if handle.current_pressed().is_empty() {

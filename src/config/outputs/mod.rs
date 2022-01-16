@@ -57,7 +57,7 @@ impl Outputs {
         outputs: Vec<Output>,
     ) -> Option<Vec<(i32, i32)>> {
         if let Some(on_rearrange) = self.on_rearrange.borrow().clone() {
-            let outputs: Array = outputs.into_iter().map(|o| Dynamic::from(o)).collect();
+            let outputs: Array = outputs.into_iter().map(Dynamic::from).collect();
 
             let res: Array = on_rearrange.call(engine, ast, (outputs,)).unwrap();
             let res: Vec<(i32, i32)> = res
@@ -103,13 +103,12 @@ impl Outputs {
         }
     }
 
-    pub fn get(&mut self, index: i64) -> Dynamic {
-        todo!();
-        // if let Some(output) = self.output_map.find_by_index(index as usize) {
-        //     Dynamic::from(output)
-        // } else {
-        //     Dynamic::from(())
-        // }
+    pub fn get(&mut self, index: INT) -> Dynamic {
+        if let Some(output) = self.output_map.outputs().get(index as usize).cloned() {
+            Dynamic::from(output)
+        } else {
+            Dynamic::from(())
+        }
     }
 }
 #[export_module]
@@ -209,13 +208,13 @@ pub mod outputs {
     // }
 
     #[rhai_fn(global)]
-    pub fn set_wallpaper(output: &mut Output, path: &str) {
+    pub fn set_wallpaper(_output: &mut Output, _path: &str) {
         todo!("Let's just spawn sway-bg client, it's better and easier anyway. (maybe implement anobg/anopaper or something like that at some point)");
         // output.set_wallpaper(path);
     }
 
     #[rhai_fn(global)]
-    pub fn update_mode(output: &mut Output, mode: Mode) {
+    pub fn update_mode(_output: &mut Output, _mode: Mode) {
         todo!("Send event using event emiter");
         // output.update_mode(mode);
     }

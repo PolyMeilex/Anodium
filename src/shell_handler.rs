@@ -39,7 +39,7 @@ impl Anodium {
 
                 if let Some(window) = window {
                     let initial_window_location =
-                        self.workspace.window_geometry(&window).unwrap().loc;
+                        self.workspace.window_geometry(window).unwrap().loc;
 
                     let grab = MoveSurfaceGrab {
                         start_data,
@@ -63,13 +63,13 @@ impl Anodium {
                 let window = self.workspace.window_for_surface(wl_surface);
 
                 if let Some(window) = window {
-                    let geometry = self.workspace.window_geometry(&window).unwrap();
+                    let geometry = self.workspace.window_geometry(window).unwrap();
                     let (initial_window_location, initial_window_size) =
                         (geometry.loc, geometry.size);
 
                     SurfaceData::with_mut(wl_surface, |data| {
                         data.resize_state = ResizeState::Resizing(ResizeData {
-                            edges: edges.into(),
+                            edges,
                             initial_window_location,
                             initial_window_size,
                         });
@@ -78,7 +78,7 @@ impl Anodium {
                     let grab = ResizeSurfaceGrab {
                         start_data,
                         window: window.clone(),
-                        edges: edges.into(),
+                        edges,
                         initial_window_size,
                         last_window_size: initial_window_size,
                     };

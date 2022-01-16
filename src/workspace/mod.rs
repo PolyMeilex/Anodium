@@ -5,6 +5,12 @@ pub struct Workspace {
     space: desktop::Space,
 }
 
+impl Default for Workspace {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Workspace {
     pub fn new() -> Self {
         Self {

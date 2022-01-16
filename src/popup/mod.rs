@@ -6,9 +6,6 @@ use smithay::{
     wayland::{compositor::with_states, shell::xdg::SurfaceCachedState},
 };
 
-mod list;
-pub use list::PopupList;
-
 mod popup_surface;
 pub use popup_surface::PopupSurface;
 

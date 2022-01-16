@@ -48,7 +48,7 @@ impl InputHandler for Anodium {
                         .outputs()
                         .next()
                         .cloned()
-                        .map(|o| Output::wrap(o))
+                        .map(Output::wrap)
                         .unwrap()
                 });
 
@@ -89,7 +89,7 @@ impl InputHandler for Anodium {
 }
 
 impl Anodium {
-    fn reset_egui_event(&self, output: &Output) {
+    fn _reset_egui_event(&self, output: &Output) {
         let mut max_point = Point::default();
         max_point.x = i32::MAX;
         max_point.y = i32::MAX;
@@ -111,7 +111,7 @@ impl Anodium {
                     output.egui().handle_pointer_button(
                         button,
                         event.state() == ButtonState::Pressed,
-                        self.input_state.modifiers_state.clone(),
+                        self.input_state.modifiers_state,
                     );
                 }
             }
@@ -121,7 +121,7 @@ impl Anodium {
                 output.egui().handle_keyboard(
                     &[event.key_code()],
                     event.state() == KeyState::Pressed,
-                    self.input_state.modifiers_state.clone(),
+                    self.input_state.modifiers_state,
                 );
             }
 
