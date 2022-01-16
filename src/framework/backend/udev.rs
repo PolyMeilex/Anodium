@@ -566,16 +566,7 @@ fn device_added<D>(
 
                     let output = Output::new(
                         &mut inner.display.borrow_mut(),
-                        OutputDescriptor {
-                            name: output_descriptor.name.clone(),
-                            // TODO: Add PhysicalProperties::Clone to smithay
-                            physical_properties: PhysicalProperties {
-                                size: output_descriptor.physical_properties.size,
-                                subpixel: output_descriptor.physical_properties.subpixel,
-                                make: output_descriptor.physical_properties.make.clone(),
-                                model: output_descriptor.physical_properties.model.clone(),
-                            },
-                        },
+                        output_descriptor.clone(),
                         wl_output::Transform::Normal,
                         output_surface.wl_mode,
                         output_surface.wl_modes.clone(),

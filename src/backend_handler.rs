@@ -10,10 +10,12 @@ use crate::{
 impl OutputHandler for Anodium {
     fn ask_for_output_mode(
         &mut self,
-        _desc: &OutputDescriptor,
+        desc: &OutputDescriptor,
         modes: &[output::Mode],
     ) -> output::Mode {
-        modes[0]
+        self.config
+            .ask_for_output_mode(desc, modes)
+            .unwrap_or_else(|| modes[0])
     }
 
     fn output_created(&mut self, output: crate::output_manager::Output) {

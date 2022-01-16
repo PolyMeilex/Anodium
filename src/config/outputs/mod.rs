@@ -6,7 +6,7 @@ use rhai::{FnPtr, INT};
 
 use smithay::wayland::output::Mode;
 
-use crate::output_manager::{Output, OutputManager};
+use crate::output_manager::{Output, OutputDescriptor, OutputManager};
 
 pub mod shell;
 
@@ -36,6 +36,7 @@ impl IntoIterator for Modes {
 pub struct Outputs {
     output_map: OutputManager,
     on_rearrange: Rc<RefCell<Option<FnPtr>>>,
+    on_mode_select: Rc<RefCell<Option<FnPtr>>>,
     on_new: Rc<RefCell<Option<FnPtr>>>,
 }
 
@@ -44,6 +45,7 @@ impl Outputs {
         Self {
             output_map,
             on_rearrange: Default::default(),
+            on_mode_select: Default::default(),
             on_new: Default::default(),
         }
     }
@@ -67,7 +69,28 @@ impl Outputs {
 
             Some(res)
         } else {
-            error!("on_rearrange not configured");
+            warn!("on_rearrange not configured");
+            None
+        }
+    }
+
+    pub fn on_mode_select(
+        &self,
+        engine: &Engine,
+        ast: &AST,
+        desc: &OutputDescriptor,
+        modes: &[Mode],
+    ) -> Option<Mode> {
+        if let Some(on_mode_select) = self.on_mode_select.borrow().clone() {
+            let modes = Modes(modes.to_vec());
+
+            let res: Mode = on_mode_select
+                .call(engine, ast, (desc.clone(), modes))
+                .unwrap();
+
+            Some(res)
+        } else {
+            warn!("on_mode_select not configured");
             None
         }
     }
@@ -90,6 +113,24 @@ impl Outputs {
     }
 }
 #[export_module]
+pub mod output_descriptor {
+    #[rhai_fn(get = "name", pure)]
+    pub fn name(desc: &mut OutputDescriptor) -> ImmutableString {
+        desc.name.clone().into()
+    }
+
+    #[rhai_fn(get = "manufacturer", pure)]
+    pub fn manufacturer(desc: &mut OutputDescriptor) -> ImmutableString {
+        desc.physical_properties.make.clone().into()
+    }
+
+    #[rhai_fn(get = "model", pure)]
+    pub fn model(desc: &mut OutputDescriptor) -> ImmutableString {
+        desc.physical_properties.model.clone().into()
+    }
+}
+
+#[export_module]
 pub mod modes {
     #[rhai_fn(get = "w", pure)]
     pub fn w(mode: &mut Mode) -> INT {
@@ -107,7 +148,7 @@ pub mod modes {
     }
 
     #[rhai_fn(global)]
-    pub fn filter(modes: &mut Modes, w: INT, h: INT, refresh: INT) -> Dynamic {
+    pub fn find(modes: &mut Modes, w: INT, h: INT, refresh: INT) -> Dynamic {
         if let Some(mode) = modes.0.iter().find(|m| {
             m.size.w as i64 == w && m.size.h as i64 == h && m.refresh as i64 == refresh * 1000
         }) {
@@ -188,6 +229,11 @@ pub mod outputs {
     }
 
     #[rhai_fn(global)]
+    pub fn on_mode_select(output: &mut Outputs, fnptr: FnPtr) {
+        *output.on_mode_select.borrow_mut() = Some(fnptr);
+    }
+
+    #[rhai_fn(global)]
     pub fn on_new(output: &mut Outputs, fnptr: FnPtr) {
         *output.on_new.borrow_mut() = Some(fnptr);
     }
@@ -205,10 +251,13 @@ impl IntoIterator for Outputs {
 
 pub fn register(engine: &mut Engine) {
     let outputs_module = exported_module!(outputs);
+    let output_desc_module = exported_module!(output_descriptor);
     let modes_module = exported_module!(modes);
     engine
+        .register_static_module("outpt_descriptor", output_desc_module.into())
         .register_static_module("outputs", outputs_module.into())
         .register_static_module("modes", modes_module.into())
+        .register_type::<OutputDescriptor>()
         .register_type::<Outputs>()
         .register_type::<Output>()
         .register_type::<Mode>()

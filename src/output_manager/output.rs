@@ -6,7 +6,6 @@ use smithay::wayland::output::Output as SmithayOutput;
 
 use smithay::{
     reexports::wayland_server::{protocol::wl_output, Display},
-    utils::{Logical, Point},
     wayland::output::{Mode, PhysicalProperties},
 };
 
@@ -16,6 +15,21 @@ use smithay::{
 pub struct OutputDescriptor {
     pub name: String,
     pub physical_properties: PhysicalProperties,
+}
+
+impl Clone for OutputDescriptor {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            // TODO: Add PhysicalProperties::Clone to smithay
+            physical_properties: PhysicalProperties {
+                size: self.physical_properties.size,
+                subpixel: self.physical_properties.subpixel,
+                make: self.physical_properties.make.clone(),
+                model: self.physical_properties.model.clone(),
+            },
+        }
+    }
 }
 
 #[derive(Default)]

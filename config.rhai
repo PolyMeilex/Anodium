@@ -179,14 +179,19 @@ anodize.outputs.on_rearrange(|outputs| {
     })
 });
 
-// anodize.outputs.on_new(|output| {
+anodize.outputs.on_mode_select(|desc, modes| {
+    if desc.name == "Virtual-1" {
+        let mode = modes.find(1440, 900, 60);
+        if mode != () {
+            return mode;
+        }
+    }
+
+    modes[0]
+});
+
+anodize.outputs.on_new(|output| {
     // anodize.log.info("anodize on_new");
-    // if output.name == "Virtual-1" {
-    //     let mode = output.modes.filter(1440, 900, 60);
-    //     if mode != () {
-    //         output.update_mode(mode);
-    //     }
-    // }
 
     // output.set_wallpaper("./resources/anocube.png");
 
@@ -205,7 +210,7 @@ anodize.outputs.on_rearrange(|outputs| {
     // top_box.add_widget(output_geometry_widget.convert());
 
     // output.shell.add_box(top_box);
-// });
+});
 
 
 
