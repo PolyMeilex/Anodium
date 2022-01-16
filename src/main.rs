@@ -1,6 +1,5 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(irrefutable_let_patterns)]
-#![feature(cell_leak)]
 
 #[macro_use]
 extern crate slog_scope;
