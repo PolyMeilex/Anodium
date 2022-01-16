@@ -5,39 +5,62 @@ pub mod winit;
 #[cfg(feature = "x11")]
 pub mod x11;
 
-use smithay::backend::renderer::gles2::Gles2Texture;
+use smithay::backend::input::{InputBackend, InputEvent};
+use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::backend::session::{auto::AutoSession, Session};
 use smithay::reexports::{
     calloop::{channel, EventLoop},
     wayland_server::Display,
 };
+use smithay::wayland;
 
 use std::{cell::RefCell, rc::Rc};
 
 use crate::cli::{AnodiumOptions, Backend};
-use crate::output_map::Output;
-use crate::render::renderer::RenderFrame;
+use crate::output_manager::{Output, OutputDescriptor};
 use crate::state::Anodium;
 
-pub enum BackendEvent<'a, 'frame> {
-    RequestOutputConfigure {
-        output: Output,
-    },
-    OutputCreated {
-        output: Output,
-    },
-    OutputModeUpdate {
-        output: &'a Output,
-    },
-    OutputRender {
-        frame: &'a mut RenderFrame<'frame>,
-        output: &'a Output,
-        pointer_image: Option<&'a Gles2Texture>,
-    },
-    SendFrames,
+pub trait OutputHandler {
+    /// Request output mode for output that is being built
+    fn ask_for_output_mode(
+        &mut self,
+        _descriptor: &OutputDescriptor,
+        modes: &[wayland::output::Mode],
+    ) -> wayland::output::Mode {
+        modes[0]
+    }
 
-    StartCompositor,
-    CloseCompositor,
+    /// Output was created
+    fn output_created(&mut self, output: Output);
+
+    /// Output got resized
+    fn output_mode_updated(&mut self, output: &Output, mode: wayland::output::Mode) {
+        output.change_current_state(Some(mode), None, None, None);
+    }
+
+    /// Render the ouput
+    fn output_render(
+        &mut self,
+        renderer: &mut Gles2Renderer,
+        output: &Output,
+        pointer_image: Option<&Gles2Texture>,
+    );
+}
+
+pub trait InputHandler {
+    /// Handle input events
+    fn process_input_event<I: InputBackend>(
+        &mut self,
+        event: InputEvent<I>,
+        output: Option<&Output>,
+    );
+}
+
+pub trait BackendHandler: OutputHandler + InputHandler {
+    fn send_frames(&mut self);
+
+    fn start_compositor(&mut self);
+    fn close_compositor(&mut self);
 }
 
 #[derive(Debug)]
@@ -60,21 +83,8 @@ pub fn winit(event_loop: &mut EventLoop<'static, Anodium>, options: AnodiumOptio
         options,
     );
 
-    winit::run_winit(
-        display,
-        event_loop,
-        &mut state,
-        rx,
-        |event, mut ddata| {
-            let state = ddata.get::<Anodium>().unwrap();
-            state.handle_backend_event(event);
-        },
-        |event, output, mut ddata| {
-            let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event, Some(output));
-        },
-    )
-    .expect("Failed to initialize winit backend.");
+    winit::run_winit(display, event_loop, &mut state, rx)
+        .expect("Failed to initialize winit backend.");
 
     info!("Winit initialized");
 
@@ -96,21 +106,7 @@ pub fn x11(event_loop: &mut EventLoop<'static, Anodium>, options: AnodiumOptions
         options,
     );
 
-    x11::run_x11(
-        display,
-        event_loop,
-        &mut state,
-        rx,
-        |event, mut ddata| {
-            let state = ddata.get::<Anodium>().unwrap();
-            state.handle_backend_event(event);
-        },
-        |event, output, mut ddata| {
-            let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event, Some(output));
-        },
-    )
-    .expect("Failed to initialize winit backend.");
+    x11::run_x11(display, event_loop, &mut state, rx).expect("Failed to initialize winit backend.");
 
     info!("Winit initialized");
 
@@ -139,23 +135,8 @@ pub fn udev(event_loop: &mut EventLoop<'static, Anodium>, options: AnodiumOption
         options,
     );
 
-    udev::run_udev(
-        display,
-        event_loop,
-        &mut state,
-        session,
-        notifier,
-        rx,
-        |event, mut ddata| {
-            let state = ddata.get::<Anodium>().unwrap();
-            state.handle_backend_event(event);
-        },
-        |event, mut ddata| {
-            let state = ddata.get::<Anodium>().unwrap();
-            state.process_input_event(event, None);
-        },
-    )
-    .expect("Failed to initialize tty backend.");
+    udev::run_udev(display, event_loop, &mut state, session, notifier, rx)
+        .expect("Failed to initialize tty backend.");
 
     state
 }

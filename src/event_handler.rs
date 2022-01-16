@@ -6,16 +6,19 @@ impl Anodium {
         match event {
             // TODO: Implement window closing from events
             ConfigEvent::Close(_window) => {}
-            ConfigEvent::Maximize(window) => {
-                self.active_workspace().maximize_request(&window.toplevel());
+            ConfigEvent::Maximize(_window) => {
+                todo!();
+                // self.active_workspace().maximize_request(&window.toplevel());
             }
-            ConfigEvent::Unmaximize(window) => {
-                self.active_workspace()
-                    .unmaximize_request(&window.toplevel());
+            ConfigEvent::Unmaximize(_window) => {
+                todo!();
+                // self.active_workspace()
+                //     .unmaximize_request(&window.toplevel());
             }
-            ConfigEvent::SwitchWorkspace(workspace) => self.switch_workspace(&workspace),
+            ConfigEvent::SwitchWorkspace(_workspace) => todo!(),
             ConfigEvent::OutputsRearrange => {
-                self.config.output_rearrange();
+                self.config
+                    .output_rearrange(self.output_map.outputs().clone());
             }
             ConfigEvent::Shell(fnptr) => {
                 self.config.execute_fnptr(fnptr, ());

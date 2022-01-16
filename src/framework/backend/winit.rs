@@ -2,13 +2,12 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use smithay::{
     backend::{
-        input::InputEvent,
-        renderer::{ImportDma, ImportEgl, Renderer, Transform},
-        winit::{self, WinitEvent, WinitInput},
+        renderer::{ImportDma, ImportEgl},
+        winit::{self, WinitEvent},
     },
     reexports::{
         calloop::{channel, timer::Timer, EventLoop},
-        wayland_server::{protocol::wl_output, DispatchData, Display},
+        wayland_server::{protocol::wl_output, Display},
     },
     wayland::{
         dmabuf::init_dmabuf_global,
@@ -16,30 +15,23 @@ use smithay::{
     },
 };
 
-use super::{BackendEvent, BackendRequest};
+use super::{BackendHandler, BackendRequest};
 
-use crate::{output_map::Output, render::renderer::RenderFrame};
+use crate::output_manager::{Output, OutputDescriptor};
 
 pub const OUTPUT_NAME: &str = "winit";
 
-pub fn run_winit<F, IF, D>(
+pub fn run_winit<D>(
     display: Rc<RefCell<Display>>,
 
     event_loop: &mut EventLoop<'static, D>,
-    state: &mut D,
+    handler: &mut D,
 
     rx: channel::Channel<BackendRequest>,
-
-    mut cb: F,
-    mut input_cb: IF,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<WinitInput>, &Output, DispatchData) + 'static,
-    D: 'static,
+    D: BackendHandler + 'static,
 {
-    let mut ddata = DispatchData::wrap(state);
-
     event_loop
         .handle()
         .insert_source(rx, move |event, _, _| match event {
@@ -94,36 +86,28 @@ where
         refresh: 60_000,
     };
 
-    let mut output = Output::new(
-        OUTPUT_NAME,
-        Default::default(),
-        &mut *display.borrow_mut(),
-        PhysicalProperties {
+    let descriptor = OutputDescriptor {
+        name: OUTPUT_NAME.to_owned(),
+        physical_properties: PhysicalProperties {
             size: (0, 0).into(),
             subpixel: wl_output::Subpixel::Unknown,
             make: "Smithay".into(),
             model: "Winit".into(),
         },
+    };
+
+    let mode = handler.ask_for_output_mode(&descriptor, &[mode]);
+
+    let output = Output::new(
+        &mut *display.borrow_mut(),
+        descriptor,
+        wl_output::Transform::Flipped180,
         mode,
         vec![mode],
-        // TODO: output should always have a workspace
-        "Unknown".into(),
-        slog_scope::logger(),
-    );
-    cb(
-        BackendEvent::RequestOutputConfigure {
-            output: output.clone(),
-        },
-        ddata.reborrow(),
-    );
-    cb(
-        BackendEvent::OutputCreated {
-            output: output.clone(),
-        },
-        ddata.reborrow(),
     );
 
-    cb(BackendEvent::StartCompositor, ddata.reborrow());
+    handler.output_created(output.clone());
+    handler.start_compositor();
 
     info!("Initialization completed, starting the main loop.");
 
@@ -134,26 +118,19 @@ where
 
     event_loop
         .handle()
-        .insert_source(timer, move |_: (), handle, state| {
-            let mut ddata = DispatchData::wrap(state);
-
+        .insert_source(timer, move |_: (), timer_handle, handler| {
             let res = input.dispatch_new_events(|event| match event {
-                WinitEvent::Resized { size, scale_factor } => {
+                WinitEvent::Resized { size, .. } => {
                     let mode = Mode {
                         size,
                         refresh: 60_000,
                     };
 
-                    output.update_mode(mode);
-                    output.update_scale(scale_factor);
-
-                    cb(
-                        BackendEvent::OutputModeUpdate { output: &output },
-                        ddata.reborrow(),
-                    );
+                    output.change_current_state(Some(mode), None, Some(1), None);
+                    handler.output_mode_updated(&output, mode);
                 }
                 WinitEvent::Input(event) => {
-                    input_cb(event, &output, ddata.reborrow());
+                    handler.process_input_event(event, Some(&output));
                 }
                 _ => {}
             });
@@ -161,43 +138,19 @@ where
             match res {
                 Ok(()) => {
                     let mut backend = backend.borrow_mut();
-                    let size = backend.window_size().physical_size;
 
                     if backend.bind().is_ok() {
-                        backend
-                            .renderer()
-                            .render(size, Transform::Flipped180, |renderer, frame| {
-                                let mut frame = RenderFrame {
-                                    transform: Transform::Flipped180,
-                                    renderer,
-                                    frame,
-                                };
-
-                                output.update_fps(fps.avg());
-
-                                cb(
-                                    BackendEvent::OutputRender {
-                                        frame: &mut frame,
-                                        output: &output,
-                                        pointer_image: None,
-                                    },
-                                    ddata.reborrow(),
-                                );
-                            })
-                            .unwrap();
-
+                        handler.output_render(backend.renderer(), &output, None);
                         backend.submit(None, 1.0).unwrap();
                     }
 
-                    cb(BackendEvent::SendFrames, ddata);
+                    handler.send_frames();
 
                     fps.tick();
 
-                    handle.add_timeout(Duration::from_millis(16), ());
+                    timer_handle.add_timeout(Duration::from_millis(16), ());
                 }
-                Err(winit::WinitError::WindowClosed) => {
-                    cb(BackendEvent::CloseCompositor, ddata);
-                }
+                Err(winit::WinitError::WindowClosed) => handler.close_compositor(),
             }
         })
         .unwrap();

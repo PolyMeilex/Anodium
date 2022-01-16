@@ -6,11 +6,6 @@ use smithay::{
     wayland::{compositor::with_states, shell::xdg::SurfaceCachedState},
 };
 
-use crate::render::{self, renderer::RenderFrame};
-
-mod list;
-pub use list::PopupList;
-
 mod popup_surface;
 pub use popup_surface::PopupSurface;
 
@@ -115,24 +110,24 @@ impl Popup {
         .unwrap_or(self.bbox)
     }
 
-    pub fn render(
-        &self,
-        frame: &mut RenderFrame,
-        initial_location: Point<i32, Logical>,
-        output_scale: f64,
-    ) {
-        let render_location = initial_location + self.popup.location();
+    // pub fn render(
+    //     &self,
+    //     frame: &mut RenderFrame,
+    //     initial_location: Point<i32, Logical>,
+    //     output_scale: f64,
+    // ) {
+    //     let render_location = initial_location + self.popup.location();
 
-        if let Some(wl_surface) = self.popup.get_surface() {
-            if let Err(err) =
-                render::draw_surface_tree(frame, wl_surface, render_location, output_scale)
-            {
-                error!("{:?}", err);
-            }
-        }
+    // if let Some(wl_surface) = self.popup.get_surface() {
+    //     if let Err(err) =
+    //         render::draw_surface_tree(frame, wl_surface, render_location, output_scale)
+    //     {
+    //         error!("{:?}", err);
+    //     }
+    // }
 
-        for child in self.children.iter() {
-            child.render(frame, render_location, output_scale);
-        }
-    }
+    //     for child in self.children.iter() {
+    //         child.render(frame, render_location, output_scale);
+    //     }
+    // }
 }

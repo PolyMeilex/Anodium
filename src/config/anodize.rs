@@ -4,7 +4,7 @@ use rhai::{plugin::*, Scope};
 use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::LoopHandle;
 
-use crate::output_map::OutputMap;
+use crate::output_manager::OutputManager;
 use crate::state::Anodium;
 
 use super::eventloop::ConfigEvent;
@@ -28,7 +28,7 @@ pub struct Anodize {
 impl Anodize {
     pub fn new(
         event_sender: Sender<ConfigEvent>,
-        output_map: OutputMap,
+        output_map: OutputManager,
         loop_handle: LoopHandle<'static, Anodium>,
     ) -> Self {
         Self {
@@ -87,7 +87,7 @@ pub fn register(
     scope: &mut Scope,
     engine: &mut Engine,
     event_sender: Sender<ConfigEvent>,
-    output_map: OutputMap,
+    output_map: OutputManager,
     loop_handle: LoopHandle<'static, Anodium>,
 ) -> Anodize {
     let anodize = Anodize::new(event_sender, output_map, loop_handle);

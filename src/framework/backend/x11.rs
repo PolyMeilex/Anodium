@@ -9,9 +9,8 @@ use smithay::{
     backend::{
         drm::DrmNode,
         egl::{EGLContext, EGLDisplay},
-        renderer::{gles2::Gles2Renderer, Bind, ImportEgl, Renderer, Transform, Unbind},
-        x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Input, X11Surface},
-        SwapBuffersError,
+        renderer::{gles2::Gles2Renderer, Bind, ImportEgl, Unbind},
+        x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },
     reexports::{
         calloop::{channel, timer::Timer, EventLoop},
@@ -22,13 +21,12 @@ use smithay::{
 };
 use smithay::{
     backend::{input::InputEvent, renderer::ImportDma},
-    reexports::wayland_server::DispatchData,
     wayland::dmabuf::init_dmabuf_global,
 };
 
-use crate::{output_map::Output, render::renderer::RenderFrame};
+use crate::output_manager::{Output, OutputDescriptor};
 
-use super::{BackendEvent, BackendRequest};
+use super::{BackendHandler, BackendRequest};
 
 pub const OUTPUT_NAME: &str = "x11";
 
@@ -76,7 +74,10 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build(self, display: &mut Display) -> OutputSurface {
+    fn build<D>(self, handler: &mut D, display: &mut Display) -> OutputSurface
+    where
+        D: BackendHandler,
+    {
         let size = {
             let s = self.window.size();
             (s.w as i32, s.h as i32).into()
@@ -87,21 +88,24 @@ impl OutputSurfaceBuilder {
             refresh: 60_000,
         };
 
-        let output = Output::new(
-            OUTPUT_NAME,
-            Default::default(),
-            display,
-            PhysicalProperties {
+        let descriptor = OutputDescriptor {
+            name: OUTPUT_NAME.to_owned(),
+            physical_properties: PhysicalProperties {
                 size: (0, 0).into(),
                 subpixel: wl_output::Subpixel::Unknown,
                 make: "Smithay".into(),
                 model: "Winit".into(),
             },
+        };
+
+        let mode = handler.ask_for_output_mode(&descriptor, &[mode]);
+
+        let output = Output::new(
+            display,
+            descriptor,
+            wl_output::Transform::Normal,
             mode,
             vec![mode],
-            // TODO: output should always have a workspace
-            "Unknown".into(),
-            slog_scope::logger(),
         );
 
         OutputSurface {
@@ -118,21 +122,16 @@ impl OutputSurfaceBuilder {
     }
 }
 
-pub fn run_x11<F, IF, D>(
+pub fn run_x11<D>(
     display: Rc<RefCell<Display>>,
 
     event_loop: &mut EventLoop<'static, D>,
-    state: &mut D,
+    handler: &mut D,
 
     rx: channel::Channel<BackendRequest>,
-
-    cb: F,
-    input_cb: IF,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<X11Input>, &Output, DispatchData) + 'static,
-    D: 'static,
+    D: BackendHandler + 'static,
 {
     event_loop
         .handle()
@@ -143,9 +142,6 @@ where
             channel::Event::Closed => {}
         })
         .unwrap();
-
-    let cb = Rc::new(RefCell::new(cb));
-    let input_cb = Rc::new(RefCell::new(input_cb));
 
     let backend = X11Backend::new(slog_scope::logger()).expect("Failed to initilize X11 backend");
     let handle = backend.handle();
@@ -173,38 +169,22 @@ where
         .expect("Failed to initialize renderer");
     let renderer = Rc::new(RefCell::new(renderer));
 
-    new_x11_window(
-        display,
-        event_loop,
-        state,
-        backend,
-        renderer,
-        x11_outputs,
-        cb,
-        input_cb,
-    )
+    new_x11_window(display, event_loop, handler, backend, renderer, x11_outputs)
 }
 
-fn new_x11_window<F, IF, D>(
+fn new_x11_window<D>(
     display: Rc<RefCell<Display>>,
 
     event_loop: &mut EventLoop<'static, D>,
-    state: &mut D,
+    handler: &mut D,
 
     backend: X11Backend,
     renderer: Rc<RefCell<Gles2Renderer>>,
     x11_outputs: Vec<OutputSurfaceBuilder>,
-
-    cb: Rc<RefCell<F>>,
-    input_cb: Rc<RefCell<IF>>,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<X11Input>, &Output, DispatchData) + 'static,
-    D: 'static,
+    D: BackendHandler + 'static,
 {
-    let mut ddata = DispatchData::wrap(state);
-
     if renderer
         .borrow_mut()
         .bind_wl_display(&*display.borrow())
@@ -227,25 +207,14 @@ where
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| o.build(&mut display.borrow_mut()))
+        .map(|o| o.build(handler, &mut display.borrow_mut()))
         .collect();
 
     for surface_data in surface_datas.iter() {
-        (cb.borrow_mut())(
-            BackendEvent::RequestOutputConfigure {
-                output: surface_data.output.clone(),
-            },
-            ddata.reborrow(),
-        );
-        (cb.borrow_mut())(
-            BackendEvent::OutputCreated {
-                output: surface_data.output.clone(),
-            },
-            ddata.reborrow(),
-        );
+        handler.output_created(surface_data.output.clone());
     }
 
-    (cb.borrow_mut())(BackendEvent::StartCompositor, ddata.reborrow());
+    handler.start_compositor();
 
     let surface_datas = Rc::new(RefCell::new(surface_datas));
 
@@ -258,12 +227,8 @@ where
         .handle()
         .insert_source(timer, {
             let surface_datas = surface_datas.clone();
-            let cb = cb.clone();
-            move |_: (), _timer_handle, state| {
-                let mut ddata = DispatchData::wrap(state);
-
+            move |_: (), _timer_handle, handler| {
                 let mut renderer = renderer.borrow_mut();
-                let mut cb = cb.borrow_mut();
                 let surface_datas = &mut *surface_datas.borrow_mut();
 
                 for surface_data in surface_datas.iter_mut() {
@@ -281,28 +246,10 @@ where
                         error!("Error while binding buffer: {}", err);
                     }
 
-                    let res = renderer.render(
-                        surface_data.mode.size,
-                        Transform::Normal,
-                        |renderer, frame| {
-                            let mut frame = RenderFrame {
-                                transform: Transform::Normal,
-                                renderer,
-                                frame,
-                            };
-
-                            surface_data.output.update_fps(surface_data.fps.avg());
-
-                            cb(
-                                BackendEvent::OutputRender {
-                                    frame: &mut frame,
-                                    output: &surface_data.output,
-                                    pointer_image: None,
-                                },
-                                ddata.reborrow(),
-                            );
-                        },
-                    );
+                    let res: Result<(), ()> = {
+                        handler.output_render(&mut renderer, &surface_data.output, None);
+                        Ok(())
+                    };
 
                     match res {
                         Ok(_) => {
@@ -316,18 +263,19 @@ where
                                 error!("Error submitting buffer for display: {}", err);
                             }
                         }
-                        Err(err) => {
-                            if let SwapBuffersError::ContextLost(err) = err.into() {
-                                error!("Critical Rendering Error: {}", err);
-                                cb(BackendEvent::CloseCompositor {}, ddata.reborrow());
-                            }
+                        Err(_) => {
+                            todo!();
+                            // if let SwapBuffersError::ContextLost(err) = err.into() {
+                            //     error!("Critical Rendering Error: {}", err);
+                            //     cb(BackendEvent::CloseCompositor {}, ddata.reborrow());
+                            // }
                         }
                     }
 
                     surface_data.fps.tick();
                 }
 
-                cb(BackendEvent::SendFrames, ddata);
+                handler.send_frames();
             }
         })
         .unwrap();
@@ -335,15 +283,12 @@ where
 
     event_loop
         .handle()
-        .insert_source(backend, move |event, _, state| {
-            let mut ddata = DispatchData::wrap(state);
-
+        .insert_source(backend, move |event, _, handler| {
             let mut surface_datas = surface_datas.borrow_mut();
 
             match event {
                 X11Event::CloseRequested { .. } => {
-                    let mut cb = cb.borrow_mut();
-                    cb(BackendEvent::CloseCompositor {}, ddata.reborrow());
+                    handler.close_compositor();
                 }
 
                 X11Event::Resized {
@@ -356,7 +301,6 @@ where
                         .unwrap();
 
                     let size = (new_size.w as i32, new_size.h as i32).into();
-                    let scale_factor = 1.0;
 
                     let mode = Mode {
                         size,
@@ -364,16 +308,11 @@ where
                     };
 
                     surface_data.mode = mode;
-                    surface_data.output.update_mode(mode);
-                    surface_data.output.update_scale(scale_factor);
+                    surface_data
+                        .output
+                        .change_current_state(Some(mode), None, Some(1), None);
 
-                    let mut cb = cb.borrow_mut();
-                    cb(
-                        BackendEvent::OutputModeUpdate {
-                            output: &surface_data.output,
-                        },
-                        ddata.reborrow(),
-                    );
+                    handler.output_mode_updated(&surface_data.output, mode);
 
                     surface_data.rerender = true;
                     timer_handle.add_timeout(Duration::ZERO, ());
@@ -410,7 +349,8 @@ where
                             .iter_mut()
                             .find(|sd| sd.window.id() == window_id)
                             .unwrap();
-                        (input_cb.borrow_mut())(event, &surface_data.output, ddata.reborrow());
+
+                        handler.process_input_event(event, Some(&surface_data.output));
                     }
                 }
             }

@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -10,17 +10,20 @@ use std::{
 };
 
 use smithay::{
-    backend::renderer::{gles2::Gles2Texture, Frame, Transform},
+    backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
+    desktop::{
+        self,
+        space::{DynamicRenderElements, SurfaceTree},
+    },
     reexports::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
     },
-    utils::{Logical, Point, Rectangle},
+    utils::{Logical, Point},
     wayland::{
         data_device::{self, DataDeviceEvent},
         output::xdg::init_xdg_output_manager,
         seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
-        shell::wlr_layer::Layer,
         shm::init_shm_global,
     },
 };
@@ -33,11 +36,9 @@ use crate::{
     config::{eventloop::ConfigEvent, ConfigVM},
     framework::backend::BackendRequest,
     framework::shell::ShellManager,
-    output_map::{Output, OutputMap},
-    positioner::{universal::Universal, Positioner},
-    render::{self, renderer::RenderFrame},
-    utils::{AsWlSurface, VisibleWorkspaceIter, VisibleWorkspaceIterMut},
-    window::Window,
+    output_manager::{Output, OutputManager},
+    render,
+    workspace::Workspace,
 };
 
 pub struct InputState {
@@ -74,12 +75,13 @@ pub struct Anodium {
 
     pub config: ConfigVM,
 
-    // Desktop Layout
-    pub output_map: OutputMap,
-    pub workspaces: HashMap<String, Box<dyn Positioner>>,
+    // Desktop
+    pub output_map: OutputManager,
+
+    pub workspace: Workspace,
+
     pub active_workspace: Option<String>,
-    pub grabed_window: Option<Window>,
-    pub focused_window: Option<Window>,
+    pub focused_window: Option<desktop::Window>,
 
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
@@ -242,7 +244,7 @@ impl Anodium {
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
         let config_tx = Self::init_config_channel(&handle);
-        let output_map = OutputMap::new(config_tx.clone());
+        let output_map = OutputManager::new();
 
         let config = ConfigVM::new(
             config_tx.clone(),
@@ -258,7 +260,6 @@ impl Anodium {
             running: Arc::new(AtomicBool::new(true)),
 
             shell_manager,
-            // desktop_layout: DesktopLayout::new(display.clone(), config.clone(), log.clone()),
             display,
 
             dnd_icon,
@@ -284,9 +285,9 @@ impl Anodium {
             config,
 
             output_map,
-            workspaces: Default::default(),
+            workspace: Workspace::new(),
+
             active_workspace: None,
-            grabed_window: Default::default(),
             focused_window: Default::default(),
 
             #[cfg(feature = "xwayland")]
@@ -295,42 +296,12 @@ impl Anodium {
             config_tx,
         }
     }
-
-    pub fn start(&mut self) {
-        let socket_name = self
-            .display
-            .borrow_mut()
-            .add_socket_auto()
-            .unwrap()
-            .into_string()
-            .unwrap();
-
-        info!("Listening on wayland socket"; "name" => socket_name.clone());
-        ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
-
-        #[cfg(feature = "xwayland")]
-        {
-            use crate::utils::LogResult;
-
-            self.xwayland
-                .start()
-                .log_err("Failed to start XWayland:")
-                .ok();
-        }
-    }
 }
 
 impl Anodium {
     pub fn update(&mut self) {
-        let elapsed = self.last_update.elapsed().as_secs_f64();
-
         self.shell_manager.refresh();
-
-        for (_, w) in self.workspaces.iter_mut() {
-            w.update(elapsed);
-        }
-
-        self.output_map.refresh();
+        self.workspace.refresh();
 
         if let Some(focused_window) = &self.focused_window {
             if !focused_window.toplevel().alive() {
@@ -341,79 +312,58 @@ impl Anodium {
         self.last_update = Instant::now();
     }
 
+    // draw the custom cursor if applicable
+    fn prepare_cursor_element(
+        &self,
+        relative_location: Point<i32, Logical>,
+    ) -> Option<SurfaceTree> {
+        // draw the cursor as relevant
+        let mut cursor_status = self.cursor_status.lock().unwrap();
+        // reset the cursor if the surface is no longer alive
+        let mut reset = false;
+        if let CursorImageStatus::Image(ref surface) = *cursor_status {
+            reset = !surface.as_ref().is_alive();
+        }
+        if reset {
+            *cursor_status = CursorImageStatus::Default;
+        }
+
+        if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
+            let elm = render::draw_cursor(wl_surface.clone(), relative_location);
+            Some(elm)
+        } else {
+            None
+        }
+    }
+
+    // draw the dnd icon if applicable
+    fn prepare_dnd_element(&self, relative_location: Point<i32, Logical>) -> Option<SurfaceTree> {
+        let guard = self.dnd_icon.lock().unwrap();
+        guard.as_ref().and_then(|wl_surface| {
+            if wl_surface.as_ref().is_alive() {
+                Some(render::draw_dnd_icon(wl_surface.clone(), relative_location))
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn render(
         &mut self,
-        frame: &mut RenderFrame,
+        renderer: &mut Gles2Renderer,
         output: &Output,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<(), smithay::backend::SwapBuffersError> {
-        let (output_geometry, output_scale) = (output.geometry(), output.scale());
+        let output_geometry = self.workspace.output_geometry(output).unwrap();
 
-        frame.clear(
-            [0.1, 0.1, 0.1, 1.0],
-            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-        )?;
+        let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
 
-        // Layers bellow windows
-        self.draw_layers(frame, Layer::Background, output_geometry, output_scale)?;
-        if let Some(wallaper) = output.get_wallpaper(frame.renderer) {
-            frame.render_texture_at(
-                &wallaper,
-                Point::<i32, Logical>::from((0, 0))
-                    .to_f64()
-                    .to_physical(output_scale as f64)
-                    .to_i32_round(),
-                1,
-                output_scale as f64,
-                Transform::Normal,
-                &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-                1.0,
-            )?;
-        }
-
-        {
-            let egui_frame = output.render_shell(
-                &self.start_time,
-                &self.input_state.modifiers_state,
-                &self.config_tx,
-            );
-
-            unsafe {
-                egui_frame.draw(frame.renderer, frame.frame).unwrap();
-            }
-            //TODO - this a bad workaround around egui_frame.draw breaking the next rendered texture, but it works for now
-            frame.clear(
-                [0.1, 0.1, 0.1, 1.0],
-                &[Rectangle::from_loc_and_size((0, 0), (0, 0))],
-            )?;
-        }
-
-        self.draw_layers(frame, Layer::Bottom, output_geometry, output_scale)?;
-
-        // draw the windows
-        self.draw_windows(frame, output_geometry, output_scale)?;
-
-        // Layers above windows
-        for layer in [Layer::Top, Layer::Overlay] {
-            self.draw_layers(frame, layer, output_geometry, output_scale)?;
-        }
-
-        // Grab Debug:
-        // if let Some(window) = self.desktop_layout.borrow().grabed_window.as_ref() {
-        //     let loc: Point<i32, Logical> = window.location() + window.geometry().loc;
-        //     let size: Size<i32, Logical> = window.geometry().size;
-        //     let quad: Rectangle<i32, Logical> = Rectangle::from_loc_and_size(loc, size);
-
-        //     if output_geometry.overlaps(quad) {
-        //         frame.quad_pipeline.render(
-        //             output_geometry.to_f64().to_physical(output_scale),
-        //             quad.to_f64().to_physical(output_scale),
-        //             frame.transform,
-        //             &frame.context,
-        //             0.1,
-        //         );
-        //     }
-        // }
+        let frame = output.render_egui_shell(
+            &self.start_time,
+            &self.input_state.modifiers_state,
+            &self.config_tx,
+        );
+        elems.push(Box::new(frame));
 
         // Pointer Related:
         if output_geometry
@@ -421,163 +371,41 @@ impl Anodium {
             .contains(self.input_state.pointer_location)
         {
             let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
-            let relative_ptr_location =
+            let relative_location =
                 Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
-            // draw the dnd icon if applicable
-            {
-                let guard = self.dnd_icon.lock().unwrap();
-                if let Some(ref wl_surface) = *guard {
-                    if wl_surface.as_ref().is_alive() {
-                        render::draw_dnd_icon(
-                            frame,
-                            wl_surface,
-                            relative_ptr_location,
-                            output_scale,
-                        )?;
-                    }
-                }
+
+            if let Some(wl_cursor) = self.prepare_cursor_element(relative_location) {
+                elems.push(Box::new(wl_cursor));
             }
 
-            // set cursor
-            {
-                let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
-                let relative_ptr_location =
-                    Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
-                // draw the cursor as relevant
-                {
-                    let mut cursor_status = self.cursor_status.lock().unwrap();
-                    // reset the cursor if the surface is no longer alive
-                    let mut reset = false;
-                    if let CursorImageStatus::Image(ref surface) = *cursor_status {
-                        reset = !surface.as_ref().is_alive();
-                    }
-                    if reset {
-                        *cursor_status = CursorImageStatus::Default;
-                    }
-
-                    if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
-                        render::draw_cursor(
-                            frame,
-                            wl_surface,
-                            relative_ptr_location,
-                            output_scale,
-                        )?;
-                    } else if let Some(pointer_image) = pointer_image {
-                        frame.render_texture_at(
-                            pointer_image,
-                            relative_ptr_location
-                                .to_f64()
-                                .to_physical(output_scale as f64)
-                                .to_i32_round(),
-                            1,
-                            output_scale as f64,
-                            Transform::Normal,
-                            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-                            1.0,
-                        )?;
-                    }
-                }
+            if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
+                elems.push(Box::new(wl_dnd));
             }
+
+            // TODO:
+            let _todo = pointer_image;
         }
+
+        self.workspace
+            .render_output(renderer, output, 0, [0.1, 0.1, 0.1, 1.0], &elems)
+            .unwrap();
 
         Ok(())
     }
 }
 
-// Workspaces
 impl Anodium {
-    pub fn active_workspace(&mut self) -> &mut dyn Positioner {
-        self.workspaces
-            .get_mut(self.active_workspace.as_ref().unwrap())
-            .unwrap()
-            .as_mut()
-    }
+    pub fn update_focused_window(&mut self, window: Option<&desktop::Window>) {
+        self.workspace.windows().for_each(|w| {
+            w.set_activated(false);
+        });
 
-    pub fn visible_workspaces(&self) -> impl Iterator<Item = &dyn Positioner> {
-        VisibleWorkspaceIter::new(&self.output_map, &self.workspaces)
-    }
-
-    pub fn visible_workspaces_mut(&mut self) -> impl Iterator<Item = &mut dyn Positioner> {
-        VisibleWorkspaceIterMut::new(&self.output_map, &mut self.workspaces)
-    }
-
-    #[allow(dead_code)]
-    pub fn find_workspace_by_surface<S: AsWlSurface>(
-        &self,
-        surface: &S,
-    ) -> Option<&dyn Positioner> {
-        for w in self.visible_workspaces() {
-            if let Some(surface) = surface.as_surface() {
-                if w.find_window(surface).is_some() {
-                    return Some(w);
-                }
-            }
+        if let Some(window) = window {
+            window.set_activated(true);
         }
-        None
-    }
 
-    pub fn find_workspace_by_surface_mut<S: AsWlSurface>(
-        &mut self,
-        surface: &S,
-    ) -> Option<&mut dyn Positioner> {
-        for w in self.visible_workspaces_mut() {
-            if let Some(surface) = surface.as_surface() {
-                if w.find_window(surface).is_some() {
-                    return Some(w);
-                }
-            }
-        }
-        None
-    }
+        self.workspace.windows().for_each(|w| w.configure());
 
-    pub fn update_workspaces_geometry(&mut self) {
-        for output in self.output_map.iter() {
-            let key = output.active_workspace();
-            if let Some(w) = self.workspaces.get_mut(&key) {
-                w.set_geometry(output.usable_geometry());
-            }
-        }
-    }
-
-    pub fn switch_workspace(&mut self, key: &str) {
-        let already_active = self.output_map.iter().any(|o| o.active_workspace() == key);
-
-        if already_active {
-            if let Some(workspace) = self.workspaces.get(key) {
-                let geometry = workspace.geometry();
-                let loc = geometry.loc;
-                let size = geometry.size;
-
-                self.input_state.pointer_location.x = (loc.x + size.w / 2) as f64;
-                self.input_state.pointer_location.y = (loc.y + size.h / 2) as f64;
-            }
-        } else {
-            for mut o in self.output_map.iter_mut() {
-                if o.geometry()
-                    .to_f64()
-                    .contains(self.input_state.pointer_location)
-                {
-                    if self.workspaces.get(key).is_none() {
-                        let positioner = Universal::new(Default::default(), Default::default());
-                        self.workspaces.insert(key.into(), Box::new(positioner));
-                    }
-                    o.set_active_workspace(key.into());
-                    break;
-                }
-            }
-
-            self.active_workspace = Some(key.into());
-            self.update_focused_window(None);
-            self.clear_keyboard_focus();
-            self.update_workspaces_geometry();
-        }
-    }
-
-    pub fn update_focused_window(&mut self, window: Option<Window>) {
-        self.config
-            .anodize
-            .windows
-            .update_focused_window(window.clone());
-        self.focused_window = window;
+        self.focused_window = window.cloned();
     }
 }

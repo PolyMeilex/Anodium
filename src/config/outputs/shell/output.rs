@@ -4,7 +4,7 @@ use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
-use crate::output_map::Output;
+use crate::output_manager::Output;
 
 use super::widget::*;
 
@@ -19,7 +19,8 @@ impl OutputGeometry {
 
 impl Widget for OutputGeometry {
     fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
-        ui.label(format!("Geometry: {:?}", self.0.geometry()));
+        let size = self.0.current_mode().unwrap().size;
+        ui.label(format!("Geometry: {:?}", size));
     }
 }
 

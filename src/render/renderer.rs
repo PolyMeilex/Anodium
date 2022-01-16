@@ -1,47 +1,5 @@
 use image::{ImageBuffer, Rgba};
-use smithay::{
-    backend::renderer::{
-        gles2::{Gles2Error, Gles2Frame, Gles2Renderer, Gles2Texture},
-        Frame, Transform,
-    },
-    utils::{Buffer, Physical, Rectangle},
-};
-pub struct RenderFrame<'a> {
-    pub transform: Transform,
-    pub frame: &'a mut Gles2Frame,
-
-    pub renderer: &'a mut Gles2Renderer,
-}
-
-impl<'a> Frame for RenderFrame<'a> {
-    type Error = Gles2Error;
-    type TextureId = Gles2Texture;
-
-    fn clear(
-        &mut self,
-        color: [f32; 4],
-        at: &[Rectangle<i32, Physical>],
-    ) -> Result<(), Self::Error> {
-        self.frame.clear(color, at)
-    }
-
-    fn render_texture_from_to(
-        &mut self,
-        texture: &Self::TextureId,
-        src: Rectangle<i32, Buffer>,
-        dst: Rectangle<f64, Physical>,
-        damage: &[Rectangle<i32, Physical>],
-        src_transform: Transform,
-        alpha: f32,
-    ) -> Result<(), Self::Error> {
-        self.frame
-            .render_texture_from_to(texture, src, dst, damage, src_transform, alpha)
-    }
-
-    fn transformation(&self) -> Transform {
-        self.transform
-    }
-}
+use smithay::backend::renderer::gles2::{Gles2Error, Gles2Renderer, Gles2Texture};
 
 pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
     renderer: &mut Gles2Renderer,

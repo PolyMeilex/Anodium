@@ -1559,7 +1559,7 @@ dependencies = [
 [[package]]
 name = "smithay"
 version = "0.3.0"
-source = "git+https://github.com/PolyMeilex/smithay.git?branch=seat-ddata#07e69d80e5a530a4361d8a40b3a78aa231cbc744"
+source = "git+https://github.com/PolyMeilex/smithay.git?branch=seat-ddata#ec2d95cf13280fd9934b0140503793318bd190bd"
 dependencies = [
  "appendlist",
  "bitflags",

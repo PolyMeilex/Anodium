@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rhai::{plugin::*, AST};
+use rhai::{plugin::*, Array, AST};
 use rhai::{FnPtr, INT};
 
 use smithay::wayland::output::Mode;
 
-use crate::output_map::{Output, OutputMap}; // a "prelude" import for macros
+use crate::output_manager::{Output, OutputDescriptor, OutputManager};
 
 pub mod shell;
 
@@ -34,25 +34,64 @@ impl IntoIterator for Modes {
 
 #[derive(Debug, Clone)]
 pub struct Outputs {
-    output_map: OutputMap,
+    output_map: OutputManager,
     on_rearrange: Rc<RefCell<Option<FnPtr>>>,
+    on_mode_select: Rc<RefCell<Option<FnPtr>>>,
     on_new: Rc<RefCell<Option<FnPtr>>>,
 }
 
 impl Outputs {
-    pub fn new(output_map: OutputMap) -> Self {
+    pub fn new(output_map: OutputManager) -> Self {
         Self {
             output_map,
             on_rearrange: Default::default(),
+            on_mode_select: Default::default(),
             on_new: Default::default(),
         }
     }
 
-    pub fn on_rearrange(&self, engine: &Engine, ast: &AST) {
+    pub fn on_rearrange(
+        &self,
+        engine: &Engine,
+        ast: &AST,
+        outputs: Vec<Output>,
+    ) -> Option<Vec<(i32, i32)>> {
         if let Some(on_rearrange) = self.on_rearrange.borrow().clone() {
-            let _result: () = on_rearrange.call(engine, ast, ()).unwrap();
+            let outputs: Array = outputs.into_iter().map(Dynamic::from).collect();
+
+            let res: Array = on_rearrange.call(engine, ast, (outputs,)).unwrap();
+            let res: Vec<(i32, i32)> = res
+                .into_iter()
+                .map(|item| item.try_cast().unwrap())
+                .map(|pos: Array| pos.into_iter().map(|p| p.try_cast().unwrap()).collect())
+                .map(|pos: Vec<INT>| (pos[0] as _, pos[1] as _))
+                .collect();
+
+            Some(res)
         } else {
-            error!("on_rearrange not configured");
+            warn!("on_rearrange not configured");
+            None
+        }
+    }
+
+    pub fn on_mode_select(
+        &self,
+        engine: &Engine,
+        ast: &AST,
+        desc: &OutputDescriptor,
+        modes: &[Mode],
+    ) -> Option<Mode> {
+        if let Some(on_mode_select) = self.on_mode_select.borrow().clone() {
+            let modes = Modes(modes.to_vec());
+
+            let res: Mode = on_mode_select
+                .call(engine, ast, (desc.clone(), modes))
+                .unwrap();
+
+            Some(res)
+        } else {
+            warn!("on_mode_select not configured");
+            None
         }
     }
 
@@ -64,14 +103,32 @@ impl Outputs {
         }
     }
 
-    pub fn get(&mut self, index: i64) -> Dynamic {
-        if let Some(output) = self.output_map.find_by_index(index as usize) {
+    pub fn get(&mut self, index: INT) -> Dynamic {
+        if let Some(output) = self.output_map.outputs().get(index as usize).cloned() {
             Dynamic::from(output)
         } else {
             Dynamic::from(())
         }
     }
 }
+#[export_module]
+pub mod output_descriptor {
+    #[rhai_fn(get = "name", pure)]
+    pub fn name(desc: &mut OutputDescriptor) -> ImmutableString {
+        desc.name.clone().into()
+    }
+
+    #[rhai_fn(get = "manufacturer", pure)]
+    pub fn manufacturer(desc: &mut OutputDescriptor) -> ImmutableString {
+        desc.physical_properties.make.clone().into()
+    }
+
+    #[rhai_fn(get = "model", pure)]
+    pub fn model(desc: &mut OutputDescriptor) -> ImmutableString {
+        desc.physical_properties.model.clone().into()
+    }
+}
+
 #[export_module]
 pub mod modes {
     #[rhai_fn(get = "w", pure)]
@@ -90,7 +147,7 @@ pub mod modes {
     }
 
     #[rhai_fn(global)]
-    pub fn filter(modes: &mut Modes, w: INT, h: INT, refresh: INT) -> Dynamic {
+    pub fn find(modes: &mut Modes, w: INT, h: INT, refresh: INT) -> Dynamic {
         if let Some(mode) = modes.0.iter().find(|m| {
             m.size.w as i64 == w && m.size.h as i64 == h && m.refresh as i64 == refresh * 1000
         }) {
@@ -110,23 +167,25 @@ pub mod outputs {
 
     #[rhai_fn(get = "w", pure)]
     pub fn w(output: &mut Output) -> INT {
-        output.geometry().size.w as _
+        output.current_mode().unwrap().size.w as _
     }
 
     #[rhai_fn(get = "h", pure)]
     pub fn h(output: &mut Output) -> INT {
-        output.geometry().size.h as _
+        output.current_mode().unwrap().size.h as _
     }
 
-    #[rhai_fn(get = "x", pure)]
-    pub fn get_x(output: &mut Output) -> INT {
-        output.geometry().loc.x as _
-    }
+    // #[rhai_fn(get = "x", pure)]
+    // pub fn get_x(output: &mut Output) -> INT {
+    //     // output.geometry().loc.x as _
+    //     todo!();
+    // }
 
-    #[rhai_fn(get = "y", pure)]
-    pub fn y(output: &mut Output) -> INT {
-        output.geometry().loc.y as _
-    }
+    // #[rhai_fn(get = "y", pure)]
+    // pub fn y(output: &mut Output) -> INT {
+    //     // output.geometry().loc.y as _
+    //     todo!();
+    // }
 
     #[rhai_fn(get = "modes", pure)]
     pub fn modes(output: &mut Output) -> Modes {
@@ -135,31 +194,39 @@ pub mod outputs {
 
     #[rhai_fn(get = "shell", pure)]
     pub fn shell(output: &mut Output) -> shell::Shell {
-        output.shell()
+        output.egui_shell().clone()
     }
 
-    #[rhai_fn(set = "x", pure)]
-    pub fn x(output: &mut Output, x: INT) {
-        let mut location = output.location();
-        location.x = x as _;
-        output.set_location(location);
-        let geometry = output.geometry();
-        output.layer_map_mut().arange(geometry);
+    // #[rhai_fn(set = "x", pure)]
+    // pub fn x(output: &mut Output, x: INT) {
+    //     todo!();
+    //     // let mut location = output.location();
+    //     // location.x = x as _;
+    //     // output.set_location(location);
+    //     // let geometry = output.geometry();
+    //     // output.layer_map_mut().arange(geometry);
+    // }
+
+    #[rhai_fn(global)]
+    pub fn set_wallpaper(_output: &mut Output, _path: &str) {
+        todo!("Let's just spawn sway-bg client, it's better and easier anyway. (maybe implement anobg/anopaper or something like that at some point)");
+        // output.set_wallpaper(path);
     }
 
     #[rhai_fn(global)]
-    pub fn set_wallpaper(output: &mut Output, path: &str) {
-        output.set_wallpaper(path);
-    }
-
-    #[rhai_fn(global)]
-    pub fn update_mode(output: &mut Output, mode: Mode) {
-        output.update_mode(mode);
+    pub fn update_mode(_output: &mut Output, _mode: Mode) {
+        todo!("Send event using event emiter");
+        // output.update_mode(mode);
     }
 
     #[rhai_fn(global)]
     pub fn on_rearrange(output: &mut Outputs, fnptr: FnPtr) {
         *output.on_rearrange.borrow_mut() = Some(fnptr);
+    }
+
+    #[rhai_fn(global)]
+    pub fn on_mode_select(output: &mut Outputs, fnptr: FnPtr) {
+        *output.on_mode_select.borrow_mut() = Some(fnptr);
     }
 
     #[rhai_fn(global)]
@@ -173,16 +240,20 @@ impl IntoIterator for Outputs {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.output_map.iter()
+        todo!();
+        // self.output_map.iter()
     }
 }
 
 pub fn register(engine: &mut Engine) {
     let outputs_module = exported_module!(outputs);
+    let output_desc_module = exported_module!(output_descriptor);
     let modes_module = exported_module!(modes);
     engine
+        .register_static_module("outpt_descriptor", output_desc_module.into())
         .register_static_module("outputs", outputs_module.into())
         .register_static_module("modes", modes_module.into())
+        .register_type::<OutputDescriptor>()
         .register_type::<Outputs>()
         .register_type::<Output>()
         .register_type::<Mode>()

@@ -4,7 +4,7 @@ use egui::Ui;
 use rhai::plugin::*;
 use rhai::Engine;
 
-use crate::output_map::Output;
+use crate::output_manager::Output;
 
 use super::widget::*;
 
@@ -19,7 +19,8 @@ impl Fps {
 
 impl Widget for Fps {
     fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
-        ui.label(format!("FPS: {}", self.0.get_fps() as u32));
+        // ui.text(format!("FPS: {}", self.0.get_fps() as u32));
+        ui.label(format!("FPS: {}", 0));
     }
 }
 

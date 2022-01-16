@@ -1,0 +1,170 @@
+use std::cell::{Cell, RefCell, RefMut};
+use std::time::Instant;
+
+use calloop::channel::Sender;
+use smithay::desktop;
+use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
+use smithay::utils::Rectangle;
+use smithay::wayland::output::Output as SmithayOutput;
+
+use smithay::wayland::seat::ModifiersState;
+use smithay::{
+    reexports::wayland_server::{protocol::wl_output, Display},
+    wayland::output::{Mode, PhysicalProperties},
+};
+
+use smithay_egui::{EguiFrame, EguiState};
+
+use crate::config::eventloop::ConfigEvent;
+use crate::config::outputs::shell::Shell;
+
+/// Inmutable description of phisical output
+/// Used before wayland output is created
+#[derive(Debug)]
+pub struct OutputDescriptor {
+    pub name: String,
+    pub physical_properties: PhysicalProperties,
+}
+
+impl Clone for OutputDescriptor {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            // TODO: Add PhysicalProperties::Clone to smithay
+            physical_properties: PhysicalProperties {
+                size: self.physical_properties.size,
+                subpixel: self.physical_properties.subpixel,
+                make: self.physical_properties.make.clone(),
+                model: self.physical_properties.model.clone(),
+            },
+        }
+    }
+}
+
+struct Data {
+    pending_mode_change: Cell<bool>,
+    possible_modes: RefCell<Vec<Mode>>,
+
+    egui: RefCell<EguiState>,
+    egui_shell: Shell,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Output {
+    output: SmithayOutput,
+}
+
+impl Output {
+    pub fn wrap(output: SmithayOutput) -> Self {
+        Self { output }
+    }
+
+    pub fn from_resource(output: &WlOutput) -> Option<Self> {
+        SmithayOutput::from_resource(output).map(Self::wrap)
+    }
+}
+
+impl Output {
+    pub fn new(
+        display: &mut Display,
+        desc: OutputDescriptor,
+        transform: wl_output::Transform,
+        mode: Mode,
+        possible_modes: Vec<Mode>,
+    ) -> Self {
+        let (output, _global) = SmithayOutput::new(
+            display,
+            desc.name,
+            desc.physical_properties,
+            slog_scope::logger(),
+        );
+
+        output.change_current_state(Some(mode), Some(transform), None, None);
+        output.set_preferred(mode);
+
+        let egui = EguiState::new();
+        let visuals = egui::style::Visuals {
+            window_corner_radius: 0.0,
+            ..Default::default()
+        };
+
+        egui.context().set_visuals(visuals);
+
+        let added = output.user_data().insert_if_missing(move || Data {
+            pending_mode_change: Default::default(),
+            possible_modes: RefCell::new(possible_modes),
+            egui: RefCell::new(egui),
+            egui_shell: Shell::new(),
+        });
+        assert!(added);
+
+        Self { output }
+    }
+
+    fn data(&self) -> &Data {
+        self.output.user_data().get().unwrap()
+    }
+
+    pub fn pending_mode_change(&self) -> bool {
+        self.data().pending_mode_change.get()
+    }
+
+    pub fn possible_modes(&self) -> Vec<Mode> {
+        self.data().possible_modes.borrow().clone()
+    }
+
+    pub fn layer_map(&self) -> RefMut<desktop::LayerMap> {
+        desktop::layer_map_for_output(&self.output)
+    }
+}
+
+impl Output {
+    pub fn egui(&self) -> RefMut<EguiState> {
+        self.data().egui.borrow_mut()
+    }
+
+    pub fn egui_shell(&self) -> &Shell {
+        &self.data().egui_shell
+    }
+
+    pub fn render_egui_shell(
+        &self,
+        start_time: &Instant,
+        modifiers: &ModifiersState,
+        config_tx: &Sender<ConfigEvent>,
+    ) -> EguiFrame {
+        let scale = self.output.current_scale();
+        let size = self.output.current_mode().unwrap().size;
+
+        let data = self.data();
+        data.egui.borrow_mut().run(
+            |ctx| {
+                egui::Area::new("main")
+                    .anchor(egui::Align2::LEFT_TOP, (10.0, 10.0))
+                    .show(ctx, |_ui| {});
+
+                data.egui_shell.render(ctx, config_tx);
+            },
+            Rectangle::from_loc_and_size((0, 0), size.to_logical(scale)),
+            size,
+            scale as f64,
+            1.0,
+            start_time,
+            *modifiers,
+        )
+    }
+}
+
+impl std::ops::Deref for Output {
+    type Target = SmithayOutput;
+
+    fn deref(&self) -> &Self::Target {
+        &self.output
+    }
+}
+
+impl std::ops::DerefMut for Output {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.output
+    }
+}

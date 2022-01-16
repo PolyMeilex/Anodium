@@ -1,6 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
+use smithay::desktop;
 use smithay::{
     desktop::Kind,
     reexports::{
@@ -11,14 +12,9 @@ use smithay::{
 };
 
 use crate::{
-    animations::enter_exit::EnterExitAnimation,
     framework::surface_data::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
     popup::Popup,
-    render::renderer::RenderFrame,
 };
-
-mod list;
-pub use list::WindowList;
 
 mod window_surface;
 pub use window_surface::WindowSurface;
@@ -38,7 +34,6 @@ impl Window {
             inner: Rc::new(RefCell::new(Inner {
                 location,
 
-                animation: EnterExitAnimation::Enter(0.0),
                 popups: Vec::new(),
 
                 window: smithay::desktop::Window::new(kind),
@@ -48,30 +43,8 @@ impl Window {
         window
     }
 
-    pub fn render(
-        &self,
-        frame: &mut RenderFrame,
-        initial_location: Point<i32, Logical>,
-        output_scale: f64,
-    ) {
-        let mut render_location = self.render_location();
-        render_location.x -= initial_location.x;
-
-        let renderer = &mut *frame.renderer;
-        let frame = &mut *frame.frame;
-
-        let inner = self.inner.borrow();
-
-        smithay::desktop::draw_window(
-            renderer,
-            frame,
-            &inner.window,
-            output_scale,
-            render_location,
-            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-            &slog_scope::logger(),
-        )
-        .unwrap();
+    pub fn desktop_window(&self) -> desktop::Window {
+        self.inner.borrow().window.clone()
     }
 
     pub fn set_activated(&self, activated: bool) {
@@ -90,8 +63,6 @@ impl Window {
 #[derive(Debug)]
 pub struct Inner {
     location: Point<i32, Logical>,
-
-    animation: EnterExitAnimation,
 
     popups: Vec<Popup>,
 
@@ -263,19 +234,6 @@ impl Inner {
     pub fn send_frame(&self, time: u32) {
         self.window.send_frame(time);
     }
-
-    pub fn update_animation(&mut self, delta: f64) {
-        self.animation.update(delta, self.window.toplevel().alive());
-    }
-
-    pub fn render_location(&self) -> Point<i32, Logical> {
-        let mut location = self.location;
-
-        location.y -= 1000;
-        location.y += (self.animation.value() * 1000.0) as i32;
-
-        location
-    }
 }
 
 impl Window {
@@ -312,10 +270,6 @@ impl Window {
         self.inner.borrow().window.toplevel().get_surface().cloned()
     }
 
-    pub fn animation(&self) -> EnterExitAnimation {
-        self.inner.borrow().animation
-    }
-
     pub fn maximize(&mut self, target_geometry: Rectangle<i32, Logical>) {
         self.inner.borrow_mut().maximize(target_geometry)
     }
@@ -340,20 +294,6 @@ impl Window {
     /// Returns the geometry of this window.
     pub fn geometry(&self) -> Rectangle<i32, Logical> {
         self.inner.borrow().geometry()
-    }
-
-    /// Sends the frame callback to all the subsurfaces in this
-    /// window that requested it
-    pub fn send_frame(&self, time: u32) {
-        self.inner.borrow().send_frame(time)
-    }
-
-    pub fn update_animation(&mut self, delta: f64) {
-        self.inner.borrow_mut().update_animation(delta)
-    }
-
-    pub fn render_location(&self) -> Point<i32, Logical> {
-        self.inner.borrow().render_location()
     }
 }
 

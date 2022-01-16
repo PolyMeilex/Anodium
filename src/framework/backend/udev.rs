@@ -45,7 +45,7 @@ use smithay::{
         gbm::Device as GbmDevice,
         input::Libinput,
         nix::{fcntl::OFlag, sys::stat::dev_t},
-        wayland_server::{protocol::wl_output, DispatchData, Display},
+        wayland_server::{protocol::wl_output, Display},
     },
     utils::{
         signaling::{Linkable, SignalToken, Signaler},
@@ -57,16 +57,14 @@ use smithay::{
     },
 };
 
-use super::{BackendEvent, BackendRequest};
+use super::{BackendHandler, BackendRequest};
 use crate::{
     framework,
-    output_map::Output,
-    render::renderer::{import_bitmap, RenderFrame},
+    output_manager::{Output, OutputDescriptor},
+    render::renderer::import_bitmap,
 };
 
 struct Inner {
-    cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
-
     display: Rc<RefCell<Display>>,
     primary_gpu: Option<PathBuf>,
     session: AutoSession,
@@ -94,23 +92,18 @@ struct UdevOutputId {
 
 type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
 
-pub fn run_udev<F, IF, D>(
+pub fn run_udev<D>(
     display: Rc<RefCell<Display>>,
     event_loop: &mut EventLoop<'static, D>,
-    state: &mut D,
+    handler: &mut D,
     mut session: AutoSession,
     notifier: AutoSessionNotifier,
     rx: channel::Channel<BackendRequest>,
-    cb: F,
-    mut input_cb: IF,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<LibinputInputBackend>, DispatchData) + 'static,
-    D: 'static,
+    D: BackendHandler + 'static,
 {
     let log = slog_scope::logger();
-    let mut ddata = DispatchData::wrap(state);
 
     let session_signal = notifier.signaler();
 
@@ -122,8 +115,6 @@ where
     info!("Primary GPU: {:?}", primary_gpu);
 
     let inner = Rc::new(RefCell::new(Inner {
-        cb: Box::new(cb),
-
         display: display.clone(),
         primary_gpu,
         session: session.clone(),
@@ -151,7 +142,7 @@ where
      */
     let _libinput_event_source = event_loop
         .handle()
-        .insert_source(libinput_backend, move |mut event, _, state| {
+        .insert_source(libinput_backend, move |mut event, _, handler| {
             match &mut event {
                 InputEvent::DeviceAdded { device } => {
                     device.config_tap_set_enabled(true).ok();
@@ -160,7 +151,7 @@ where
                 _ => {}
             }
 
-            input_cb(event, DispatchData::wrap(state));
+            handler.process_input_event(event, None);
         })
         .unwrap();
     let _session_event_source = event_loop
@@ -170,12 +161,12 @@ where
 
     for (dev, path) in udev_backend.device_list() {
         device_added(
+            handler,
             event_loop.handle(),
             inner.clone(),
             dev,
             path.into(),
             &session_signal,
-            ddata.reborrow(),
         )
     }
 
@@ -229,23 +220,20 @@ where
     let handle = event_loop.handle();
     let _udev_event_source = event_loop
         .handle()
-        .insert_source(udev_backend, {
-            let inner = inner.clone();
-            move |event, _, state| match event {
-                UdevEvent::Added { device_id, path } => device_added(
-                    handle.clone(),
-                    inner.clone(),
-                    device_id,
-                    path,
-                    &session_signal,
-                    DispatchData::wrap(state),
-                ),
-                UdevEvent::Changed { device_id } => {
-                    error!("Udev device ({:?}) changed: unimplemented", device_id);
-                }
-                UdevEvent::Removed { device_id } => {
-                    error!("Udev device ({:?}) removed: unimplemented", device_id);
-                }
+        .insert_source(udev_backend, move |event, _, handler| match event {
+            UdevEvent::Added { device_id, path } => device_added(
+                handler,
+                handle.clone(),
+                inner.clone(),
+                device_id,
+                path,
+                &session_signal,
+            ),
+            UdevEvent::Changed { device_id } => {
+                error!("Udev device ({:?}) changed: unimplemented", device_id);
+            }
+            UdevEvent::Removed { device_id } => {
+                error!("Udev device ({:?}) removed: unimplemented", device_id);
             }
         })
         .map_err(|e| -> IoError { e.into() })
@@ -254,7 +242,7 @@ where
     /*
      * Start XWayland and Wayland Socket
      */
-    (inner.borrow_mut().cb)(BackendEvent::StartCompositor, ddata);
+    handler.start_compositor();
 
     // Cleanup stuff
 
@@ -268,12 +256,16 @@ where
 pub type RenderSurface = GbmBufferedSurface<SessionFd>;
 
 struct OutputSurfaceData {
+    output_descriptor: OutputDescriptor,
+
+    wl_mode: Mode,
+    wl_modes: Vec<Mode>,
+
+    drm_modes: Vec<DrmMode>,
+
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
     fps: fps_ticker::Fps,
-    _output_name: String,
-    mode: Mode,
-    modes: Vec<DrmMode>,
     _connector_info: connector::Info,
     crtc: crtc::Handle,
 }
@@ -291,19 +283,21 @@ pub struct UdevDeviceData {
 
 struct ConnectorScanResult {
     backends: HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
-    outputs: HashMap<crtc::Handle, Output>,
     backends_order: Vec<crtc::Handle>,
 }
 
-fn scan_connectors<D: 'static>(
+fn scan_connectors<D>(
+    handler: &mut D,
     inner: InnerRc,
     handle: LoopHandle<'static, D>,
     drm: &mut DrmDevice<SessionFd>,
     gbm: &GbmDevice<SessionFd>,
     renderer: &mut Gles2Renderer,
     signaler: &Signaler<SessionSignal>,
-    mut ddata: DispatchData,
-) -> ConnectorScanResult {
+) -> ConnectorScanResult
+where
+    D: BackendHandler + 'static,
+{
     // Get a set of all modesetting resource handles (excluding planes):
     let res_handles = drm.resource_handles().unwrap();
 
@@ -318,7 +312,6 @@ fn scan_connectors<D: 'static>(
 
     let mut backends = HashMap::new();
     let mut backends_order = Vec::new();
-    let mut outputs_map = HashMap::new();
 
     // very naive way of finding good crtc/encoder/connector combinations. This problem is np-complete
     for connector_info in connector_infos {
@@ -357,23 +350,11 @@ fn scan_connectors<D: 'static>(
                         format!("{}-{}", interface_short_name, connector_info.interface_id())
                     };
 
-                    let modes = connector_info.modes();
+                    let drm_modes = connector_info.modes();
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 
-                    let mut connector_inner = inner.borrow_mut();
-                    let display = connector_inner.display.clone();
-                    let display = &mut *display.borrow_mut();
-
-                    let mode = modes[0];
-
-                    let size = mode.size();
-                    let output_mode = Mode {
-                        size: (size.0 as i32, size.1 as i32).into(),
-                        refresh: (mode.vrefresh() * 1000) as i32,
-                    };
-
-                    let output_modes: Vec<Mode> = modes
+                    let wl_modes: Vec<Mode> = drm_modes
                         .iter()
                         .map(|m| {
                             let size = m.size();
@@ -384,42 +365,24 @@ fn scan_connectors<D: 'static>(
                         })
                         .collect();
 
-                    let output = Output::new(
-                        &output_name,
-                        Default::default(),
-                        display,
-                        PhysicalProperties {
+                    let descriptor = OutputDescriptor {
+                        name: output_name,
+                        physical_properties: PhysicalProperties {
                             size: (phys_w as i32, phys_h as i32).into(),
                             subpixel: wl_output::Subpixel::Unknown,
                             make: "Smithay".into(),
                             model: "Generic DRM".into(),
                         },
-                        output_mode,
-                        output_modes,
-                        // TODO: output should always have a workspace
-                        "Unknown".into(),
-                        slog_scope::logger(),
-                    );
-                    (connector_inner.cb)(
-                        BackendEvent::RequestOutputConfigure {
-                            output: output.clone(),
-                        },
-                        ddata.reborrow(),
-                    );
+                    };
 
-                    let current_mode = output.current_mode();
+                    let wl_mode = handler.ask_for_output_mode(&descriptor, &wl_modes);
 
-                    let mode = modes
-                        .iter()
-                        .find(|m| {
-                            m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
-                                && m.vrefresh() == (current_mode.refresh / 1000) as u32
-                        })
-                        .cloned()
-                        .unwrap_or(mode);
+                    let mode_id = wl_modes.iter().position(|m| m == &wl_mode).unwrap();
+
+                    let drm_mode = drm_modes[mode_id];
 
                     let mut surface =
-                        match drm.create_surface(crtc, mode, &[connector_info.handle()]) {
+                        match drm.create_surface(crtc, drm_mode, &[connector_info.handle()]) {
                             Ok(surface) => surface,
                             Err(err) => {
                                 warn!("Failed to create drm surface: {}", err);
@@ -446,15 +409,17 @@ fn scan_connectors<D: 'static>(
 
                     let timer = Timer::new().unwrap();
 
-                    outputs_map.insert(crtc, output);
-
                     entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
+                        output_descriptor: descriptor,
+
+                        wl_mode,
+                        wl_modes,
+
+                        drm_modes: drm_modes.to_owned(),
+
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
                         fps: fps_ticker::Fps::default(),
-                        _output_name: output_name,
-                        mode: output_mode,
-                        modes: modes.to_owned(),
                         _connector_info: connector_info,
                         crtc,
                     })));
@@ -462,13 +427,8 @@ fn scan_connectors<D: 'static>(
 
                     let inner = inner.clone();
                     handle
-                        .insert_source(timer, move |(dev_id, crtc), _, ddata| {
-                            udev_render(
-                                inner.clone(),
-                                dev_id,
-                                Some(crtc),
-                                DispatchData::wrap(ddata),
-                            )
+                        .insert_source(timer, move |(dev_id, crtc), _, handler| {
+                            udev_render(handler, inner.clone(), dev_id, Some(crtc))
                         })
                         .unwrap();
 
@@ -480,7 +440,6 @@ fn scan_connectors<D: 'static>(
 
     ConnectorScanResult {
         backends,
-        outputs: outputs_map,
         backends_order,
     }
 }
@@ -523,14 +482,16 @@ fn open_device(
         })
 }
 
-fn device_added<D: 'static>(
+fn device_added<D>(
+    handler: &mut D,
     handle: LoopHandle<'static, D>,
     inner: InnerRc,
     device_id: dev_t,
     path: PathBuf,
     session_signal: &Signaler<SessionSignal>,
-    mut ddata: DispatchData,
-) {
+) where
+    D: BackendHandler + 'static,
+{
     info!("Device Added {:?} : {:?}", device_id, path);
 
     let ret = open_device(&mut inner.borrow_mut().session, device_id, &path);
@@ -575,16 +536,15 @@ fn device_added<D: 'static>(
 
         let ConnectorScanResult {
             backends: outputs,
-            outputs: outputs_map,
             backends_order: outputs_order,
         } = scan_connectors(
+            handler,
             inner.clone(),
             handle.clone(),
             &mut drm,
             &gbm,
             &mut *renderer.borrow_mut(),
             session_signal,
-            ddata.reborrow(),
         );
 
         {
@@ -592,23 +552,30 @@ fn device_added<D: 'static>(
 
             for output_handle in outputs_order {
                 let output = {
-                    let outputsurface = outputs.get(&output_handle).unwrap();
-                    let output = outputs_map.get(&output_handle).unwrap();
+                    let output_surface = outputs.get(&output_handle).unwrap();
+                    let output_surface = output_surface.borrow();
 
-                    let outputsurface = &*outputsurface.borrow();
-                    let crtc = outputsurface.crtc;
+                    let output_descriptor = &output_surface.output_descriptor;
 
-                    output.userdata().insert_if_missing(|| UdevOutputId {
-                        crtc,
+                    let output = Output::new(
+                        &mut inner.display.borrow_mut(),
+                        output_descriptor.clone(),
+                        wl_output::Transform::Normal,
+                        output_surface.wl_mode,
+                        output_surface.wl_modes.clone(),
+                    );
+
+                    output.user_data().insert_if_missing(|| UdevOutputId {
+                        crtc: output_surface.crtc,
                         device_id: drm.device_id(),
                     });
 
-                    output.clone()
+                    output
                 };
 
                 inner.outputs.push(output.clone());
 
-                (inner.cb)(BackendEvent::OutputCreated { output }, ddata.reborrow());
+                handler.output_created(output);
             }
         }
 
@@ -622,8 +589,8 @@ fn device_added<D: 'static>(
             move |signal| match signal {
                 SessionSignal::ActivateSession | SessionSignal::ActivateDevice { .. } => {
                     let inner = inner.clone();
-                    handle.insert_idle(move |state| {
-                        udev_render(inner.clone(), dev_id, None, DispatchData::wrap(state))
+                    handle.insert_idle(move |handler| {
+                        udev_render(handler, inner.clone(), dev_id, None)
                     });
                 }
                 _ => {}
@@ -633,9 +600,9 @@ fn device_added<D: 'static>(
         drm.link(session_signal.clone());
         let event_dispatcher = Dispatcher::new(drm, {
             let inner = inner.clone();
-            move |event, _, state| match event {
+            move |event, _, handler| match event {
                 DrmEvent::VBlank(crtc) => {
-                    udev_render(inner.clone(), dev_id, Some(crtc), DispatchData::wrap(state));
+                    udev_render(handler, inner.clone(), dev_id, Some(crtc));
                 }
                 DrmEvent::Error(error) => {
                     error!("{:?}", error);
@@ -670,7 +637,10 @@ fn device_added<D: 'static>(
     }
 }
 
-fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddata: DispatchData) {
+fn udev_render<D>(handler: &mut D, inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>)
+where
+    D: BackendHandler + 'static,
+{
     let inner = &mut *inner.borrow_mut();
 
     let device_backend = match inner.udev_devices.get_mut(&dev_id) {
@@ -715,14 +685,13 @@ fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddat
             });
 
         let result = render_output_surface(
-            &mut inner.cb,
+            handler,
             &inner.outputs,
             &mut *surface.borrow_mut(),
             renderer,
             device_backend.dev_id,
             crtc,
             &pointer_image,
-            ddata.reborrow(),
         );
 
         if let Err(err) = result {
@@ -750,7 +719,7 @@ fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddat
             }
         } else {
             // Send frame events so that client start drawing their next frame
-            (inner.cb)(BackendEvent::SendFrames, ddata.reborrow());
+            handler.send_frames();
         }
     }
 }
@@ -781,21 +750,23 @@ fn schedule_initial_render<Data: 'static>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn render_output_surface(
-    cb: &mut Box<dyn FnMut(BackendEvent, DispatchData)>,
+fn render_output_surface<D>(
+    handler: &mut D,
     outputs: &[Output],
     surface: &mut OutputSurfaceData,
     renderer: &mut Gles2Renderer,
     device_id: dev_t,
     crtc: crtc::Handle,
     pointer_image: &Gles2Texture,
-    ddata: DispatchData,
-) -> Result<(), SwapBuffersError> {
+) -> Result<(), SwapBuffersError>
+where
+    D: BackendHandler + 'static,
+{
     surface.surface.frame_submitted()?;
 
     let output = outputs
         .iter()
-        .find(|o| o.userdata().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc }));
+        .find(|o| o.user_data().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc }));
 
     let output = if let Some(output) = output {
         output
@@ -805,15 +776,15 @@ fn render_output_surface(
     };
 
     if output.pending_mode_change() {
-        let current_mode = output.current_mode();
-        if let Some(drm_mode) = surface.modes.iter().find(|m| {
+        let current_mode = output.current_mode().unwrap();
+        if let Some(drm_mode) = surface.drm_modes.iter().find(|m| {
             m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
                 && m.vrefresh() == (current_mode.refresh / 1000) as u32
         }) {
             if let Err(err) = surface.surface.use_mode(*drm_mode) {
                 error!("pending mode: {:?} failed: {:?}", current_mode, err);
             } else {
-                surface.mode = current_mode;
+                surface.wl_mode = current_mode;
             }
         } else {
             error!("pending mode: {:?} not found in drm", current_mode);
@@ -824,39 +795,14 @@ fn render_output_surface(
     renderer.bind(dmabuf)?;
 
     // and draw to our buffer
-    match renderer
-        .render(surface.mode.size, Transform::Normal, |renderer, frame| {
-            {
-                let mut frame = RenderFrame {
-                    transform: Transform::Normal,
-                    renderer,
-                    frame,
-                };
+    handler.output_render(renderer, output, Some(pointer_image));
 
-                output.update_fps(surface.fps.avg());
+    surface.fps.tick();
 
-                cb(
-                    BackendEvent::OutputRender {
-                        frame: &mut frame,
-                        output,
-                        pointer_image: Some(pointer_image),
-                    },
-                    ddata,
-                );
-            }
-            surface.fps.tick();
-            Ok(())
-        })
+    surface
+        .surface
+        .queue_buffer()
         .map_err(Into::<SwapBuffersError>::into)
-        .and_then(|x| x)
-        .map_err(Into::<SwapBuffersError>::into)
-    {
-        Ok(()) => surface
-            .surface
-            .queue_buffer()
-            .map_err(Into::<SwapBuffersError>::into),
-        Err(err) => Err(err),
-    }
 }
 
 fn initial_render(

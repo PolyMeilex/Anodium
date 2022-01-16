@@ -1,5 +1,5 @@
 use smithay::{
-    desktop::Kind,
+    desktop::{self},
     reexports::wayland_server::{
         protocol::{wl_pointer::ButtonState, wl_surface},
         DispatchData,
@@ -13,12 +13,10 @@ use smithay::{
 
 use crate::state::Anodium;
 
-use crate::framework::surface_data::{MoveAfterResizeState, SurfaceData};
-
 pub struct MoveSurfaceGrab {
     pub start_data: GrabStartData,
 
-    pub toplevel: Kind,
+    pub window: desktop::Window,
     pub initial_window_location: Point<i32, Logical>,
 }
 
@@ -35,26 +33,31 @@ impl PointerGrab for MoveSurfaceGrab {
         let anodium = ddata.get::<Anodium>().unwrap();
 
         let delta = location - self.start_data.location;
+        let new_location = self.initial_window_location.to_f64() + delta;
 
-        if let Some(window) = anodium.grabed_window.as_mut() {
-            if let Some(surface) = window.toplevel().get_surface() {
-                // Check if there is MoveAfterResize in progress
-                let started = SurfaceData::with(surface, |data| {
-                    matches!(
-                        &data.move_after_resize_state,
-                        // If done
-                        MoveAfterResizeState::Current(_) |
-                        // Or if non-existent
-                        MoveAfterResizeState::None,
-                    )
-                });
+        anodium
+            .workspace
+            .map_window(&self.window, new_location.to_i32_round(), true);
 
-                if started {
-                    let new_location = self.initial_window_location.to_f64() + delta;
-                    window.set_location(new_location.to_i32_round());
-                }
-            }
-        }
+        // if let Some(window) = anodium.grabed_window.as_mut() {
+        //     if let Some(surface) = window.toplevel().get_surface() {
+        //         // Check if there is MoveAfterResize in progress
+        //         let started = SurfaceData::with(surface, |data| {
+        //             matches!(
+        //                 &data.move_after_resize_state,
+        //                 // If done
+        //                 MoveAfterResizeState::Current(_) |
+        //                 // Or if non-existent
+        //                 MoveAfterResizeState::None,
+        //             )
+        //         });
+
+        //         if started {
+        //             let new_location = self.initial_window_location.to_f64() + delta;
+        //             window.set_location(new_location.to_i32_round());
+        //         }
+        //     }
+        // }
 
         // TODO:
         //     if anodium.pointer_location.y < 5.0 {
@@ -84,10 +87,8 @@ impl PointerGrab for MoveSurfaceGrab {
         state: ButtonState,
         serial: Serial,
         time: u32,
-        mut ddata: DispatchData,
+        _ddata: DispatchData,
     ) {
-        let anodium = ddata.get::<Anodium>().unwrap();
-
         handle.button(button, state, serial, time);
         if handle.current_pressed().is_empty() {
             // TODO:
@@ -103,25 +104,25 @@ impl PointerGrab for MoveSurfaceGrab {
             // anodium.maximize_animation.stop();
             // }
 
-            {
-                let window = anodium.grabed_window.take().unwrap();
+            // {
+            // let _window = anodium.grabed_window.take().unwrap();
 
-                let location = window.location() + window.geometry().loc;
+            //     let location = window.location() + window.geometry().loc;
 
-                if let Some(key) = anodium
-                    .output_map
-                    .find_by_position(location)
-                    .map(|o| o.active_workspace())
-                {
-                    anodium
-                        .workspaces
-                        .get_mut(&key)
-                        .unwrap()
-                        .map_toplevel(window, false);
-                } else {
-                    anodium.active_workspace().map_toplevel(window, false);
-                }
-            }
+            //     if let Some(key) = anodium
+            //         .output_map
+            //         .find_by_position(location)
+            //         .map(|o| o.active_workspace())
+            //     {
+            //         anodium
+            //             .workspaces
+            //             .get_mut(&key)
+            //             .unwrap()
+            //             .map_toplevel(window, false);
+            //     } else {
+            //         anodium.active_workspace().map_toplevel(window, false);
+            //     }
+            // }
 
             // No more buttons are pressed, release the grab.
             handle.unset_grab(serial, time);

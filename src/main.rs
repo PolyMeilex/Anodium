@@ -14,12 +14,9 @@ mod grabs;
 mod render;
 mod utils;
 
-mod animations;
-mod positioner;
-
 mod config;
 
-mod output_map;
+mod output_manager;
 
 mod popup;
 mod window;
@@ -30,6 +27,8 @@ mod backend_handler;
 mod shell_handler;
 
 mod cli;
+
+mod workspace;
 
 use config::outputs::shell::logger::ShellDrain;
 use state::Anodium;
@@ -78,7 +77,7 @@ fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
-            if state.output_map.is_empty() || !state.running.load(Ordering::SeqCst) {
+            if state.workspace.outputs().count() == 0 || !state.running.load(Ordering::SeqCst) {
                 signal.stop();
             }
 

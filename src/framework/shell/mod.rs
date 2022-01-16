@@ -1,4 +1,4 @@
-use smithay::desktop::{Kind, PopupKind, PopupManager};
+use smithay::desktop::{self, Kind, LayerSurface, PopupKind, PopupManager};
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{DispatchData, Display};
@@ -14,7 +14,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Mutex;
 
-use crate::output_map::LayerSurface;
 use crate::popup::PopupSurface;
 use crate::window::Window;
 
@@ -49,6 +48,11 @@ pub enum ShellEvent {
         seat: Seat,
         edges: ResizeEdge,
         serial: Serial,
+    },
+
+    WindowGotResized {
+        window: desktop::Window,
+        new_location: Point<i32, Logical>,
     },
 
     WindowMaximize {
@@ -124,7 +128,7 @@ struct Inner {
 
 impl Inner {
     // Try to updated mapped surface
-    fn try_update_mapped(&mut self, surface: &WlSurface) {
+    fn try_update_mapped(&mut self, surface: &WlSurface, ddata: DispatchData) {
         if let Some(window) = self.windows.find_mut(surface) {
             window.self_update();
 
@@ -177,8 +181,14 @@ impl Inner {
                 new_location
             });
 
-            if let Some(location) = new_location {
-                window.set_location(location);
+            if let Some(new_location) = new_location {
+                (self.cb)(
+                    ShellEvent::WindowGotResized {
+                        window: window.desktop_window(),
+                        new_location,
+                    },
+                    ddata,
+                )
             }
         }
     }
@@ -255,7 +265,7 @@ impl Inner {
         self.try_map_unmaped(&surface, ddata.reborrow());
 
         // Update mapped windows
-        self.try_update_mapped(&surface);
+        self.try_update_mapped(&surface, ddata.reborrow());
 
         // TODO:
         // if let Some(popup) = self.window_map.borrow().popups().find(surface) {
@@ -288,7 +298,7 @@ impl Inner {
             })
             .unwrap();
             if !initial_configure_sent {
-                layer.surface().send_configure();
+                layer.layer_surface().send_configure();
             }
         }
 
