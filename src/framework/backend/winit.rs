@@ -18,7 +18,7 @@ use smithay::{
 
 use super::{BackendHandler, BackendRequest};
 
-use crate::output_manager::Output;
+use crate::output_manager::{Output, OutputDescriptor};
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -87,24 +87,25 @@ where
         refresh: 60_000,
     };
 
-    let output = Output::new(
-        OUTPUT_NAME,
-        Default::default(),
-        &mut *display.borrow_mut(),
-        PhysicalProperties {
+    let descriptor = OutputDescriptor {
+        name: OUTPUT_NAME.to_owned(),
+        physical_properties: PhysicalProperties {
             size: (0, 0).into(),
             subpixel: wl_output::Subpixel::Unknown,
             make: "Smithay".into(),
             model: "Winit".into(),
         },
+    };
+
+    let mode = handler.ask_for_output_mode(&descriptor, &[mode]);
+
+    let output = Output::new(
+        &mut *display.borrow_mut(),
+        descriptor,
         wl_output::Transform::Flipped180,
         mode,
         vec![mode],
     );
-
-    let mode = handler.ask_for_output_mode(&output, &[mode]);
-    output.change_current_state(Some(mode), None, Some(1), None);
-    // TODO: mode
 
     handler.output_created(output.clone());
     handler.start_compositor();

@@ -175,7 +175,7 @@ anodize.outputs.on_rearrange(|outputs| {
         let x = output_x;
         output_x += output.w;
         
-        (x,0)
+        return [x, 0];
     })
 });
 

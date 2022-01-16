@@ -26,7 +26,7 @@ use smithay::{
     wayland::dmabuf::init_dmabuf_global,
 };
 
-use crate::output_manager::Output;
+use crate::output_manager::{Output, OutputDescriptor};
 
 use super::{BackendHandler, BackendRequest};
 
@@ -95,16 +95,21 @@ impl OutputSurfaceBuilder {
             refresh: 60_000,
         };
 
-        let output = Output::new(
-            OUTPUT_NAME,
-            Default::default(),
-            display,
-            PhysicalProperties {
+        let descriptor = OutputDescriptor {
+            name: OUTPUT_NAME.to_owned(),
+            physical_properties: PhysicalProperties {
                 size: (0, 0).into(),
                 subpixel: wl_output::Subpixel::Unknown,
                 make: "Smithay".into(),
                 model: "Winit".into(),
             },
+        };
+
+        let mode = handler.ask_for_output_mode(&descriptor, &[mode]);
+
+        let output = Output::new(
+            display,
+            descriptor,
             wl_output::Transform::Normal,
             mode,
             vec![mode],
@@ -112,10 +117,6 @@ impl OutputSurfaceBuilder {
             "Unknown".into(),
             slog_scope::logger(),
         );
-
-        let mode = handler.ask_for_output_mode(&output, &[mode]);
-        output.change_current_state(Some(mode), None, Some(1), None);
-        // TODO: mode
 
         OutputSurface {
             surface: self.surface,

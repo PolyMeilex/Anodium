@@ -10,6 +10,14 @@ use smithay::{
     wayland::output::{Mode, PhysicalProperties},
 };
 
+/// Inmutable description of phisical output
+/// Used before wayland output is created
+#[derive(Debug)]
+pub struct OutputDescriptor {
+    pub name: String,
+    pub physical_properties: PhysicalProperties,
+}
+
 #[derive(Default)]
 struct Data {
     pending_mode_change: Cell<bool>,
@@ -32,33 +40,21 @@ impl Output {
 }
 
 impl Output {
-    pub fn new<N>(
-        name: N,
-        location: Point<i32, Logical>,
+    pub fn new(
         display: &mut Display,
-        physical: PhysicalProperties,
+        desc: OutputDescriptor,
         transform: wl_output::Transform,
         mode: Mode,
         possible_modes: Vec<Mode>,
-    ) -> Self
-    where
-        N: AsRef<str>,
-    {
+    ) -> Self {
         let (output, _global) = SmithayOutput::new(
             display,
-            name.as_ref().into(),
-            physical,
+            desc.name,
+            desc.physical_properties,
             slog_scope::logger(),
         );
 
-        let scale = 1.0f64;
-
-        output.change_current_state(
-            Some(mode),
-            Some(transform),
-            Some(scale.round() as i32),
-            Some(location),
-        );
+        output.change_current_state(Some(mode), Some(transform), None, None);
         output.set_preferred(mode);
 
         let added = output.user_data().insert_if_missing(move || Data {

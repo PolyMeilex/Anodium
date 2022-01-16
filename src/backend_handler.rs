@@ -3,18 +3,34 @@ use std::sync::atomic::Ordering;
 
 use crate::{
     framework::backend::{BackendHandler, OutputHandler},
-    output_manager::Output,
+    output_manager::{Output, OutputDescriptor},
     state::Anodium,
 };
 
 impl OutputHandler for Anodium {
-    fn ask_for_output_mode(&mut self, _output: &Output, modes: &[output::Mode]) -> output::Mode {
+    fn ask_for_output_mode(
+        &mut self,
+        _desc: &OutputDescriptor,
+        modes: &[output::Mode],
+    ) -> output::Mode {
         modes[0]
     }
 
     fn output_created(&mut self, output: crate::output_manager::Output) {
         info!("OutputCreated: {}", output.name());
         self.output_map.add(&mut self.workspace, &output);
+
+        if let Some(layout) = self
+            .config
+            .output_rearrange(self.output_map.outputs().into())
+        {
+            for (output, pos) in self.output_map.outputs().iter().zip(layout.iter()) {
+                let scale = self.workspace.output_scale(output).unwrap_or(1.0);
+
+                let (x, y) = *pos;
+                self.workspace.map_output(output, scale, (x, y));
+            }
+        }
     }
 
     fn output_mode_updated(&mut self, output: &crate::output_manager::Output, mode: output::Mode) {

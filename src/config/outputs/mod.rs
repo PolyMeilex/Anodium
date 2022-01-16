@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rhai::{plugin::*, AST};
+use rhai::{plugin::*, Array, AST};
 use rhai::{FnPtr, INT};
 
 use smithay::wayland::output::Mode;
@@ -55,7 +55,17 @@ impl Outputs {
         outputs: Vec<Output>,
     ) -> Option<Vec<(i32, i32)>> {
         if let Some(on_rearrange) = self.on_rearrange.borrow().clone() {
-            on_rearrange.call(engine, ast, (outputs,)).ok()
+            let outputs: Array = outputs.into_iter().map(|o| Dynamic::from(o)).collect();
+
+            let res: Array = on_rearrange.call(engine, ast, (outputs,)).unwrap();
+            let res: Vec<(i32, i32)> = res
+                .into_iter()
+                .map(|item| item.try_cast().unwrap())
+                .map(|pos: Array| pos.into_iter().map(|p| p.try_cast().unwrap()).collect())
+                .map(|pos: Vec<INT>| (pos[0] as _, pos[1] as _))
+                .collect();
+
+            Some(res)
         } else {
             error!("on_rearrange not configured");
             None
@@ -118,14 +128,12 @@ pub mod outputs {
 
     #[rhai_fn(get = "w", pure)]
     pub fn w(output: &mut Output) -> INT {
-        // output.geometry().size.w as _
-        todo!();
+        output.current_mode().unwrap().size.w as _
     }
 
     #[rhai_fn(get = "h", pure)]
     pub fn h(output: &mut Output) -> INT {
-        // output.geometry().size.h as _
-        todo!();
+        output.current_mode().unwrap().size.h as _
     }
 
     #[rhai_fn(get = "x", pure)]

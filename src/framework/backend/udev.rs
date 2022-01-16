@@ -58,7 +58,11 @@ use smithay::{
 };
 
 use super::{BackendHandler, BackendRequest};
-use crate::{framework, output_manager::Output, render::renderer::import_bitmap};
+use crate::{
+    framework,
+    output_manager::{Output, OutputDescriptor},
+    render::renderer::import_bitmap,
+};
 
 struct Inner {
     display: Rc<RefCell<Display>>,
@@ -255,12 +259,16 @@ where
 pub type RenderSurface = GbmBufferedSurface<SessionFd>;
 
 struct OutputSurfaceData {
+    output_descriptor: OutputDescriptor,
+
+    wl_mode: Mode,
+    wl_modes: Vec<Mode>,
+
+    drm_modes: Vec<DrmMode>,
+
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
     fps: fps_ticker::Fps,
-    _output_name: String,
-    mode: Mode,
-    modes: Vec<DrmMode>,
     _connector_info: connector::Info,
     crtc: crtc::Handle,
 }
@@ -278,7 +286,6 @@ pub struct UdevDeviceData {
 
 struct ConnectorScanResult {
     backends: HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
-    outputs: HashMap<crtc::Handle, Output>,
     backends_order: Vec<crtc::Handle>,
 }
 
@@ -308,7 +315,6 @@ where
 
     let mut backends = HashMap::new();
     let mut backends_order = Vec::new();
-    let mut outputs_map = HashMap::new();
 
     // very naive way of finding good crtc/encoder/connector combinations. This problem is np-complete
     for connector_info in connector_infos {
@@ -347,23 +353,15 @@ where
                         format!("{}-{}", interface_short_name, connector_info.interface_id())
                     };
 
-                    let modes = connector_info.modes();
+                    let drm_modes = connector_info.modes();
 
                     let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 
-                    let mut connector_inner = inner.borrow_mut();
+                    let connector_inner = inner.borrow();
                     let display = connector_inner.display.clone();
                     let display = &mut *display.borrow_mut();
 
-                    let mode = modes[0];
-
-                    let size = mode.size();
-                    let output_mode = Mode {
-                        size: (size.0 as i32, size.1 as i32).into(),
-                        refresh: (mode.vrefresh() * 1000) as i32,
-                    };
-
-                    let output_modes: Vec<Mode> = modes
+                    let wl_modes: Vec<Mode> = drm_modes
                         .iter()
                         .map(|m| {
                             let size = m.size();
@@ -374,38 +372,24 @@ where
                         })
                         .collect();
 
-                    let output = Output::new(
-                        &output_name,
-                        Default::default(),
-                        display,
-                        PhysicalProperties {
+                    let descriptor = OutputDescriptor {
+                        name: output_name,
+                        physical_properties: PhysicalProperties {
                             size: (phys_w as i32, phys_h as i32).into(),
                             subpixel: wl_output::Subpixel::Unknown,
                             make: "Smithay".into(),
                             model: "Generic DRM".into(),
                         },
-                        wl_output::Transform::Normal,
-                        output_mode,
-                        output_modes.clone(),
-                    );
+                    };
 
-                    let current_mode = handler.ask_for_output_mode(&output, &output_modes);
-                    output.change_current_state(Some(current_mode), None, None, None);
-                    // TODO: mode
+                    let wl_mode = handler.ask_for_output_mode(&descriptor, &wl_modes);
 
-                    let current_mode = output.current_mode().unwrap();
+                    let mode_id = wl_modes.iter().position(|m| m == &wl_mode).unwrap();
 
-                    let mode = modes
-                        .iter()
-                        .find(|m| {
-                            m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
-                                && m.vrefresh() == (current_mode.refresh / 1000) as u32
-                        })
-                        .cloned()
-                        .unwrap_or(mode);
+                    let drm_mode = drm_modes[mode_id];
 
                     let mut surface =
-                        match drm.create_surface(crtc, mode, &[connector_info.handle()]) {
+                        match drm.create_surface(crtc, drm_mode, &[connector_info.handle()]) {
                             Ok(surface) => surface,
                             Err(err) => {
                                 warn!("Failed to create drm surface: {}", err);
@@ -432,15 +416,17 @@ where
 
                     let timer = Timer::new().unwrap();
 
-                    outputs_map.insert(crtc, output);
-
                     entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
+                        output_descriptor: descriptor,
+
+                        wl_mode,
+                        wl_modes,
+
+                        drm_modes: drm_modes.to_owned(),
+
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
                         fps: fps_ticker::Fps::default(),
-                        _output_name: output_name,
-                        mode: output_mode,
-                        modes: modes.to_owned(),
                         _connector_info: connector_info,
                         crtc,
                     })));
@@ -461,7 +447,6 @@ where
 
     ConnectorScanResult {
         backends,
-        outputs: outputs_map,
         backends_order,
     }
 }
@@ -558,7 +543,6 @@ fn device_added<D>(
 
         let ConnectorScanResult {
             backends: outputs,
-            outputs: outputs_map,
             backends_order: outputs_order,
         } = scan_connectors(
             handler,
@@ -575,18 +559,34 @@ fn device_added<D>(
 
             for output_handle in outputs_order {
                 let output = {
-                    let outputsurface = outputs.get(&output_handle).unwrap();
-                    let output = outputs_map.get(&output_handle).unwrap();
+                    let output_surface = outputs.get(&output_handle).unwrap();
+                    let output_surface = output_surface.borrow();
 
-                    let outputsurface = &*outputsurface.borrow();
-                    let crtc = outputsurface.crtc;
+                    let output_descriptor = &output_surface.output_descriptor;
+
+                    let output = Output::new(
+                        &mut inner.display.borrow_mut(),
+                        OutputDescriptor {
+                            name: output_descriptor.name.clone(),
+                            // TODO: Add PhysicalProperties::Clone to smithay
+                            physical_properties: PhysicalProperties {
+                                size: output_descriptor.physical_properties.size,
+                                subpixel: output_descriptor.physical_properties.subpixel,
+                                make: output_descriptor.physical_properties.make.clone(),
+                                model: output_descriptor.physical_properties.model.clone(),
+                            },
+                        },
+                        wl_output::Transform::Normal,
+                        output_surface.wl_mode,
+                        output_surface.wl_modes.clone(),
+                    );
 
                     output.user_data().insert_if_missing(|| UdevOutputId {
-                        crtc,
+                        crtc: output_surface.crtc,
                         device_id: drm.device_id(),
                     });
 
-                    output.clone()
+                    output
                 };
 
                 inner.outputs.push(output.clone());
@@ -793,14 +793,14 @@ where
 
     if output.pending_mode_change() {
         let current_mode = output.current_mode().unwrap();
-        if let Some(drm_mode) = surface.modes.iter().find(|m| {
+        if let Some(drm_mode) = surface.drm_modes.iter().find(|m| {
             m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
                 && m.vrefresh() == (current_mode.refresh / 1000) as u32
         }) {
             if let Err(err) = surface.surface.use_mode(*drm_mode) {
                 error!("pending mode: {:?} failed: {:?}", current_mode, err);
             } else {
-                surface.mode = current_mode;
+                surface.wl_mode = current_mode;
             }
         } else {
             error!("pending mode: {:?} not found in drm", current_mode);

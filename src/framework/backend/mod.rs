@@ -17,14 +17,14 @@ use smithay::wayland;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::cli::{AnodiumOptions, Backend};
-use crate::output_manager::Output;
+use crate::output_manager::{Output, OutputDescriptor};
 use crate::state::Anodium;
 
 pub trait OutputHandler {
     /// Request output mode for output that is being built
     fn ask_for_output_mode(
         &mut self,
-        _output: &Output,
+        _descriptor: &OutputDescriptor,
         modes: &[wayland::output::Mode],
     ) -> wayland::output::Mode {
         modes[0]
