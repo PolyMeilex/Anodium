@@ -132,8 +132,10 @@ impl Output {
         N: AsRef<str>,
     {
         let egui = EguiState::new();
-        let mut visuals = egui::style::Visuals::default();
-        visuals.window_corner_radius = 0.0;
+        let visuals = egui::style::Visuals {
+            window_corner_radius: 0.0,
+            ..Default::default()
+        };
 
         egui.context().set_visuals(visuals);
 
