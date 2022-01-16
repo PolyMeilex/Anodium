@@ -62,8 +62,8 @@ let logger_box = box::new_raw(700, 330, 5, 35, layout::vertical());
 let logger = widget::logger();
 logger.c_debug = [255, 26, 255, 128];
 
-// logger_box.background = false;
-// logger_box.add_widget(logger.convert());
+logger_box.background = false;
+logger_box.add_widget(logger.convert());
 
 // anodize.keyboard.callbacks.register(|| {
 //     if logger_box.visable {
@@ -190,30 +190,30 @@ anodize.outputs.on_mode_select(|desc, modes| {
     modes[0]
 });
 
+let logger_added = false;
+
 anodize.outputs.on_new(|output| {
-    // anodize.log.info("anodize on_new");
+    anodize.log.info("anodize on_new");
 
-    // output.set_wallpaper("./resources/anocube.png");
-
-    let top_box = box::new_raw(output.w, 15, 0, 0, layout::horizontal());
-    top_box.scroll = false;
     let fps_widget = widget::fps(output);
+    let fps_box = box::new_raw(50, 30, 510, 0, layout::horizontal());
+    fps_box.add_widget(fps_widget.convert());
+    output.shell.add_box(fps_box);
 
-    // top_box.add_widget(fps_widget.convert());
+    if !logger_added {
+        logger_added = true;
 
-    // let current_workspace_widget = widget::current_workspace(output);
+        let top_box = box::new_raw(500, 100, 0, 0, layout::vertical());
+        top_box.scroll = false;
+        top_box.alpha = 0.5;
+        top_box.background = false;
 
-    // top_box.add_widget(current_workspace_widget.convert());
+        let logger = widget::logger();
+        top_box.add_widget(logger.convert());
 
-    // let output_geometry_widget = widget::output_geometry(output);
-
-    // top_box.add_widget(output_geometry_widget.convert());
-
-    // output.shell.add_box(top_box);
+        output.shell.add_box(top_box);
+    }
 });
-
-
-
 
 // anodize.system.add_timeout(|| {
 //     anodize.system.exec_read("cat /sys/class/hwmon/hwmon1/temp1_input", |o| {

@@ -18,9 +18,9 @@ impl Fps {
 }
 
 impl Widget for Fps {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
-        todo!();
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
         // ui.text(format!("FPS: {}", self.0.get_fps() as u32));
+        ui.label(format!("FPS: 0"));
     }
 }
 

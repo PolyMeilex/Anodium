@@ -18,9 +18,9 @@ impl OutputGeometry {
 }
 
 impl Widget for OutputGeometry {
-    fn render(&self, ui: &Ui, _config_tx: &Sender<ConfigEvent>) {
-        todo!();
-        // ui.text(format!("Geometry: {:?}", self.0.geometry()));
+    fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
+        let size = self.0.current_mode().unwrap().size;
+        ui.label(format!("Geometry: {:?}", size));
     }
 }
 

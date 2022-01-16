@@ -22,6 +22,8 @@ impl OutputHandler for Anodium {
         info!("OutputCreated: {}", output.name());
         self.output_map.add(&mut self.workspace, &output);
 
+        self.config.output_new(output.clone());
+
         if let Some(layout) = self
             .config
             .output_rearrange(self.output_map.outputs().into())

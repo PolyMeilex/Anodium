@@ -16,7 +16,7 @@ use smithay::{
     },
     desktop::{
         self,
-        space::{RenderElement, SurfaceTree},
+        space::{DynamicRenderElements, RenderElement, SurfaceTree},
     },
     reexports::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
@@ -358,10 +358,16 @@ impl Anodium {
         output: &Output,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<(), smithay::backend::SwapBuffersError> {
-        // let (output_geometry, output_scale) = (output.geometry(), output.scale());
         let output_geometry = self.workspace.output_geometry(output).unwrap();
 
-        let mut elems: Vec<Box<dyn RenderElement<_, _, _, _>>> = Vec::new();
+        let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
+
+        let frame = output.render_egui_shell(
+            &self.start_time,
+            &self.input_state.modifiers_state,
+            &self.config_tx,
+        );
+        elems.push(Box::new(frame));
 
         // Pointer Related:
         if output_geometry

@@ -41,7 +41,7 @@ pub struct Box {
 }
 
 impl Box {
-    pub fn new(w: u16, h: u16, x: u32, y: u32, layout: Layout) -> Self {
+    pub fn new(w: f32, h: f32, x: f32, y: f32, layout: Layout) -> Self {
         BOX_ID.with(move |id_cell| {
             let id = id_cell.get();
             id_cell.set(id + 1);

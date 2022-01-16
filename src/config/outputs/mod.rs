@@ -197,8 +197,7 @@ pub mod outputs {
 
     #[rhai_fn(get = "shell", pure)]
     pub fn shell(output: &mut Output) -> shell::Shell {
-        // output.shell()
-        todo!();
+        output.egui_shell().clone()
     }
 
     #[rhai_fn(set = "x", pure)]

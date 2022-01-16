@@ -68,6 +68,77 @@ impl InputHandler for Anodium {
             }
             _ => {}
         };
+
+        if let Some(output) = self
+            .workspace
+            .output_under(self.input_state.pointer_location)
+            .next()
+        {
+            let output = Output::wrap(output.clone());
+
+            // NOTE: after desktop abstraction was added egui is always on top (tehnical limitation of desktop abstractions)
+            // If it is on top then it always can grab events
+
+            // if captured {
+            self.process_egui_event(event, &output);
+            // } else {
+            // self.reset_egui_event(&output);
+            // }
+        }
+    }
+}
+
+impl Anodium {
+    fn reset_egui_event(&self, output: &Output) {
+        let mut max_point = Point::default();
+        max_point.x = i32::MAX;
+        max_point.y = i32::MAX;
+        output.egui().handle_pointer_motion(max_point);
+    }
+
+    fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
+        match event {
+            InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
+                let output_loc = self.workspace.output_geometry(output).unwrap().loc;
+                let mouse_location = self.input_state.pointer_location - output_loc.to_f64();
+                output
+                    .egui()
+                    .handle_pointer_motion(mouse_location.to_i32_round());
+            }
+
+            InputEvent::PointerButton { event, .. } => {
+                if let Some(button) = event.button() {
+                    output.egui().handle_pointer_button(
+                        button,
+                        event.state() == ButtonState::Pressed,
+                        self.input_state.modifiers_state.clone(),
+                    );
+                }
+            }
+
+            InputEvent::Keyboard { event } => {
+                //TODO - is that enough or do we need the whole code from here https://github.com/Smithay/smithay-egui/blob/main/examples/integrate.rs#L69 ?
+                output.egui().handle_keyboard(
+                    &[event.key_code()],
+                    event.state() == KeyState::Pressed,
+                    self.input_state.modifiers_state.clone(),
+                );
+            }
+
+            InputEvent::PointerAxis { event, .. } => output.egui().handle_pointer_axis(
+                event
+                    .amount_discrete(input::Axis::Horizontal)
+                    .or_else(|| event.amount(input::Axis::Horizontal).map(|x| x * 3.0))
+                    .unwrap_or(0.0)
+                    * 10.0,
+                event
+                    .amount_discrete(input::Axis::Vertical)
+                    .or_else(|| event.amount(input::Axis::Vertical).map(|x| x * 3.0))
+                    .unwrap_or(0.0)
+                    * 10.0,
+            ),
+            _ => {}
+        }
     }
 }
 
@@ -221,9 +292,9 @@ impl Anodium {
         // }
 
         // if let Some(button) = evt.button() {
-        // for w in self.visible_workspaces_mut() {
-        //     w.on_pointer_button(button, evt.state());
-        // }
+        //     for w in self.visible_workspaces_mut() {
+        //         w.on_pointer_button(button, evt.state());
+        //     }
         // }
     }
 
