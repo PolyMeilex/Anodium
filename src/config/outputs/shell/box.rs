@@ -8,16 +8,11 @@ use rhai::{plugin::*, FLOAT, INT};
 
 use crate::config::eventloop::ConfigEvent;
 
+use super::container::{Container, Layout};
 use super::widget::Widget;
 
 thread_local! {
     static BOX_ID: Cell<i32> = Cell::new(0);
-}
-
-#[derive(Debug, Clone)]
-pub enum Layout {
-    Vertical,
-    Horizontal,
 }
 
 //#[derive(Debug)]
@@ -63,8 +58,10 @@ impl Box {
             }
         })
     }
+}
 
-    pub fn render(&self, ctx: &CtxRef, config_tx: &Sender<ConfigEvent>) {
+impl Container for Box {
+    fn render(&self, ctx: &CtxRef, config_tx: &Sender<ConfigEvent>) {
         let inner = self.inner.borrow();
         if inner.visable {
             let mut frame = egui::Frame::window(&ctx.style());
@@ -100,10 +97,6 @@ impl Box {
 
 #[export_module]
 pub mod r#box {
-    pub fn new_raw(w: INT, h: INT, x: INT, y: INT, layout: Layout) -> Box {
-        Box::new(w as _, h as _, x as _, y as _, layout)
-    }
-
     #[rhai_fn(get = "w", pure)]
     pub fn w(r#box: &mut Box) -> INT {
         r#box.inner.borrow().w as _
@@ -196,27 +189,13 @@ pub mod r#box {
 
     #[rhai_fn(global)]
     pub fn add_widget(r#box: &mut Box, widget: Rc<dyn Widget>) {
-        //info!("adding widget: {:?}", widget);
         r#box.inner.borrow_mut().widgets.push(widget);
-    }
-}
-
-#[export_module]
-pub mod layout {
-    pub fn vertical() -> Layout {
-        Layout::Vertical
-    }
-    pub fn horizontal() -> Layout {
-        Layout::Horizontal
     }
 }
 
 pub fn register(engine: &mut Engine) {
     let box_module = exported_module!(r#box);
-    let layout_module = exported_module!(layout);
     engine
         .register_static_module("box", box_module.into())
-        .register_static_module("layout", layout_module.into())
-        .register_type::<Box>()
-        .register_type::<Layout>();
+        .register_type::<Box>();
 }

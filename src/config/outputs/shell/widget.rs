@@ -23,7 +23,7 @@ impl Clone for Box<dyn Widget> {
 #[export_module]
 pub mod widget {
     use crate::config::outputs::shell::{
-        button::Button, fps::Fps, logger::Logger, output::OutputGeometry, text::Text,
+        button::Button, fps::Fps, logger::Logger, menu::Menu, output::OutputGeometry, text::Text,
         workspace::CurrentWorkspace,
     };
     use crate::output_manager::Output;
@@ -34,6 +34,10 @@ pub mod widget {
 
     pub fn button(text: String) -> Button {
         Button::new(text)
+    }
+
+    pub fn menu(text: String) -> Menu {
+        Menu::new(text)
     }
 
     pub fn fps(output: Output) -> Fps {

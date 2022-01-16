@@ -7,18 +7,22 @@ use rhai::Engine;
 
 pub mod r#box;
 mod button;
+pub mod container;
 mod fps;
 pub mod logger;
+mod menu;
 mod output;
+pub mod panel;
 mod text;
 mod widget;
 mod workspace;
 
+use container::Container;
 use widget::*;
 
 #[derive(Clone, Default)]
 pub struct Shell {
-    boxes: Rc<RefCell<Vec<r#box::Box>>>,
+    boxes: Rc<RefCell<Vec<Box<dyn Container>>>>,
 }
 
 impl Shell {
@@ -29,7 +33,11 @@ impl Shell {
     }
 
     pub fn add_box(&self, r#box: r#box::Box) {
-        self.boxes.borrow_mut().push(r#box);
+        self.boxes.borrow_mut().push(Box::new(r#box));
+    }
+
+    pub fn add_panel(&self, panel: panel::Panel) {
+        self.boxes.borrow_mut().push(Box::new(panel));
     }
 
     pub fn render(&self, ctx: &CtxRef, config_tx: &Sender<ConfigEvent>) {
@@ -51,6 +59,11 @@ pub mod shell {
     pub fn add_box(shell: &mut Shell, r#box: r#box::Box) {
         shell.add_box(r#box);
     }
+
+    #[rhai_fn(global)]
+    pub fn add_panel(shell: &mut Shell, panel: panel::Panel) {
+        shell.add_panel(panel);
+    }
 }
 
 pub fn register(engine: &mut Engine) {
@@ -60,11 +73,14 @@ pub fn register(engine: &mut Engine) {
         .register_type::<Shell>();
 
     widget::register(engine);
+    container::register(engine);
     r#box::register(engine);
+    panel::register(engine);
     text::register(engine);
     logger::register(engine);
     fps::register(engine);
     workspace::register(engine);
     output::register(engine);
     button::register(engine);
+    menu::register(engine);
 }

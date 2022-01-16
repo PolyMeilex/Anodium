@@ -83,10 +83,16 @@ impl Output {
         output.set_preferred(mode);
 
         let egui = EguiState::new();
-        let visuals = egui::style::Visuals {
+        let mut visuals = egui::style::Visuals {
             window_corner_radius: 0.0,
             ..Default::default()
         };
+
+        visuals.widgets.inactive.corner_radius = 0.0;
+        visuals.widgets.noninteractive.corner_radius = 0.0;
+        visuals.widgets.hovered.corner_radius = 0.0;
+        visuals.widgets.active.corner_radius = 0.0;
+        visuals.widgets.open.corner_radius = 0.0;
 
         egui.context().set_visuals(visuals);
 

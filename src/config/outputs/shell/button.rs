@@ -25,10 +25,11 @@ impl Button {
 
 impl Widget for Button {
     fn render(&self, ui: &mut Ui, config_tx: &Sender<ConfigEvent>) {
-        let button = self.0.borrow();
-        let response = ui.button(&button.label);
+        let inner = self.0.borrow();
+        let button = egui::widgets::Button::new(&inner.label);
+        let response = ui.add(button);
         if response.clicked() {
-            if let Some(click) = &button.click {
+            if let Some(click) = &inner.click {
                 config_tx.send(ConfigEvent::Shell(click.clone())).unwrap();
             }
         }

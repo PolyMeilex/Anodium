@@ -58,7 +58,7 @@ anodize.keyboard.callbacks.register(|| {
 
 let weather = widget::text("");
 let date = widget::text("");
-let logger_box = box::new_raw(700, 330, 5, 35, layout::vertical());
+let logger_box = container::box(700, 330, 35, 35, layout::vertical());
 let logger = widget::logger();
 logger.c_debug = [255, 26, 255, 128];
 
@@ -77,7 +77,7 @@ logger_box.add_widget(logger.convert());
 //     let output = anodize.outputs[0];
 //     //output.set_wallpaper("./resources/wip-anodium-wallpaper.png");
     
-//     let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
+//     let box = container::box(output.w, 30, 0, output.h - 30, layout::horizontal());
 //     box.alpha = 0.0;
 //     box.background = false;
 //     box.scroll = false;
@@ -100,7 +100,7 @@ logger_box.add_widget(logger.convert());
 
 //     let output = anodize.outputs[1];
 //     if output != () {
-//         let box = box::new_raw(output.w, 30, 0, output.h - 30, layout::horizontal());
+//         let box = container::box(output.w, 30, 0, output.h - 30, layout::horizontal());
 //         box.alpha = 0.0;
 //         box.background = false;
 //         box.scroll = false;
@@ -196,14 +196,14 @@ anodize.outputs.on_new(|output| {
     anodize.log.info("anodize on_new");
 
     let fps_widget = widget::fps(output);
-    let fps_box = box::new_raw(50, 30, 510, 0, layout::horizontal());
+    let fps_box = container::box(50, 30, 560, 0, layout::horizontal());
     fps_box.add_widget(fps_widget.convert());
     output.shell.add_box(fps_box);
 
     if !logger_added {
         logger_added = true;
 
-        let top_box = box::new_raw(500, 100, 0, 0, layout::vertical());
+        let top_box = container::box(500, 100, 50, 0, layout::vertical());
         top_box.scroll = false;
         top_box.alpha = 0.5;
         top_box.background = false;
@@ -213,6 +213,14 @@ anodize.outputs.on_new(|output| {
 
         output.shell.add_box(top_box);
     }
+
+    let panel = container::panel(40, layout::horizontal(), position::left());
+    
+    let menu = widget::menu("Menu");
+    menu.add_item(menu::label("weston-terminal", || { anodize.system.exec("weston-terminal") }).convert());
+
+    panel.add_widget(menu.convert());
+    output.shell.add_panel(panel);
 });
 
 // anodize.system.add_timeout(|| {
