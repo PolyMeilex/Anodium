@@ -67,7 +67,7 @@ features = ["executor", "futures-io"]
 
 [dependencies.smithay-egui]
 git = "https://github.com/dragonnn/smithay-egui"
-commit = "1a8a03304eb8fdd5d770144de59f4ea9c0b94d56"
+rev = "1a8a03304eb8fdd5d770144de59f4ea9c0b94d56"
 
 
 
