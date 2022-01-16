@@ -45,7 +45,7 @@ use smithay::{
         gbm::Device as GbmDevice,
         input::Libinput,
         nix::{fcntl::OFlag, sys::stat::dev_t},
-        wayland_server::{protocol::wl_output, DispatchData, Display},
+        wayland_server::{protocol::wl_output, Display},
     },
     utils::{
         signaling::{Linkable, SignalToken, Signaler},
@@ -57,12 +57,10 @@ use smithay::{
     },
 };
 
-use super::{BackendEvent, BackendRequest};
+use super::{BackendHandler, BackendRequest};
 use crate::{framework, output_manager::Output, render::renderer::import_bitmap};
 
 struct Inner {
-    cb: Box<dyn FnMut(BackendEvent, DispatchData)>,
-
     display: Rc<RefCell<Display>>,
     primary_gpu: Option<PathBuf>,
     session: AutoSession,
@@ -90,23 +88,18 @@ struct UdevOutputId {
 
 type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
 
-pub fn run_udev<F, IF, D>(
+pub fn run_udev<D>(
     display: Rc<RefCell<Display>>,
     event_loop: &mut EventLoop<'static, D>,
-    state: &mut D,
+    handler: &mut D,
     mut session: AutoSession,
     notifier: AutoSessionNotifier,
     rx: channel::Channel<BackendRequest>,
-    cb: F,
-    mut input_cb: IF,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<LibinputInputBackend>, DispatchData) + 'static,
-    D: 'static,
+    D: BackendHandler + 'static,
 {
     let log = slog_scope::logger();
-    let mut ddata = DispatchData::wrap(state);
 
     let session_signal = notifier.signaler();
 
@@ -118,8 +111,6 @@ where
     info!("Primary GPU: {:?}", primary_gpu);
 
     let inner = Rc::new(RefCell::new(Inner {
-        cb: Box::new(cb),
-
         display: display.clone(),
         primary_gpu,
         session: session.clone(),
@@ -147,7 +138,7 @@ where
      */
     let _libinput_event_source = event_loop
         .handle()
-        .insert_source(libinput_backend, move |mut event, _, state| {
+        .insert_source(libinput_backend, move |mut event, _, handler| {
             match &mut event {
                 InputEvent::DeviceAdded { device } => {
                     device.config_tap_set_enabled(true).ok();
@@ -156,7 +147,7 @@ where
                 _ => {}
             }
 
-            input_cb(event, DispatchData::wrap(state));
+            handler.process_input_event(event, None);
         })
         .unwrap();
     let _session_event_source = event_loop
@@ -166,12 +157,12 @@ where
 
     for (dev, path) in udev_backend.device_list() {
         device_added(
+            handler,
             event_loop.handle(),
             inner.clone(),
             dev,
             path.into(),
             &session_signal,
-            ddata.reborrow(),
         )
     }
 
@@ -227,14 +218,14 @@ where
         .handle()
         .insert_source(udev_backend, {
             let inner = inner.clone();
-            move |event, _, state| match event {
+            move |event, _, handler| match event {
                 UdevEvent::Added { device_id, path } => device_added(
+                    handler,
                     handle.clone(),
                     inner.clone(),
                     device_id,
                     path,
                     &session_signal,
-                    DispatchData::wrap(state),
                 ),
                 UdevEvent::Changed { device_id } => {
                     error!("Udev device ({:?}) changed: unimplemented", device_id);
@@ -250,7 +241,7 @@ where
     /*
      * Start XWayland and Wayland Socket
      */
-    (inner.borrow_mut().cb)(BackendEvent::StartCompositor, ddata);
+    handler.start_compositor();
 
     // Cleanup stuff
 
@@ -291,15 +282,18 @@ struct ConnectorScanResult {
     backends_order: Vec<crtc::Handle>,
 }
 
-fn scan_connectors<D: 'static>(
+fn scan_connectors<D>(
+    handler: &mut D,
     inner: InnerRc,
     handle: LoopHandle<'static, D>,
     drm: &mut DrmDevice<SessionFd>,
     gbm: &GbmDevice<SessionFd>,
     renderer: &mut Gles2Renderer,
     signaler: &Signaler<SessionSignal>,
-    mut ddata: DispatchData,
-) -> ConnectorScanResult {
+) -> ConnectorScanResult
+where
+    D: BackendHandler + 'static,
+{
     // Get a set of all modesetting resource handles (excluding planes):
     let res_handles = drm.resource_handles().unwrap();
 
@@ -392,14 +386,12 @@ fn scan_connectors<D: 'static>(
                         },
                         wl_output::Transform::Normal,
                         output_mode,
-                        output_modes,
+                        output_modes.clone(),
                     );
-                    (connector_inner.cb)(
-                        BackendEvent::RequestOutputConfigure {
-                            output: output.clone(),
-                        },
-                        ddata.reborrow(),
-                    );
+
+                    let current_mode = handler.ask_for_output_mode(&output, &output_modes);
+                    output.change_current_state(Some(current_mode), None, None, None);
+                    // TODO: mode
 
                     let current_mode = output.current_mode().unwrap();
 
@@ -456,13 +448,8 @@ fn scan_connectors<D: 'static>(
 
                     let inner = inner.clone();
                     handle
-                        .insert_source(timer, move |(dev_id, crtc), _, ddata| {
-                            udev_render(
-                                inner.clone(),
-                                dev_id,
-                                Some(crtc),
-                                DispatchData::wrap(ddata),
-                            )
+                        .insert_source(timer, move |(dev_id, crtc), _, handler| {
+                            udev_render(handler, inner.clone(), dev_id, Some(crtc))
                         })
                         .unwrap();
 
@@ -517,14 +504,16 @@ fn open_device(
         })
 }
 
-fn device_added<D: 'static>(
+fn device_added<D>(
+    handler: &mut D,
     handle: LoopHandle<'static, D>,
     inner: InnerRc,
     device_id: dev_t,
     path: PathBuf,
     session_signal: &Signaler<SessionSignal>,
-    mut ddata: DispatchData,
-) {
+) where
+    D: BackendHandler + 'static,
+{
     info!("Device Added {:?} : {:?}", device_id, path);
 
     let ret = open_device(&mut inner.borrow_mut().session, device_id, &path);
@@ -572,13 +561,13 @@ fn device_added<D: 'static>(
             outputs: outputs_map,
             backends_order: outputs_order,
         } = scan_connectors(
+            handler,
             inner.clone(),
             handle.clone(),
             &mut drm,
             &gbm,
             &mut *renderer.borrow_mut(),
             session_signal,
-            ddata.reborrow(),
         );
 
         {
@@ -602,7 +591,7 @@ fn device_added<D: 'static>(
 
                 inner.outputs.push(output.clone());
 
-                (inner.cb)(BackendEvent::OutputCreated { output }, ddata.reborrow());
+                handler.output_created(output);
             }
         }
 
@@ -616,8 +605,8 @@ fn device_added<D: 'static>(
             move |signal| match signal {
                 SessionSignal::ActivateSession | SessionSignal::ActivateDevice { .. } => {
                     let inner = inner.clone();
-                    handle.insert_idle(move |state| {
-                        udev_render(inner.clone(), dev_id, None, DispatchData::wrap(state))
+                    handle.insert_idle(move |handler| {
+                        udev_render(handler, inner.clone(), dev_id, None)
                     });
                 }
                 _ => {}
@@ -627,9 +616,9 @@ fn device_added<D: 'static>(
         drm.link(session_signal.clone());
         let event_dispatcher = Dispatcher::new(drm, {
             let inner = inner.clone();
-            move |event, _, state| match event {
+            move |event, _, handler| match event {
                 DrmEvent::VBlank(crtc) => {
-                    udev_render(inner.clone(), dev_id, Some(crtc), DispatchData::wrap(state));
+                    udev_render(handler, inner.clone(), dev_id, Some(crtc));
                 }
                 DrmEvent::Error(error) => {
                     error!("{:?}", error);
@@ -664,7 +653,10 @@ fn device_added<D: 'static>(
     }
 }
 
-fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddata: DispatchData) {
+fn udev_render<D>(handler: &mut D, inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>)
+where
+    D: BackendHandler + 'static,
+{
     let inner = &mut *inner.borrow_mut();
 
     let device_backend = match inner.udev_devices.get_mut(&dev_id) {
@@ -709,14 +701,13 @@ fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddat
             });
 
         let result = render_output_surface(
-            &mut inner.cb,
+            handler,
             &inner.outputs,
             &mut *surface.borrow_mut(),
             renderer,
             device_backend.dev_id,
             crtc,
             &pointer_image,
-            ddata.reborrow(),
         );
 
         if let Err(err) = result {
@@ -744,7 +735,7 @@ fn udev_render(inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>, mut ddat
             }
         } else {
             // Send frame events so that client start drawing their next frame
-            (inner.cb)(BackendEvent::SendFrames, ddata.reborrow());
+            handler.send_frames();
         }
     }
 }
@@ -775,16 +766,18 @@ fn schedule_initial_render<Data: 'static>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn render_output_surface(
-    cb: &mut Box<dyn FnMut(BackendEvent, DispatchData)>,
+fn render_output_surface<D>(
+    handler: &mut D,
     outputs: &[Output],
     surface: &mut OutputSurfaceData,
     renderer: &mut Gles2Renderer,
     device_id: dev_t,
     crtc: crtc::Handle,
     pointer_image: &Gles2Texture,
-    ddata: DispatchData,
-) -> Result<(), SwapBuffersError> {
+) -> Result<(), SwapBuffersError>
+where
+    D: BackendHandler + 'static,
+{
     surface.surface.frame_submitted()?;
 
     let output = outputs
@@ -818,14 +811,7 @@ fn render_output_surface(
     renderer.bind(dmabuf)?;
 
     // and draw to our buffer
-    cb(
-        BackendEvent::OutputRender {
-            renderer,
-            output,
-            pointer_image: Some(pointer_image),
-        },
-        ddata,
-    );
+    handler.output_render(renderer, output, Some(pointer_image));
 
     surface.fps.tick();
 

@@ -16,7 +16,7 @@ struct Data {
     possible_modes: Cell<Vec<Mode>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Output {
     output: SmithayOutput,
 }

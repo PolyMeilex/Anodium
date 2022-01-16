@@ -9,7 +9,7 @@ use smithay::{
     backend::{
         drm::DrmNode,
         egl::{EGLContext, EGLDisplay},
-        renderer::{gles2::Gles2Renderer, Bind, ImportEgl, Renderer, Transform, Unbind},
+        renderer::{gles2::Gles2Renderer, Bind, ImportEgl, Unbind},
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Input, X11Surface},
         SwapBuffersError,
     },
@@ -28,7 +28,7 @@ use smithay::{
 
 use crate::output_manager::Output;
 
-use super::{BackendEvent, BackendRequest};
+use super::{BackendHandler, BackendRequest};
 
 pub const OUTPUT_NAME: &str = "x11";
 
@@ -76,7 +76,15 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build(self, display: &mut Display) -> OutputSurface {
+    fn build<D>(
+        self,
+        handler: &mut D,
+        display: &mut Display,
+        renderer: &mut Gles2Renderer,
+    ) -> OutputSurface
+    where
+        D: BackendHandler,
+    {
         let size = {
             let s = self.window.size();
             (s.w as i32, s.h as i32).into()
@@ -105,6 +113,10 @@ impl OutputSurfaceBuilder {
             slog_scope::logger(),
         );
 
+        let mode = handler.ask_for_output_mode(&output, &[mode]);
+        output.change_current_state(Some(mode), None, Some(1), None);
+        // TODO: mode
+
         OutputSurface {
             surface: self.surface,
             window: self.window,
@@ -119,21 +131,16 @@ impl OutputSurfaceBuilder {
     }
 }
 
-pub fn run_x11<F, IF, D>(
+pub fn run_x11<D>(
     display: Rc<RefCell<Display>>,
 
     event_loop: &mut EventLoop<'static, D>,
-    state: &mut D,
+    handler: &mut D,
 
     rx: channel::Channel<BackendRequest>,
-
-    cb: F,
-    input_cb: IF,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<X11Input>, &Output, DispatchData) + 'static,
-    D: 'static,
+    D: BackendHandler + 'static,
 {
     event_loop
         .handle()
@@ -144,9 +151,6 @@ where
             channel::Event::Closed => {}
         })
         .unwrap();
-
-    let cb = Rc::new(RefCell::new(cb));
-    let input_cb = Rc::new(RefCell::new(input_cb));
 
     let backend = X11Backend::new(slog_scope::logger()).expect("Failed to initilize X11 backend");
     let handle = backend.handle();
@@ -174,38 +178,22 @@ where
         .expect("Failed to initialize renderer");
     let renderer = Rc::new(RefCell::new(renderer));
 
-    new_x11_window(
-        display,
-        event_loop,
-        state,
-        backend,
-        renderer,
-        x11_outputs,
-        cb,
-        input_cb,
-    )
+    new_x11_window(display, event_loop, handler, backend, renderer, x11_outputs)
 }
 
-fn new_x11_window<F, IF, D>(
+fn new_x11_window<D>(
     display: Rc<RefCell<Display>>,
 
     event_loop: &mut EventLoop<'static, D>,
-    state: &mut D,
+    handler: &mut D,
 
     backend: X11Backend,
     renderer: Rc<RefCell<Gles2Renderer>>,
     x11_outputs: Vec<OutputSurfaceBuilder>,
-
-    cb: Rc<RefCell<F>>,
-    input_cb: Rc<RefCell<IF>>,
 ) -> Result<(), ()>
 where
-    F: FnMut(BackendEvent, DispatchData) + 'static,
-    IF: FnMut(InputEvent<X11Input>, &Output, DispatchData) + 'static,
-    D: 'static,
+    D: BackendHandler + 'static,
 {
-    let mut ddata = DispatchData::wrap(state);
-
     if renderer
         .borrow_mut()
         .bind_wl_display(&*display.borrow())
@@ -228,25 +216,20 @@ where
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| o.build(&mut display.borrow_mut()))
+        .map(|o| {
+            o.build(
+                handler,
+                &mut display.borrow_mut(),
+                &mut renderer.borrow_mut(),
+            )
+        })
         .collect();
 
     for surface_data in surface_datas.iter() {
-        (cb.borrow_mut())(
-            BackendEvent::RequestOutputConfigure {
-                output: surface_data.output.clone(),
-            },
-            ddata.reborrow(),
-        );
-        (cb.borrow_mut())(
-            BackendEvent::OutputCreated {
-                output: surface_data.output.clone(),
-            },
-            ddata.reborrow(),
-        );
+        handler.output_created(surface_data.output.clone());
     }
 
-    (cb.borrow_mut())(BackendEvent::StartCompositor, ddata.reborrow());
+    handler.start_compositor();
 
     let surface_datas = Rc::new(RefCell::new(surface_datas));
 
@@ -259,12 +242,10 @@ where
         .handle()
         .insert_source(timer, {
             let surface_datas = surface_datas.clone();
-            let cb = cb.clone();
-            move |_: (), _timer_handle, state| {
-                let mut ddata = DispatchData::wrap(state);
+            move |_: (), _timer_handle, handler| {
+                let mut ddata = DispatchData::wrap(handler);
 
                 let mut renderer = renderer.borrow_mut();
-                let mut cb = cb.borrow_mut();
                 let surface_datas = &mut *surface_datas.borrow_mut();
 
                 for surface_data in surface_datas.iter_mut() {
@@ -283,15 +264,7 @@ where
                     }
 
                     let res: Result<(), ()> = {
-                        cb(
-                            BackendEvent::OutputRender {
-                                renderer: &mut renderer,
-                                output: &surface_data.output,
-                                pointer_image: None,
-                            },
-                            ddata.reborrow(),
-                        );
-                        //
+                        handler.output_render(&mut renderer, &surface_data.output, None);
                         Ok(())
                     };
 
@@ -318,7 +291,7 @@ where
                     surface_data.fps.tick();
                 }
 
-                cb(BackendEvent::SendFrames, ddata);
+                handler.send_frames();
             }
         })
         .unwrap();
@@ -326,15 +299,12 @@ where
 
     event_loop
         .handle()
-        .insert_source(backend, move |event, _, state| {
-            let mut ddata = DispatchData::wrap(state);
-
+        .insert_source(backend, move |event, _, handler| {
             let mut surface_datas = surface_datas.borrow_mut();
 
             match event {
                 X11Event::CloseRequested { .. } => {
-                    let mut cb = cb.borrow_mut();
-                    cb(BackendEvent::CloseCompositor {}, ddata.reborrow());
+                    handler.close_compositor();
                 }
 
                 X11Event::Resized {
@@ -358,13 +328,7 @@ where
                         .output
                         .change_current_state(Some(mode), None, Some(1), None);
 
-                    let mut cb = cb.borrow_mut();
-                    cb(
-                        BackendEvent::OutputModeUpdate {
-                            output: &surface_data.output,
-                        },
-                        ddata.reborrow(),
-                    );
+                    handler.output_mode_updated(&surface_data.output, mode);
 
                     surface_data.rerender = true;
                     timer_handle.add_timeout(Duration::ZERO, ());
@@ -401,7 +365,8 @@ where
                             .iter_mut()
                             .find(|sd| sd.window.id() == window_id)
                             .unwrap();
-                        (input_cb.borrow_mut())(event, &surface_data.output, ddata.reborrow());
+
+                        handler.process_input_event(event, Some(&surface_data.output));
                     }
                 }
             }

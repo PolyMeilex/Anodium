@@ -1,6 +1,10 @@
 use std::sync::atomic::Ordering;
 
-use crate::{framework::backend::BackendRequest, output_manager::Output, Anodium};
+use crate::{
+    framework::backend::{BackendRequest, InputHandler},
+    output_manager::Output,
+    Anodium,
+};
 
 use smithay::{
     backend::input::{
@@ -15,13 +19,13 @@ use smithay::{
     },
 };
 
-impl Anodium {
-    pub fn process_input_event<I: InputBackend>(
+impl InputHandler for Anodium {
+    fn process_input_event<I: InputBackend>(
         &mut self,
         event: InputEvent<I>,
         output: Option<&Output>,
     ) {
-        let _captured = match &event {
+        match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
                 if action == KeyAction::Filtred {
@@ -31,14 +35,12 @@ impl Anodium {
                     self.input_state.keyboard.is_focused()
                 } else {
                     true
-                }
+                };
             }
             InputEvent::PointerMotion { event, .. } => {
                 self.input_state.pointer_location =
                     self.clamp_coords(self.input_state.pointer_location + event.delta());
                 self.on_pointer_move(event.time());
-                self.surface_under(self.input_state.pointer_location)
-                    .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output = output.cloned().unwrap_or_else(|| {
@@ -57,34 +59,19 @@ impl Anodium {
                 self.input_state.pointer_location =
                     event.position_transformed(output_size) + output_pos;
                 self.on_pointer_move(event.time());
-                self.surface_under(self.input_state.pointer_location)
-                    .is_none()
             }
             InputEvent::PointerButton { event, .. } => {
                 self.on_pointer_button::<I>(event);
-                self.surface_under(self.input_state.pointer_location)
-                    .is_none()
             }
             InputEvent::PointerAxis { event, .. } => {
                 self.on_pointer_axis::<I>(event);
-                self.surface_under(self.input_state.pointer_location)
-                    .is_none()
             }
-            _ => false,
+            _ => {}
         };
-
-        // if let Some(output) = self
-        //     .output_map
-        //     .find_by_position(self.input_state.pointer_location.to_i32_round())
-        // {
-        //     if captured {
-        //         self.process_imgui_event(event, &output);
-        //     } else {
-        //         self.reset_imgui_event(&output);
-        //     }
-        // }
     }
+}
 
+impl Anodium {
     fn keyboard_key_to_action<I: InputBackend>(&mut self, evt: &I::KeyboardKeyEvent) -> KeyAction {
         let keycode = evt.key_code();
         let state = evt.state();

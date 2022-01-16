@@ -42,8 +42,6 @@ use crate::{
     framework::shell::ShellManager,
     output_manager::{Output, OutputManager},
     render,
-    utils::AsWlSurface,
-    window::Window,
     workspace::Workspace,
 };
 
@@ -300,29 +298,6 @@ impl Anodium {
             xwayland,
             backend_tx,
             config_tx,
-        }
-    }
-
-    pub fn start(&mut self) {
-        let socket_name = self
-            .display
-            .borrow_mut()
-            .add_socket_auto()
-            .unwrap()
-            .into_string()
-            .unwrap();
-
-        info!("Listening on wayland socket"; "name" => socket_name.clone());
-        ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
-
-        #[cfg(feature = "xwayland")]
-        {
-            use crate::utils::LogResult;
-
-            self.xwayland
-                .start()
-                .log_err("Failed to start XWayland:")
-                .ok();
         }
     }
 }
