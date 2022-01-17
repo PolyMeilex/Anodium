@@ -1,5 +1,13 @@
 use std::io::Read;
 
+use smithay::{
+    backend::renderer::{
+        gles2::{Gles2Error, Gles2Frame, Gles2Renderer, Gles2Texture},
+        Frame, Texture,
+    },
+    desktop::space::{RenderElement, SpaceOutputTuple},
+    utils::{Logical, Point, Rectangle, Size, Transform},
+};
 use xcursor::{
     parser::{parse_xcursor, Image},
     CursorTheme,
@@ -102,4 +110,65 @@ fn load_icon(theme: &CursorTheme) -> Result<Vec<Image>, Error> {
     let mut cursor_data = Vec::new();
     cursor_file.read_to_end(&mut cursor_data)?;
     parse_xcursor(&cursor_data).ok_or(Error::Parse)
+}
+
+#[derive(Clone, Debug)]
+pub struct PointerElement {
+    texture: Gles2Texture,
+    position: Point<i32, Logical>,
+    size: Size<i32, Logical>,
+}
+
+impl PointerElement {
+    pub fn new(texture: Gles2Texture, relative_pointer_pos: Point<i32, Logical>) -> PointerElement {
+        let size = texture.size().to_logical(1, Transform::Normal);
+        PointerElement {
+            texture,
+            position: relative_pointer_pos,
+            size,
+        }
+    }
+}
+
+impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for PointerElement {
+    fn id(&self) -> usize {
+        0
+    }
+
+    fn geometry(&self) -> Rectangle<i32, Logical> {
+        Rectangle::from_loc_and_size(self.position, self.size)
+    }
+
+    fn accumulated_damage(
+        &self,
+        _: Option<SpaceOutputTuple<'_, '_>>,
+    ) -> Vec<Rectangle<i32, Logical>> {
+        vec![Rectangle::from_loc_and_size((0, 0), self.size)]
+    }
+
+    fn draw(
+        &self,
+        _renderer: &mut Gles2Renderer,
+        frame: &mut Gles2Frame,
+        scale: f64,
+        damage: &[Rectangle<i32, Logical>],
+        _log: &slog::Logger,
+    ) -> Result<(), Gles2Error> {
+        frame.render_texture_at(
+            &self.texture,
+            self.position
+                .to_f64()
+                .to_physical(scale as f64)
+                .to_i32_round(),
+            1,
+            scale as f64,
+            Transform::Normal,
+            &*damage
+                .iter()
+                .map(|rect| rect.to_buffer(1, Transform::Normal, &self.size))
+                .collect::<Vec<_>>(),
+            1.0,
+        )?;
+        Ok(())
+    }
 }

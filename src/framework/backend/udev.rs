@@ -18,7 +18,7 @@ use smithay::{
         libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{
             gles2::{Gles2Renderer, Gles2Texture},
-            Bind, Frame, ImportDma, ImportEgl, Renderer, Transform,
+            Bind, Frame, ImportDma, ImportEgl, Renderer,
         },
         session::{
             auto::{AutoSession, AutoSessionNotifier},
@@ -49,7 +49,7 @@ use smithay::{
     },
     utils::{
         signaling::{Linkable, SignalToken, Signaler},
-        Rectangle,
+        Rectangle, Transform,
     },
     wayland::{
         dmabuf::init_dmabuf_global,

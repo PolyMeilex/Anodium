@@ -35,7 +35,7 @@ use crate::{
     cli::AnodiumOptions,
     config::{eventloop::ConfigEvent, ConfigVM},
     framework::backend::BackendRequest,
-    framework::shell::ShellManager,
+    framework::{cursor::PointerElement, shell::ShellManager},
     output_manager::{Output, OutputManager},
     render,
     workspace::Workspace,
@@ -376,15 +376,18 @@ impl Anodium {
 
             if let Some(wl_cursor) = self.prepare_cursor_element(relative_location) {
                 elems.push(Box::new(wl_cursor));
+            } else if let Some(texture) = pointer_image {
+                elems.push(Box::new(PointerElement::new(
+                    texture.clone(),
+                    relative_location,
+                )));
             }
 
             if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
                 elems.push(Box::new(wl_dnd));
             }
-
-            // TODO:
-            let _todo = pointer_image;
         }
+
         let render_result = self
             .workspace
             .render_output(renderer, output, 0, [0.1, 0.1, 0.1, 1.0], &elems)
