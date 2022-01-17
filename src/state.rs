@@ -385,10 +385,17 @@ impl Anodium {
             // TODO:
             let _todo = pointer_image;
         }
-
-        self.workspace
+        let render_result = self
+            .workspace
             .render_output(renderer, output, 0, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
+
+        if let Some(render_result) = render_result {
+            if !render_result.is_empty() {
+                #[cfg(feature = "debug")]
+                output.tick_fps();
+            }
+        }
 
         Ok(())
     }
