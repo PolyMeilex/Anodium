@@ -394,7 +394,6 @@ impl Anodium {
             if !render_result.is_empty() {
                 #[cfg(feature = "debug")]
                 output.tick_fps();
-                return Err(smithay::backend::SwapBuffersError::AlreadySwapped);
             }
         }
 
