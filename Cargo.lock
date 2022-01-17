@@ -1619,7 +1619,7 @@ dependencies = [
 [[package]]
 name = "smithay-egui"
 version = "0.1.0"
-source = "git+https://github.com/dragonnn/smithay-egui?rev=1a8a03304eb8fdd5d770144de59f4ea9c0b94d56#1a8a03304eb8fdd5d770144de59f4ea9c0b94d56"
+source = "git+https://github.com/dragonnn/smithay-egui?rev=c2a931caed542eb82a7056dec506a40819c40e61#c2a931caed542eb82a7056dec506a40819c40e61"
 dependencies = [
  "egui",
  "lazy_static",
