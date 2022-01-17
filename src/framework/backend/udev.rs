@@ -265,7 +265,6 @@ struct OutputSurfaceData {
 
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
-    fps: fps_ticker::Fps,
     _connector_info: connector::Info,
     crtc: crtc::Handle,
 }
@@ -419,7 +418,6 @@ where
 
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
-                        fps: fps_ticker::Fps::default(),
                         _connector_info: connector_info,
                         crtc,
                     })));
@@ -796,8 +794,6 @@ where
 
     // and draw to our buffer
     handler.output_render(renderer, output, Some(pointer_image));
-
-    surface.fps.tick();
 
     surface
         .surface

@@ -34,8 +34,6 @@ struct OutputSurface {
     surface: X11Surface,
     window: smithay::backend::x11::Window,
 
-    fps: fps_ticker::Fps,
-
     _output_name: String,
     output: Output,
     mode: Mode,
@@ -111,8 +109,6 @@ impl OutputSurfaceBuilder {
         OutputSurface {
             surface: self.surface,
             window: self.window,
-
-            fps: fps_ticker::Fps::default(),
             mode,
             _output_name: "X11(1)".into(),
             output,
@@ -271,8 +267,6 @@ where
                             // }
                         }
                     }
-
-                    surface_data.fps.tick();
                 }
 
                 handler.send_frames();

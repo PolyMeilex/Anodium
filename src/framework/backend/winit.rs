@@ -114,8 +114,6 @@ where
     let timer = Timer::new().unwrap();
     let timer_handle = timer.handle();
 
-    let fps = fps_ticker::Fps::default();
-
     event_loop
         .handle()
         .insert_source(timer, move |_: (), timer_handle, handler| {
@@ -145,8 +143,6 @@ where
                     }
 
                     handler.send_frames();
-
-                    fps.tick();
 
                     timer_handle.add_timeout(Duration::from_millis(16), ());
                 }

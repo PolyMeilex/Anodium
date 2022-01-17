@@ -47,6 +47,9 @@ struct Data {
 
     egui: RefCell<EguiState>,
     egui_shell: Shell,
+
+    #[cfg(feature = "debug")]
+    fps_ticker: fps_ticker::Fps,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,6 +104,7 @@ impl Output {
             possible_modes: RefCell::new(possible_modes),
             egui: RefCell::new(egui),
             egui_shell: Shell::new(),
+            fps_ticker: fps_ticker::Fps::default(),
         });
         assert!(added);
 
@@ -158,6 +162,16 @@ impl Output {
             start_time,
             *modifiers,
         )
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn tick_fps(&self) {
+        self.data().fps_ticker.tick();
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_fps(&self) -> u32 {
+        self.data().fps_ticker.avg().round() as u32
     }
 }
 

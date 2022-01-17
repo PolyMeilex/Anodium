@@ -68,7 +68,7 @@ impl ConfigVM {
 
         let ast = engine.compile_file(config)?;
 
-        engine.eval_ast_with_scope(&mut scope, &ast)?;
+        let _ignore: Dynamic = engine.eval_ast_with_scope(&mut scope, &ast)?;
 
         Ok(ConfigVM {
             inner: Rc::new(RefCell::new(Inner { engine, ast, scope })),
