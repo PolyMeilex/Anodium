@@ -5,6 +5,7 @@ pub mod winit;
 #[cfg(feature = "x11")]
 pub mod x11;
 
+use anodium_protocol::server::AnodiumProtocol;
 use smithay::backend::input::{InputBackend, InputEvent};
 use smithay::backend::renderer::gles2::{Gles2Renderer, Gles2Texture};
 use smithay::backend::session::{auto::AutoSession, Session};
@@ -57,6 +58,11 @@ pub trait InputHandler {
 }
 
 pub trait BackendHandler: OutputHandler + InputHandler {
+    // TODO(poly): I'm not a huge fan of mixing backend code with anodium specific stuff
+    // This getter is used for output creation,
+    // so maybe use SmithayOutput only in backend?
+    fn anodium_protocol(&mut self) -> &mut AnodiumProtocol;
+
     fn send_frames(&mut self);
 
     fn start_compositor(&mut self);

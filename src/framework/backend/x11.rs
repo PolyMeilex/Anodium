@@ -100,6 +100,7 @@ impl OutputSurfaceBuilder {
 
         let output = Output::new(
             display,
+            handler.anodium_protocol(),
             descriptor,
             wl_output::Transform::Normal,
             mode,

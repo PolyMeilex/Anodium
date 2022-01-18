@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+anodium-protocol = { path = "./anodium-protocol", features = ["server"] }
+
 bitflags = "1.2.1"
 input = { version = "0.7.0", features = ["udev"], optional = true }
 thiserror = "1"
@@ -68,7 +70,6 @@ features = ["executor", "futures-io"]
 [dependencies.smithay-egui]
 git = "https://github.com/dragonnn/smithay-egui"
 rev = "c2a931caed542eb82a7056dec506a40819c40e61"
-
 
 
 [features]

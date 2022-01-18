@@ -1,3 +1,4 @@
+use anodium_protocol::server::AnodiumProtocol;
 use smithay::{desktop, wayland::output};
 use std::sync::atomic::Ordering;
 
@@ -54,6 +55,10 @@ impl OutputHandler for Anodium {
 }
 
 impl BackendHandler for Anodium {
+    fn anodium_protocol(&mut self) -> &mut AnodiumProtocol {
+        &mut self.anodium_protocol
+    }
+
     fn send_frames(&mut self) {
         let time = self.start_time.elapsed().as_millis() as u32;
 

@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell, RefMut};
 use std::time::Instant;
 
+use anodium_protocol::server::{AnodiumProtocol, AnodiumProtocolOutput};
 use calloop::channel::Sender;
 use smithay::desktop;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
@@ -42,6 +43,8 @@ impl Clone for OutputDescriptor {
 }
 
 struct Data {
+    _anodium_protocol_output: AnodiumProtocolOutput,
+
     pending_mode_change: Cell<bool>,
     possible_modes: RefCell<Vec<Mode>>,
 
@@ -70,6 +73,7 @@ impl Output {
 impl Output {
     pub fn new(
         display: &mut Display,
+        anodium_protocol: &mut AnodiumProtocol,
         desc: OutputDescriptor,
         transform: wl_output::Transform,
         mode: Mode,
@@ -81,6 +85,9 @@ impl Output {
             desc.physical_properties,
             slog_scope::logger(),
         );
+
+        let mut anodium_protocol_output = anodium_protocol.new_output();
+        anodium_protocol_output.set_name(output.name());
 
         output.change_current_state(Some(mode), Some(transform), None, None);
         output.set_preferred(mode);
@@ -100,6 +107,8 @@ impl Output {
         egui.context().set_visuals(visuals);
 
         let added = output.user_data().insert_if_missing(move || Data {
+            _anodium_protocol_output: anodium_protocol_output,
+
             pending_mode_change: Default::default(),
             possible_modes: RefCell::new(possible_modes),
             egui: RefCell::new(egui),

@@ -4,25 +4,32 @@ version = "0.1.0"
 edition = "2021"
 
 [build-dependencies]
-wayland-scanner="0.29.1"
+wayland-scanner = "0.29.1"
 
 [dependencies]
-wayland-server="0.29.1"
-wayland-client="0.29.1"
-wayland-commons="0.29.1"
+wayland-server = { version = "0.29", optional = true }
+wayland-client = { version = "0.29", optional = true }
+wayland-commons = "0.29.1"
 
-calloop={ version="0.9.1", optional=true }
-glib ={ version="0.14.8", optional=true }
+calloop = { version = "0.9.1", optional = true }
+glib = { version = "0.15.2", optional = true }
 
 [features]
-default=["calloop-adapter", "glib-adapter"]
-calloop-adapter=["calloop"]
-glib-adapter=["glib"]
+default = []
+server = ["wayland-server"]
+client = ["wayland-client"]
+
+calloop-adapter = ["calloop"]
+glib-adapter = ["glib"]
 
 [[example]]
-name="calloop_client"
+name = "calloop_client"
 required-features = ["calloop-adapter"]
 
 [[example]]
-name="glib_client"
+name = "glib_client"
 required-features = ["glib-adapter"]
+
+[[example]]
+name = "server"
+required-features = ["server", "calloop-adapter"]

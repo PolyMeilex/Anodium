@@ -47,7 +47,7 @@ fn main() {
 
     insert_wayland_source(event_loop.handle(), &display).unwrap();
 
-    let mut anodium_protocol = AnodiumProtocol::init(&mut display);
+    let (mut anodium_protocol, _) = AnodiumProtocol::init(&mut display);
 
     let mut out1 = anodium_protocol.new_output();
     out1.set_name("HDMI-1");

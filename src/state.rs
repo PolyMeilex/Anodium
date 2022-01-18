@@ -9,6 +9,7 @@ use std::{
     time::Instant,
 };
 
+use anodium_protocol::server::AnodiumProtocol;
 use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     desktop::{
@@ -76,6 +77,7 @@ pub struct Anodium {
     pub config: ConfigVM,
 
     // Desktop
+    pub anodium_protocol: AnodiumProtocol,
     pub output_map: OutputManager,
 
     pub workspace: Workspace,
@@ -240,6 +242,8 @@ impl Anodium {
 
         let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, seat_name.clone());
 
+        let (anodium_protocol, _global) = AnodiumProtocol::init(&mut display.borrow_mut());
+
         #[cfg(feature = "xwayland")]
         let xwayland = Self::init_xwayland_connection(&handle, &display);
 
@@ -284,6 +288,7 @@ impl Anodium {
 
             config,
 
+            anodium_protocol,
             output_map,
             workspace: Workspace::new(),
 

@@ -32,11 +32,10 @@ struct Inner {
 
 pub struct AnodiumProtocol {
     inner: Rc<RefCell<Inner>>,
-    pub global: Global<AnodiumWorkspaceManager>,
 }
 
 impl AnodiumProtocol {
-    pub fn init(display: &mut Display) -> AnodiumProtocol {
+    pub fn init(display: &mut Display) -> (AnodiumProtocol, Global<AnodiumWorkspaceManager>) {
         let inner = Rc::new(RefCell::new(Inner::default()));
 
         let global: Global<AnodiumWorkspaceManager> = display.create_global(1, {
@@ -64,7 +63,7 @@ impl AnodiumProtocol {
             )
         });
 
-        AnodiumProtocol { inner, global }
+        (AnodiumProtocol { inner }, global)
     }
 
     pub fn new_output(&mut self) -> AnodiumProtocolOutput {

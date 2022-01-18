@@ -557,6 +557,7 @@ fn device_added<D>(
 
                     let output = Output::new(
                         &mut inner.display.borrow_mut(),
+                        handler.anodium_protocol(),
                         output_descriptor.clone(),
                         wl_output::Transform::Normal,
                         output_surface.wl_mode,

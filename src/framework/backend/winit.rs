@@ -100,6 +100,7 @@ where
 
     let output = Output::new(
         &mut *display.borrow_mut(),
+        handler.anodium_protocol(),
         descriptor,
         wl_output::Transform::Flipped180,
         mode,
