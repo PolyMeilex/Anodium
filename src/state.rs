@@ -60,7 +60,7 @@ pub struct Anodium {
     pub running: Arc<AtomicBool>,
     pub display: Rc<RefCell<Display>>,
 
-    pub shell_manager: ShellManager,
+    pub shell_manager: ShellManager<Self>,
 
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
     pub cursor_status: Arc<Mutex<CursorImageStatus>>,
@@ -237,11 +237,7 @@ impl Anodium {
 
         let dnd_icon = Self::init_data_device(&display);
 
-        let shell_manager =
-            ShellManager::init_shell(&mut display.borrow_mut(), |event, mut ddata| {
-                let state = ddata.get::<Anodium>().unwrap();
-                state.on_shell_event(event);
-            });
+        let shell_manager = ShellManager::init_shell(&mut display.borrow_mut());
 
         let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, seat_name.clone());
 

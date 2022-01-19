@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use smithay::{
     desktop::Kind,
-    reexports::{wayland_protocols::xdg_shell::server::xdg_toplevel, wayland_server::DispatchData},
+    reexports::wayland_protocols::xdg_shell::server::xdg_toplevel,
     wayland::{
         compositor,
         seat::{GrabStartData, Seat},
@@ -11,14 +11,20 @@ use smithay::{
     },
 };
 
-use super::super::surface_data::{MoveAfterResizeState, ResizeState, SurfaceData};
+use super::{
+    super::surface_data::{MoveAfterResizeState, ResizeState, SurfaceData},
+    ShellHandler,
+};
 
 use crate::{popup::PopupSurface, utils::AsWlSurface, window::WindowSurface};
 
 use super::ShellEvent;
 
-impl super::Inner {
-    pub fn xdg_shell_request(&mut self, request: XdgRequest, ddata: DispatchData) {
+impl<D> super::Inner<D>
+where
+    D: ShellHandler,
+{
+    pub fn xdg_shell_request(&mut self, request: XdgRequest, handler: &mut D) {
         match request {
             //
             // Toplevel
@@ -36,15 +42,12 @@ impl super::Inner {
                 let seat = Seat::from_resource(&seat).unwrap();
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
-                    (self.cb)(
-                        ShellEvent::WindowMove {
-                            toplevel: Kind::Xdg(surface),
-                            start_data,
-                            seat,
-                            serial,
-                        },
-                        ddata,
-                    );
+                    handler.on_shell_event(ShellEvent::WindowMove {
+                        toplevel: Kind::Xdg(surface),
+                        start_data,
+                        seat,
+                        serial,
+                    });
                 }
             }
             XdgRequest::Resize {
@@ -56,61 +59,43 @@ impl super::Inner {
                 let seat = Seat::from_resource(&seat).unwrap();
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
-                    (self.cb)(
-                        ShellEvent::WindowResize {
-                            toplevel: Kind::Xdg(surface),
-                            start_data,
-                            seat,
-                            edges: edges.into(),
-                            serial,
-                        },
-                        ddata,
-                    );
+                    handler.on_shell_event(ShellEvent::WindowResize {
+                        toplevel: Kind::Xdg(surface),
+                        start_data,
+                        seat,
+                        edges: edges.into(),
+                        serial,
+                    });
                 }
             }
 
             XdgRequest::Maximize { surface } => {
-                (self.cb)(
-                    ShellEvent::WindowMaximize {
-                        toplevel: Kind::Xdg(surface),
-                    },
-                    ddata,
-                );
+                handler.on_shell_event(ShellEvent::WindowMaximize {
+                    toplevel: Kind::Xdg(surface),
+                });
             }
             XdgRequest::UnMaximize { surface } => {
-                (self.cb)(
-                    ShellEvent::WindowUnMaximize {
-                        toplevel: Kind::Xdg(surface),
-                    },
-                    ddata,
-                );
+                handler.on_shell_event(ShellEvent::WindowUnMaximize {
+                    toplevel: Kind::Xdg(surface),
+                });
             }
 
             XdgRequest::Fullscreen { surface, output } => {
-                (self.cb)(
-                    ShellEvent::WindowFullscreen {
-                        toplevel: Kind::Xdg(surface),
-                        output,
-                    },
-                    ddata,
-                );
+                handler.on_shell_event(ShellEvent::WindowFullscreen {
+                    toplevel: Kind::Xdg(surface),
+                    output,
+                });
             }
             XdgRequest::UnFullscreen { surface } => {
-                (self.cb)(
-                    ShellEvent::WindowUnFullscreen {
-                        toplevel: Kind::Xdg(surface),
-                    },
-                    ddata,
-                );
+                handler.on_shell_event(ShellEvent::WindowUnFullscreen {
+                    toplevel: Kind::Xdg(surface),
+                });
             }
 
             XdgRequest::Minimize { surface } => {
-                (self.cb)(
-                    ShellEvent::WindowMinimize {
-                        toplevel: Kind::Xdg(surface),
-                    },
-                    ddata,
-                );
+                handler.on_shell_event(ShellEvent::WindowMinimize {
+                    toplevel: Kind::Xdg(surface),
+                });
             }
 
             //
@@ -128,15 +113,12 @@ impl super::Inner {
                 let seat = Seat::from_resource(&seat).unwrap();
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
-                    (self.cb)(
-                        ShellEvent::PopupGrab {
-                            popup: PopupSurface::Xdg(surface),
-                            start_data,
-                            seat,
-                            serial,
-                        },
-                        ddata,
-                    );
+                    handler.on_shell_event(ShellEvent::PopupGrab {
+                        popup: PopupSurface::Xdg(surface),
+                        start_data,
+                        seat,
+                        serial,
+                    });
                 }
             }
             XdgRequest::RePosition { .. } => {
@@ -152,15 +134,12 @@ impl super::Inner {
                 serial,
                 location,
             } => {
-                (self.cb)(
-                    ShellEvent::ShowWindowMenu {
-                        toplevel: Kind::Xdg(surface),
-                        seat: Seat::from_resource(&seat).unwrap(),
-                        serial,
-                        location,
-                    },
-                    ddata,
-                );
+                handler.on_shell_event(ShellEvent::ShowWindowMenu {
+                    toplevel: Kind::Xdg(surface),
+                    seat: Seat::from_resource(&seat).unwrap(),
+                    serial,
+                    location,
+                });
             }
 
             XdgRequest::AckConfigure {

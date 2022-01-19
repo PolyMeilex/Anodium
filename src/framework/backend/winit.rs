@@ -7,7 +7,7 @@ use smithay::{
     },
     reexports::{
         calloop::{channel, timer::Timer, EventLoop},
-        wayland_server::{protocol::wl_output, Display},
+        wayland_server::protocol::wl_output,
     },
     wayland::{
         dmabuf::init_dmabuf_global,

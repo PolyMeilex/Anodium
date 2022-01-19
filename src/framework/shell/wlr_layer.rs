@@ -1,12 +1,12 @@
-use smithay::{
-    desktop::LayerSurface, reexports::wayland_server::DispatchData,
-    wayland::shell::wlr_layer::LayerShellRequest,
-};
+use smithay::{desktop::LayerSurface, wayland::shell::wlr_layer::LayerShellRequest};
 
-use super::ShellEvent;
+use super::{ShellEvent, ShellHandler};
 
-impl super::Inner {
-    pub fn wlr_layer_shell_request(&mut self, request: LayerShellRequest, ddata: DispatchData) {
+impl<D> super::Inner<D>
+where
+    D: ShellHandler,
+{
+    pub fn wlr_layer_shell_request(&mut self, request: LayerShellRequest, handler: &mut D) {
         match request {
             LayerShellRequest::NewLayerSurface {
                 surface,
@@ -19,18 +19,15 @@ impl super::Inner {
                 // TODO: Wait for first commit
                 self.layers.push(surface.clone());
 
-                (self.cb)(
-                    ShellEvent::LayerCreated {
-                        surface,
-                        output,
-                        layer,
-                        namespace,
-                    },
-                    ddata,
-                );
+                handler.on_shell_event(ShellEvent::LayerCreated {
+                    surface,
+                    output,
+                    layer,
+                    namespace,
+                });
             }
             LayerShellRequest::AckConfigure { surface, configure } => {
-                (self.cb)(ShellEvent::LayerAckConfigure { surface, configure }, ddata);
+                handler.on_shell_event(ShellEvent::LayerAckConfigure { surface, configure });
             }
         }
     }

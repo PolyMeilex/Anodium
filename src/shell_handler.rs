@@ -6,7 +6,7 @@ use smithay::{
 
 use crate::{
     framework::{
-        shell::ShellEvent,
+        shell::{ShellEvent, ShellHandler},
         surface_data::{ResizeData, ResizeState, SurfaceData},
     },
     grabs::{MoveSurfaceGrab, ResizeSurfaceGrab},
@@ -14,8 +14,8 @@ use crate::{
     state::Anodium,
 };
 
-impl Anodium {
-    pub fn on_shell_event(&mut self, event: ShellEvent) {
+impl ShellHandler for Anodium {
+    fn on_shell_event(&mut self, event: ShellEvent) {
         match event {
             //
             // Toplevel
@@ -134,7 +134,9 @@ impl Anodium {
             _ => {}
         }
     }
+}
 
+impl Anodium {
     pub fn surface_under(
         &self,
         point: Point<f64, Logical>,

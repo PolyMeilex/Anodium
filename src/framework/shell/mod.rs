@@ -11,6 +11,7 @@ use smithay::wayland::shell::wlr_layer::{
 use smithay::wayland::shell::xdg::xdg_shell_init;
 use smithay::wayland::Serial;
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Mutex;
 
@@ -29,6 +30,10 @@ mod xdg;
 pub mod xwayland;
 #[cfg(feature = "xwayland")]
 pub use xwayland::X11Surface;
+
+pub trait ShellHandler {
+    fn on_shell_event(&mut self, event: ShellEvent);
+}
 
 pub enum ShellEvent {
     WindowCreated {
@@ -117,18 +122,21 @@ pub enum ShellEvent {
     },
 }
 
-struct Inner {
-    cb: Box<dyn FnMut(ShellEvent, DispatchData)>,
+struct Inner<D> {
     not_mapped_list: NotMappedList,
     windows: ShellWindowList,
     layers: ShellLayerList,
 
     popup_manager: PopupManager,
+    _pd: PhantomData<D>,
 }
 
-impl Inner {
+impl<D> Inner<D>
+where
+    D: ShellHandler + 'static,
+{
     // Try to updated mapped surface
-    fn try_update_mapped(&mut self, surface: &WlSurface, ddata: DispatchData) {
+    fn try_update_mapped(&mut self, surface: &WlSurface, handler: &mut D) {
         if let Some(window) = self.windows.find_mut(surface) {
             window.self_update();
 
@@ -182,22 +190,19 @@ impl Inner {
             });
 
             if let Some(new_location) = new_location {
-                (self.cb)(
-                    ShellEvent::WindowGotResized {
-                        window: window.desktop_window(),
-                        new_location,
-                    },
-                    ddata,
-                )
+                handler.on_shell_event(ShellEvent::WindowGotResized {
+                    window: window.desktop_window(),
+                    new_location,
+                })
             }
         }
     }
 
     // Try to map surface
-    fn try_map_unmaped(&mut self, surface: &WlSurface, mut ddata: DispatchData) {
+    fn try_map_unmaped(&mut self, surface: &WlSurface, handler: &mut D) {
         if let Some(window) = self.not_mapped_list.try_window_map(surface) {
             self.windows.push(window.clone());
-            (self.cb)(ShellEvent::WindowCreated { window }, ddata.reborrow());
+            handler.on_shell_event(ShellEvent::WindowCreated { window });
         }
 
         if let Some(popup) = self.not_mapped_list.try_popup_map(surface) {
@@ -228,18 +233,17 @@ impl Inner {
                 }
 
                 if added {
-                    (self.cb)(
-                        ShellEvent::PopupCreated {
-                            popup: popup_surface,
-                        },
-                        ddata,
-                    );
+                    handler.on_shell_event(ShellEvent::PopupCreated {
+                        popup: popup_surface,
+                    });
                 }
             }
         }
     }
 
     fn surface_commit(&mut self, surface: WlSurface, mut ddata: DispatchData) {
+        let handler = ddata.get::<D>().unwrap();
+
         #[cfg(feature = "xwayland")]
         self.xwayland_commit_hook(&surface);
 
@@ -262,10 +266,10 @@ impl Inner {
         }
 
         // Map unmaped windows
-        self.try_map_unmaped(&surface, ddata.reborrow());
+        self.try_map_unmaped(&surface, handler);
 
         // Update mapped windows
-        self.try_update_mapped(&surface, ddata.reborrow());
+        self.try_update_mapped(&surface, handler);
 
         // TODO:
         // if let Some(popup) = self.window_map.borrow().popups().find(surface) {
@@ -302,27 +306,27 @@ impl Inner {
             }
         }
 
-        (self.cb)(ShellEvent::SurfaceCommit { surface }, ddata);
+        let handler = ddata.get::<D>().unwrap();
+        handler.on_shell_event(ShellEvent::SurfaceCommit { surface });
     }
 }
 
-pub struct ShellManager {
-    inner: Rc<RefCell<Inner>>,
+pub struct ShellManager<D> {
+    inner: Rc<RefCell<Inner<D>>>,
 }
 
-impl ShellManager {
-    pub fn init_shell<F>(display: &mut Display, cb: F) -> Self
+impl<D> ShellManager<D> {
+    pub fn init_shell(display: &mut Display) -> Self
     where
-        F: FnMut(ShellEvent, DispatchData) + 'static,
+        D: ShellHandler + 'static,
     {
-        let cb = Box::new(cb);
         let inner = Rc::new(RefCell::new(Inner {
-            cb,
             not_mapped_list: Default::default(),
             windows: Default::default(),
             layers: Default::default(),
 
             popup_manager: PopupManager::new(slog_scope::logger()),
+            _pd: PhantomData::<D>,
         }));
 
         // Create the compositor
@@ -340,7 +344,11 @@ impl ShellManager {
             display,
             {
                 let inner = inner.clone();
-                move |request, ddata| inner.borrow_mut().xdg_shell_request(request, ddata)
+                move |request, mut ddata| {
+                    inner
+                        .borrow_mut()
+                        .xdg_shell_request(request, ddata.get().unwrap());
+                }
             },
             slog_scope::logger(),
         );
@@ -350,7 +358,11 @@ impl ShellManager {
             display,
             {
                 let inner = inner.clone();
-                move |request, ddata| inner.borrow_mut().wlr_layer_shell_request(request, ddata)
+                move |request, mut ddata| {
+                    inner
+                        .borrow_mut()
+                        .wlr_layer_shell_request(request, ddata.get().unwrap())
+                }
             },
             slog_scope::logger(),
         );
