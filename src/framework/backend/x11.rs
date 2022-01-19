@@ -235,7 +235,7 @@ where
                         continue;
                     }
 
-                    let (buffer, _age) = surface_data
+                    let (buffer, age) = surface_data
                         .surface
                         .buffer()
                         .expect("gbm device was destroyed");
@@ -244,7 +244,12 @@ where
                     }
 
                     let res: Result<(), ()> = {
-                        handler.output_render(&mut renderer, &surface_data.output, None);
+                        handler.output_render(
+                            &mut renderer,
+                            &surface_data.output,
+                            age as usize,
+                            None,
+                        );
                         Ok(())
                     };
 

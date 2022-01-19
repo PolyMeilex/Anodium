@@ -48,9 +48,10 @@ impl OutputHandler for Anodium {
         &mut self,
         renderer: &mut smithay::backend::renderer::gles2::Gles2Renderer,
         output: &Output,
+        age: usize,
         pointer_image: Option<&smithay::backend::renderer::gles2::Gles2Texture>,
     ) {
-        self.render(renderer, output, pointer_image).ok();
+        self.render(renderer, output, age, pointer_image).ok();
     }
 }
 

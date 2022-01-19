@@ -790,11 +790,11 @@ where
         }
     }
 
-    let (dmabuf, _age) = surface.surface.next_buffer()?;
+    let (dmabuf, age) = surface.surface.next_buffer()?;
     renderer.bind(dmabuf)?;
 
     // and draw to our buffer
-    handler.output_render(renderer, output, Some(pointer_image));
+    handler.output_render(renderer, output, age as usize, Some(pointer_image));
 
     surface
         .surface

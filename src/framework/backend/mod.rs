@@ -44,6 +44,7 @@ pub trait OutputHandler {
         &mut self,
         renderer: &mut Gles2Renderer,
         output: &Output,
+        age: usize,
         pointer_image: Option<&Gles2Texture>,
     );
 }

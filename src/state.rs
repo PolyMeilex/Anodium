@@ -357,6 +357,7 @@ impl Anodium {
         &mut self,
         renderer: &mut Gles2Renderer,
         output: &Output,
+        age: usize,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<(), smithay::backend::SwapBuffersError> {
         let output_geometry = self.workspace.output_geometry(output).unwrap();
@@ -395,7 +396,7 @@ impl Anodium {
 
         let render_result = self
             .workspace
-            .render_output(renderer, output, 0, [0.1, 0.1, 0.1, 1.0], &elems)
+            .render_output(renderer, output, age, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
 
         if let Some(render_result) = render_result {
