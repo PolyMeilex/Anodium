@@ -10,6 +10,7 @@ use std::{
 };
 
 use anodium_protocol::server::AnodiumProtocol;
+use calloop::channel::{self, Channel};
 use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     desktop::{
@@ -216,13 +217,15 @@ impl Anodium {
     }
 
     pub fn new(
-        display: Rc<RefCell<Display>>,
         handle: LoopHandle<'static, Self>,
         seat_name: String,
-        backend_tx: Sender<BackendRequest>,
         options: AnodiumOptions,
-    ) -> Self {
+    ) -> (Self, Channel<BackendRequest>) {
         let log = slog_scope::logger();
+
+        let (backend_tx, backend_rx) = channel::channel();
+
+        let display = Rc::new(RefCell::new(Display::new()));
 
         // init the wayland connection
         Self::init_wayland_connection(&handle, &display);
@@ -258,48 +261,51 @@ impl Anodium {
         )
         .unwrap();
 
-        Self {
-            handle,
+        (
+            Self {
+                handle,
 
-            running: Arc::new(AtomicBool::new(true)),
+                running: Arc::new(AtomicBool::new(true)),
 
-            shell_manager,
-            display,
+                shell_manager,
+                display,
 
-            dnd_icon,
-            cursor_status,
+                dnd_icon,
+                cursor_status,
 
-            input_state: InputState {
-                pointer_location: (0.0, 0.0).into(),
-                pointer,
-                keyboard,
-                modifiers_state: Default::default(),
-                suppressed_keys: Vec::new(),
-                pressed_keys: HashSet::new(),
+                input_state: InputState {
+                    pointer_location: (0.0, 0.0).into(),
+                    pointer,
+                    keyboard,
+                    modifiers_state: Default::default(),
+                    suppressed_keys: Vec::new(),
+                    pressed_keys: HashSet::new(),
+                },
+
+                seat_name,
+                seat,
+
+                options,
+
+                start_time: Instant::now(),
+                last_update: Instant::now(),
+
+                config,
+
+                anodium_protocol,
+                output_map,
+                workspace: Workspace::new(),
+
+                active_workspace: None,
+                focused_window: Default::default(),
+
+                #[cfg(feature = "xwayland")]
+                xwayland,
+                backend_tx,
+                config_tx,
             },
-
-            seat_name,
-            seat,
-
-            options,
-
-            start_time: Instant::now(),
-            last_update: Instant::now(),
-
-            config,
-
-            anodium_protocol,
-            output_map,
-            workspace: Workspace::new(),
-
-            active_workspace: None,
-            focused_window: Default::default(),
-
-            #[cfg(feature = "xwayland")]
-            xwayland,
-            backend_tx,
-            config_tx,
-        }
+            backend_rx,
+        )
     }
 }
 

@@ -1,6 +1,6 @@
 use anodium_protocol::server::AnodiumProtocol;
-use smithay::{desktop, wayland::output};
-use std::sync::atomic::Ordering;
+use smithay::{desktop, reexports::wayland_server::Display, wayland::output};
+use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
 
 use crate::{
     framework::backend::{BackendHandler, OutputHandler},
@@ -58,6 +58,10 @@ impl OutputHandler for Anodium {
 impl BackendHandler for Anodium {
     fn anodium_protocol(&mut self) -> &mut AnodiumProtocol {
         &mut self.anodium_protocol
+    }
+
+    fn wl_display(&mut self) -> Rc<RefCell<Display>> {
+        self.display.clone()
     }
 
     fn send_frames(&mut self) {

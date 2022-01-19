@@ -4,7 +4,7 @@ use gumdrop::Options;
 
 use strum::EnumString;
 
-#[derive(Debug, EnumString)]
+#[derive(Debug, Clone, EnumString)]
 pub enum Backend {
     #[strum(serialize = "auto")]
     Auto,
@@ -16,7 +16,7 @@ pub enum Backend {
     Udev,
 }
 
-#[derive(Debug, Options)]
+#[derive(Debug, Clone, Options)]
 pub struct AnodiumOptions {
     #[options(help = "print help message")]
     help: bool,

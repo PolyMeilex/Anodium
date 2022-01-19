@@ -41,6 +41,7 @@ use std::sync::atomic::Ordering;
 
 fn main() {
     let options = cli::get_anodium_options();
+    let prefered_backend = options.backend.clone();
 
     std::env::set_var("RUST_LOG", "trace,smithay=error");
     let terminal_drain = slog_async::Async::default(slog_envlogger::new(
@@ -54,22 +55,21 @@ fn main() {
 
     let log = slog::Logger::root(
         slog::Duplicate::new(terminal_drain, shell_drain).fuse(),
-        //terminal_drain,
-        //std::sync::Mutex::new(slog_term::term_full().fuse()).fuse(),
         slog::o!(),
     );
     let _guard = slog_scope::set_global_logger(log.clone());
-    //let _guard = slog_envlogger::init().expect("Could not setup log backend");
     slog_stdlog::init().expect("Could not setup log backend");
 
-    //let _guard = slog_envlogger::new(_log);
-
-    //slog_scope::set_global_logger(_guard);
+    //
+    // Run The Compositor
+    //
 
     let mut event_loop = EventLoop::try_new().unwrap();
 
-    let anodium = framework::backend::auto(&mut event_loop, options);
-    let anodium = anodium.expect("Could not create a backend!");
+    let (mut anodium, rx) = Anodium::new(event_loop.handle(), "seat0".into(), options);
+
+    framework::backend::auto(&mut event_loop, &mut anodium, rx, prefered_backend);
+
     run_loop(anodium, event_loop);
 }
 

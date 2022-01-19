@@ -93,7 +93,6 @@ struct UdevOutputId {
 type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
 
 pub fn run_udev<D>(
-    display: Rc<RefCell<Display>>,
     event_loop: &mut EventLoop<'static, D>,
     handler: &mut D,
     mut session: AutoSession,
@@ -106,6 +105,8 @@ where
     let log = slog_scope::logger();
 
     let session_signal = notifier.signaler();
+
+    let display = handler.wl_display();
 
     /*
      * Initialize the compositor

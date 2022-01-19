@@ -120,8 +120,6 @@ impl OutputSurfaceBuilder {
 }
 
 pub fn run_x11<D>(
-    display: Rc<RefCell<Display>>,
-
     event_loop: &mut EventLoop<'static, D>,
     handler: &mut D,
 
@@ -130,6 +128,8 @@ pub fn run_x11<D>(
 where
     D: BackendHandler + 'static,
 {
+    let display = handler.wl_display();
+
     event_loop
         .handle()
         .insert_source(rx, move |event, _, _| match event {
