@@ -2,9 +2,9 @@ use std::{
     cell::RefCell,
     rc::Rc,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
+use calloop::ping;
 use smithay::{
     backend::{
         drm::DrmNode,
@@ -13,7 +13,7 @@ use smithay::{
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },
     reexports::{
-        calloop::{channel, timer::Timer, EventLoop},
+        calloop::{channel, EventLoop},
         gbm,
         wayland_server::{protocol::wl_output, Display},
     },
@@ -217,12 +217,11 @@ where
 
     info!("Initialization completed, starting the main loop.");
 
-    let timer = Timer::new().unwrap();
-    let timer_handle = timer.handle();
+    let (render, source) = ping::make_ping().unwrap();
 
     event_loop
         .handle()
-        .insert_source(timer, {
+        .insert_source(source, {
             let surface_datas = surface_datas.clone();
             move |_: (), _timer_handle, handler| {
                 let mut renderer = renderer.borrow_mut();
@@ -279,7 +278,8 @@ where
             }
         })
         .unwrap();
-    timer_handle.add_timeout(Duration::ZERO, ());
+
+    render.ping();
 
     event_loop
         .handle()
@@ -315,7 +315,7 @@ where
                     handler.output_mode_updated(&surface_data.output, mode);
 
                     surface_data.rerender = true;
-                    timer_handle.add_timeout(Duration::ZERO, ());
+                    render.ping();
                 }
 
                 X11Event::PresentCompleted { window_id, .. }
@@ -326,7 +326,7 @@ where
                         .unwrap();
 
                     surface_data.rerender = true;
-                    timer_handle.add_timeout(Duration::ZERO, ());
+                    render.ping();
                 }
 
                 X11Event::Input(event) => {
