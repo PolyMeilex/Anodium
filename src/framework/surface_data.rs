@@ -5,7 +5,7 @@ use smithay::{
         wayland_protocols::xdg_shell::server::xdg_toplevel,
         wayland_server::protocol::{wl_shell_surface, wl_surface::WlSurface},
     },
-    utils::{Logical, Point, Rectangle, Size},
+    utils::{Logical, Point, Size},
     wayland::{compositor, Serial},
 };
 
@@ -13,7 +13,6 @@ use crate::utils::LogResult;
 
 #[derive(Default)]
 pub struct SurfaceData {
-    pub geometry: Option<Rectangle<i32, Logical>>,
     pub resize_state: ResizeState,
     pub move_after_resize_state: MoveAfterResizeState,
 }

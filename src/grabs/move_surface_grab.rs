@@ -37,7 +37,7 @@ impl PointerGrab for MoveSurfaceGrab {
 
         anodium
             .workspace
-            .map_window(&self.window, new_location.to_i32_round(), true);
+            .map_window(&self.window, new_location.to_i32_round(), false);
 
         // if let Some(window) = anodium.grabed_window.as_mut() {
         //     if let Some(surface) = window.toplevel().get_surface() {

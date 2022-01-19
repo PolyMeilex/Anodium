@@ -35,10 +35,10 @@ impl OutputManager {
 
     pub fn add(&mut self, space: &mut Workspace, output: &Output) {
         let loc = (
-            // space
-            //     .outputs()
-            //     .fold(0, |acc, o| acc + space.output_geometry(o).unwrap().size.w),
-            0, 0,
+            space
+                .outputs()
+                .fold(0, |acc, o| acc + space.output_geometry(o).unwrap().size.w),
+            0,
         );
 
         output.change_current_state(None, None, None, Some(loc.into()));

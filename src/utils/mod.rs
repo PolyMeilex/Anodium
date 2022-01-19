@@ -6,11 +6,6 @@ use smithay::{
     wayland::shell::xdg::{self, ToplevelSurface},
 };
 
-use crate::window::WindowSurface;
-
-// mod iterators;
-// pub use iterators::{VisibleWorkspaceIter, VisibleWorkspaceIterMut};
-
 pub trait AsWlSurface {
     fn as_surface(&self) -> Option<&WlSurface>;
 }
@@ -18,12 +13,6 @@ pub trait AsWlSurface {
 impl AsWlSurface for WlSurface {
     fn as_surface(&self) -> Option<&WlSurface> {
         Some(self)
-    }
-}
-
-impl AsWlSurface for WindowSurface {
-    fn as_surface(&self) -> Option<&WlSurface> {
-        self.get_surface()
     }
 }
 

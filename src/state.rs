@@ -67,7 +67,6 @@ pub struct Anodium {
 
     pub input_state: InputState,
 
-    pub seat_name: String,
     pub seat: Seat,
 
     pub options: AnodiumOptions,
@@ -79,7 +78,7 @@ pub struct Anodium {
 
     // Desktop
     pub anodium_protocol: AnodiumProtocol,
-    pub output_map: OutputManager,
+    pub output_manager: OutputManager,
 
     pub workspace: Workspace,
 
@@ -239,7 +238,7 @@ impl Anodium {
 
         let shell_manager = ShellManager::init_shell(&mut display.borrow_mut());
 
-        let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, seat_name.clone());
+        let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, seat_name);
 
         let (anodium_protocol, _global) = AnodiumProtocol::init(&mut display.borrow_mut());
 
@@ -278,7 +277,6 @@ impl Anodium {
                     pressed_keys: HashSet::new(),
                 },
 
-                seat_name,
                 seat,
 
                 options,
@@ -289,7 +287,7 @@ impl Anodium {
                 config,
 
                 anodium_protocol,
-                output_map,
+                output_manager: output_map,
                 workspace: Workspace::new(),
 
                 active_workspace: None,
@@ -366,12 +364,12 @@ impl Anodium {
 
         let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
 
-        let frame = output.render_egui_shell(
-            &self.start_time,
-            &self.input_state.modifiers_state,
-            &self.config_tx,
-        );
-        elems.push(Box::new(frame));
+        // let frame = output.render_egui_shell(
+        //     &self.start_time,
+        //     &self.input_state.modifiers_state,
+        //     &self.config_tx,
+        // );
+        // elems.push(Box::new(frame));
 
         // Pointer Related:
         if output_geometry

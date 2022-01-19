@@ -18,7 +18,7 @@ impl Anodium {
             ConfigEvent::SwitchWorkspace(_workspace) => todo!(),
             ConfigEvent::OutputsRearrange => {
                 self.config
-                    .output_rearrange(self.output_map.outputs().clone());
+                    .output_rearrange(self.output_manager.outputs().clone());
             }
             ConfigEvent::Shell(fnptr) => {
                 self.config.execute_fnptr(fnptr, ());

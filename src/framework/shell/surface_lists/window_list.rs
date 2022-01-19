@@ -10,22 +10,6 @@ impl ShellWindowList {
         self.windows.push(window)
     }
 
-    // pub fn find<S: AsWlSurface>(&self, surface: &S) -> Option<&Window> {
-    //     surface.as_surface().and_then(|surface| {
-    //         self.windows.iter().find_map(|w| {
-    //             if w.toplevel()
-    //                 .get_surface()
-    //                 .map(|s| s.as_ref().equals(surface.as_ref()))
-    //                 .unwrap_or(false)
-    //             {
-    //                 Some(w)
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    //     })
-    // }
-
     /// Finds the toplevel corresponding to the given `WlSurface`.
     pub fn find_mut<S: AsWlSurface>(&mut self, surface: &S) -> Option<&mut Window> {
         if let Some(surface) = surface.as_surface() {
@@ -43,10 +27,6 @@ impl ShellWindowList {
         } else {
             None
         }
-    }
-
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<Window> {
-        self.windows.iter_mut()
     }
 
     pub fn refresh(&mut self) {

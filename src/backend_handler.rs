@@ -21,15 +21,15 @@ impl OutputHandler for Anodium {
 
     fn output_created(&mut self, output: crate::output_manager::Output) {
         info!("OutputCreated: {}", output.name());
-        self.output_map.add(&mut self.workspace, &output);
+        self.output_manager.add(&mut self.workspace, &output);
 
         self.config.output_new(output.clone());
 
         if let Some(layout) = self
             .config
-            .output_rearrange(self.output_map.outputs().clone())
+            .output_rearrange(self.output_manager.outputs().clone())
         {
-            for (output, pos) in self.output_map.outputs().iter().zip(layout.iter()) {
+            for (output, pos) in self.output_manager.outputs().iter().zip(layout.iter()) {
                 let scale = self.workspace.output_scale(output).unwrap_or(1.0);
 
                 let (x, y) = *pos;

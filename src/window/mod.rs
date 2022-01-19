@@ -5,19 +5,12 @@ use smithay::desktop;
 use smithay::{
     desktop::Kind,
     reexports::{
-        wayland_protocols::xdg_shell::server::xdg_toplevel,
-        wayland_server::protocol::wl_surface::{self, WlSurface},
+        wayland_protocols::xdg_shell::server::xdg_toplevel, wayland_server::protocol::wl_surface,
     },
     utils::{Logical, Point, Rectangle},
 };
 
-use crate::{
-    framework::surface_data::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData},
-    popup::Popup,
-};
-
-mod window_surface;
-pub use window_surface::WindowSurface;
+use crate::framework::surface_data::{MoveAfterResizeData, MoveAfterResizeState, SurfaceData};
 
 #[derive(Debug, Clone)]
 pub struct Window {
@@ -25,18 +18,12 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn new(toplevel: WindowSurface, location: Point<i32, Logical>) -> Self {
-        let kind = match &toplevel {
-            WindowSurface::Xdg(xdg) => Kind::Xdg(xdg.clone()),
-        };
-
+    pub fn new(toplevel: Kind, location: Point<i32, Logical>) -> Self {
         let mut window = Window {
             inner: Rc::new(RefCell::new(Inner {
                 location,
 
-                popups: Vec::new(),
-
-                window: smithay::desktop::Window::new(kind),
+                window: smithay::desktop::Window::new(toplevel),
             })),
         };
         window.self_update();
@@ -64,26 +51,10 @@ impl Window {
 pub struct Inner {
     location: Point<i32, Logical>,
 
-    popups: Vec<Popup>,
-
     window: smithay::desktop::Window,
 }
 
 impl Inner {
-    pub fn popups(&self) -> &[Popup] {
-        &self.popups
-    }
-
-    pub fn add_popup(&mut self, popup: Popup) {
-        self.popups.push(popup);
-    }
-
-    pub fn find_popup_in_tree(&mut self, surface: &WlSurface) -> Option<&mut Popup> {
-        self.popups
-            .iter_mut()
-            .find_map(|popup| popup.find_popup_in_tree(surface))
-    }
-
     pub fn set_location(&mut self, location: Point<i32, Logical>) {
         self.location = location;
         // TODO: XWayland
@@ -196,32 +167,12 @@ impl Inner {
             return None;
         }
 
-        for popup in self.popups.iter() {
-            let found = popup.matching(self.location + self.geometry().loc, point);
-            if found.is_some() {
-                return found;
-            }
-        }
-
-        if !self.bbox_in_comp_space().to_f64().contains(point) {
-            return None;
-        }
-
         let wl_surface = self.window.toplevel().get_surface()?;
         smithay::desktop::utils::under_from_surface_tree(wl_surface, point, self.location)
-
-        // TODO:
-        // self.window.surface_under(point - self.location.to_f64())
     }
 
     pub fn self_update(&mut self) {
         self.window.refresh();
-
-        self.popups.retain(|popup| popup.popup_surface().alive());
-
-        for popup in self.popups.iter_mut() {
-            popup.self_update();
-        }
     }
 
     /// Returns the geometry of this window.
@@ -243,10 +194,6 @@ impl Window {
 
     pub fn borrow_mut(&mut self) -> RefMut<Inner> {
         self.inner.borrow_mut()
-    }
-
-    pub fn add_popup(&mut self, popup: Popup) {
-        self.inner.borrow_mut().add_popup(popup);
     }
 
     pub fn location(&self) -> Point<i32, Logical> {

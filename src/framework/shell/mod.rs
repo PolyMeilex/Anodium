@@ -8,14 +8,14 @@ use smithay::wayland::seat::{GrabStartData, Seat};
 use smithay::wayland::shell::wlr_layer::{
     wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
 };
-use smithay::wayland::shell::xdg::xdg_shell_init;
+use smithay::wayland::shell::xdg::{xdg_shell_init, XdgPopupSurfaceRoleAttributes};
 use smithay::wayland::Serial;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Mutex;
 
-use crate::popup::PopupSurface;
+use crate::popup::Popup;
 use crate::window::Window;
 
 use super::surface_data::{MoveAfterResizeState, ResizeData, ResizeEdge, ResizeState, SurfaceData};
@@ -83,11 +83,11 @@ pub enum ShellEvent {
     // Popup
     //
     PopupCreated {
-        popup: PopupSurface,
+        popup: Popup,
         // positioner: PositionerState,
     },
     PopupGrab {
-        popup: PopupSurface,
+        popup: PopupKind,
         start_data: GrabStartData,
         seat: Seat,
         serial: Serial,
@@ -205,38 +205,20 @@ where
             handler.on_shell_event(ShellEvent::WindowCreated { window });
         }
 
-        if let Some(popup) = self.not_mapped_list.try_popup_map(surface) {
-            self.popup_manager
-                .track_popup(PopupKind::Xdg({
-                    let PopupSurface::Xdg(xdg) = popup.popup_surface();
-                    xdg
-                }))
-                .unwrap();
-
-            if let Some(parent) = popup.popup_surface().parent() {
-                let popup_surface = popup.popup_surface();
-
-                let mut added = false;
-
-                if let Some(window) = self.windows.find_mut(&parent) {
-                    window.add_popup(popup);
-                    added = true;
-                } else {
-                    for window in self.windows.iter_mut() {
-                        let mut window = window.borrow_mut();
-                        if let Some(parent) = window.find_popup_in_tree(&parent) {
-                            parent.add_child(popup);
-                            added = true;
-                            break;
-                        }
-                    }
-                }
-
-                if added {
-                    handler.on_shell_event(ShellEvent::PopupCreated {
-                        popup: popup_surface,
-                    });
-                }
+        if let Some(popup) = self.popup_manager.find_popup(surface) {
+            let PopupKind::Xdg(ref popup) = popup;
+            let initial_configure_sent = compositor::with_states(surface, |states| {
+                states
+                    .data_map
+                    .get::<Mutex<XdgPopupSurfaceRoleAttributes>>()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .initial_configure_sent
+            })
+            .unwrap();
+            if !initial_configure_sent {
+                popup.send_configure().expect("Initial configure failed");
             }
         }
     }

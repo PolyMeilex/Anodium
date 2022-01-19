@@ -91,7 +91,7 @@ impl ShellHandler for Anodium {
                 window,
                 new_location,
             } => {
-                self.workspace.map_window(&window, new_location, true);
+                self.workspace.map_window(&window, new_location, false);
             }
 
             ShellEvent::WindowMaximize { .. } => {}

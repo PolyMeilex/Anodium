@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use smithay::{
-    desktop::Kind,
+    desktop::{Kind, PopupKind},
     reexports::wayland_protocols::xdg_shell::server::xdg_toplevel,
     wayland::{
         compositor,
@@ -16,7 +16,7 @@ use super::{
     ShellHandler,
 };
 
-use crate::{popup::PopupSurface, utils::AsWlSurface, window::WindowSurface};
+use crate::utils::AsWlSurface;
 
 use super::ShellEvent;
 
@@ -31,7 +31,7 @@ where
             //
             XdgRequest::NewToplevel { surface } => {
                 self.not_mapped_list
-                    .insert_window(WindowSurface::Xdg(surface), Default::default());
+                    .insert_window(Kind::Xdg(surface), Default::default());
             }
 
             XdgRequest::Move {
@@ -102,8 +102,9 @@ where
             // Popup
             //
             XdgRequest::NewPopup { surface, .. } => {
-                self.not_mapped_list
-                    .insert_popup(PopupSurface::Xdg(surface));
+                self.popup_manager
+                    .track_popup(PopupKind::Xdg(surface))
+                    .unwrap();
             }
             XdgRequest::Grab {
                 seat,
@@ -114,7 +115,7 @@ where
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
                     handler.on_shell_event(ShellEvent::PopupGrab {
-                        popup: PopupSurface::Xdg(surface),
+                        popup: PopupKind::Xdg(surface),
                         start_data,
                         seat,
                         serial,
