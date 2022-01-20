@@ -34,7 +34,7 @@ impl ShellWindowList {
         self.windows.retain(|w| w.toplevel().alive());
 
         for w in self.windows.iter_mut() {
-            w.self_update();
+            w.refresh();
         }
     }
 }

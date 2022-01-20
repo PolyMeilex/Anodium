@@ -2,7 +2,6 @@ use std::sync::Mutex;
 
 use smithay::desktop::Kind;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
-use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
@@ -17,9 +16,9 @@ pub struct NotMappedList {
 
 /// Toplevel Windows
 impl NotMappedList {
-    pub fn insert_window(&mut self, toplevel: Kind, location: Point<i32, Logical>) {
-        let mut window = Window::new(toplevel, location);
-        window.self_update();
+    pub fn insert_window(&mut self, toplevel: Kind) {
+        let window = Window::new(toplevel);
+        window.refresh();
         self.windows.push(window);
     }
 
@@ -44,7 +43,7 @@ impl NotMappedList {
 
     pub fn try_window_map(&mut self, surface: &WlSurface) -> Option<Window> {
         let toplevel = self.find_window_mut(surface).and_then(|win| {
-            win.self_update();
+            win.refresh();
 
             let toplevel = win.toplevel();
             // send the initial configure if relevant
@@ -97,12 +96,14 @@ impl NotMappedList {
             }
         });
 
-        toplevel.and_then(|toplevel| self.remove_window(&toplevel))
+        toplevel
+            .cloned()
+            .and_then(|toplevel| self.remove_window(&toplevel))
     }
 
     pub fn remove_window(&mut self, kind: &Kind) -> Option<Window> {
         let id = self.windows.iter().enumerate().find_map(|(id, win)| {
-            if &win.toplevel() == kind {
+            if win.toplevel() == kind {
                 Some(id)
             } else {
                 None

@@ -30,8 +30,7 @@ where
             // Toplevel
             //
             XdgRequest::NewToplevel { surface } => {
-                self.not_mapped_list
-                    .insert_window(Kind::Xdg(surface), Default::default());
+                self.not_mapped_list.insert_window(Kind::Xdg(surface));
             }
 
             XdgRequest::Move {

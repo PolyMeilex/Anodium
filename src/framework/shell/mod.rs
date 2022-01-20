@@ -138,9 +138,9 @@ where
     // Try to updated mapped surface
     fn try_update_mapped(&mut self, surface: &WlSurface, handler: &mut D) {
         if let Some(window) = self.windows.find_mut(surface) {
-            window.self_update();
+            window.refresh();
 
-            let geometry = window.geometry();
+            // let geometry = window.geometry();
             let new_location = SurfaceData::with_mut(surface, |data| {
                 let mut new_location = None;
 
@@ -152,23 +152,25 @@ where
                     | ResizeState::WaitingForCommit(resize_data) => {
                         let ResizeData {
                             edges,
-                            initial_window_location,
-                            initial_window_size,
+                            // initial_window_location,
+                            // initial_window_size,
+                            ..
                         } = resize_data;
 
                         if edges.intersects(ResizeEdge::TOP_LEFT) {
-                            let mut location = window.location();
+                            todo!("Move this to anodium, in order to have acces to location.");
+                            // let mut location = window.location();
 
-                            if edges.intersects(ResizeEdge::LEFT) {
-                                location.x = initial_window_location.x
-                                    + (initial_window_size.w - geometry.size.w);
-                            }
-                            if edges.intersects(ResizeEdge::TOP) {
-                                location.y = initial_window_location.y
-                                    + (initial_window_size.h - geometry.size.h);
-                            }
+                            // if edges.intersects(ResizeEdge::LEFT) {
+                            //     location.x = initial_window_location.x
+                            //         + (initial_window_size.w - geometry.size.w);
+                            // }
+                            // if edges.intersects(ResizeEdge::TOP) {
+                            //     location.y = initial_window_location.y
+                            //         + (initial_window_size.h - geometry.size.h);
+                            // }
 
-                            new_location = Some(location);
+                            // new_location = Some(location);
                         }
                     }
                     ResizeState::NotResizing => (),
@@ -191,7 +193,7 @@ where
 
             if let Some(new_location) = new_location {
                 handler.on_shell_event(ShellEvent::WindowGotResized {
-                    window: window.desktop_window(),
+                    window: window.desktop_window().clone(),
                     new_location,
                 })
             }

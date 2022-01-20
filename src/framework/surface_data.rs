@@ -85,6 +85,7 @@ pub struct MoveAfterResizeData {
 
 /// State of the resize operation.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[allow(dead_code)]
 pub enum MoveAfterResizeState {
     /// Idle
     None,
