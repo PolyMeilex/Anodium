@@ -33,6 +33,8 @@ pub use xwayland::X11Surface;
 
 pub trait ShellHandler {
     fn on_shell_event(&mut self, event: ShellEvent);
+
+    fn window_location(&self, window: &Window) -> Point<i32, Logical>;
 }
 
 pub enum ShellEvent {
@@ -140,7 +142,9 @@ where
         if let Some(window) = self.windows.find_mut(surface) {
             window.refresh();
 
-            // let geometry = window.geometry();
+            let geometry = window.geometry();
+            let location = handler.window_location(window);
+
             let new_location = SurfaceData::with_mut(surface, |data| {
                 let mut new_location = None;
 
@@ -152,25 +156,22 @@ where
                     | ResizeState::WaitingForCommit(resize_data) => {
                         let ResizeData {
                             edges,
-                            // initial_window_location,
-                            // initial_window_size,
-                            ..
+                            initial_window_location,
+                            initial_window_size,
                         } = resize_data;
 
+                        let mut location = location;
                         if edges.intersects(ResizeEdge::TOP_LEFT) {
-                            todo!("Move this to anodium, in order to have acces to location.");
-                            // let mut location = window.location();
+                            if edges.intersects(ResizeEdge::LEFT) {
+                                location.x = initial_window_location.x
+                                    + (initial_window_size.w - geometry.size.w);
+                            }
+                            if edges.intersects(ResizeEdge::TOP) {
+                                location.y = initial_window_location.y
+                                    + (initial_window_size.h - geometry.size.h);
+                            }
 
-                            // if edges.intersects(ResizeEdge::LEFT) {
-                            //     location.x = initial_window_location.x
-                            //         + (initial_window_size.w - geometry.size.w);
-                            // }
-                            // if edges.intersects(ResizeEdge::TOP) {
-                            //     location.y = initial_window_location.y
-                            //         + (initial_window_size.h - geometry.size.h);
-                            // }
-
-                            // new_location = Some(location);
+                            new_location = Some(location);
                         }
                     }
                     ResizeState::NotResizing => (),

@@ -12,6 +12,7 @@ use crate::{
     grabs::{MoveSurfaceGrab, ResizeSurfaceGrab},
     output_manager::Output,
     state::Anodium,
+    window::Window,
 };
 
 impl ShellHandler for Anodium {
@@ -132,6 +133,10 @@ impl ShellHandler for Anodium {
             }
             _ => {}
         }
+    }
+
+    fn window_location(&self, window: &Window) -> Point<i32, Logical> {
+        self.workspace.window_geometry(window).unwrap().loc
     }
 }
 
