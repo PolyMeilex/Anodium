@@ -13,10 +13,9 @@ pub struct Window {
 
 impl Window {
     pub fn new(toplevel: Kind) -> Self {
-        let window = Window {
+        Self {
             window: smithay::desktop::Window::new(toplevel),
-        };
-        window
+        }
     }
 
     pub fn desktop_window(&self) -> &desktop::Window {

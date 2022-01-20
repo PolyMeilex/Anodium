@@ -21,8 +21,7 @@ impl ShellHandler for Anodium {
             // Toplevel
             //
             ShellEvent::WindowCreated { window } => {
-                self.workspace
-                    .map_window(&window.desktop_window(), (0, 0), false);
+                self.workspace.map_window(&window, (0, 0), false);
             }
 
             ShellEvent::WindowMove {
