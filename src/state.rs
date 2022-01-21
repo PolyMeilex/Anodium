@@ -364,12 +364,12 @@ impl Anodium {
 
         let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
 
-        // let frame = output.render_egui_shell(
-        //     &self.start_time,
-        //     &self.input_state.modifiers_state,
-        //     &self.config_tx,
-        // );
-        // elems.push(Box::new(frame));
+        let frame = output.render_egui_shell(
+            &self.start_time,
+            &self.input_state.modifiers_state,
+            &self.config_tx,
+        );
+        elems.push(Box::new(frame));
 
         // Pointer Related:
         if output_geometry
