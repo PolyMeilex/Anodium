@@ -822,5 +822,7 @@ fn initial_render(
         .map_err(Into::<SwapBuffersError>::into)
         .and_then(|x| x.map_err(Into::<SwapBuffersError>::into))?;
     surface.queue_buffer()?;
+    surface.reset_buffers();
+
     Ok(())
 }
