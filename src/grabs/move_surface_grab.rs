@@ -6,7 +6,7 @@ use smithay::{
     },
     utils::{Logical, Point},
     wayland::{
-        seat::{AxisFrame, GrabStartData, PointerGrab, PointerInnerHandle},
+        seat::{AxisFrame, PointerGrab, PointerGrabStartData, PointerInnerHandle},
         Serial,
     },
 };
@@ -14,7 +14,7 @@ use smithay::{
 use crate::state::Anodium;
 
 pub struct MoveSurfaceGrab {
-    pub start_data: GrabStartData,
+    pub start_data: PointerGrabStartData,
 
     pub window: desktop::Window,
     pub initial_window_location: Point<i32, Logical>,
@@ -138,7 +138,7 @@ impl PointerGrab for MoveSurfaceGrab {
         handle.axis(details)
     }
 
-    fn start_data(&self) -> &GrabStartData {
+    fn start_data(&self) -> &PointerGrabStartData {
         &self.start_data
     }
 }

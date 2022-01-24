@@ -11,6 +11,7 @@ use smithay::{
         self, ButtonState, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent,
         PointerAxisEvent, PointerButtonEvent, PointerMotionAbsoluteEvent, PointerMotionEvent,
     },
+    desktop::WindowSurfaceType,
     reexports::wayland_server::protocol::wl_pointer,
     utils::{Logical, Point},
     wayland::{
@@ -118,11 +119,11 @@ impl Anodium {
 
             InputEvent::Keyboard { event } => {
                 //TODO - is that enough or do we need the whole code from here https://github.com/Smithay/smithay-egui/blob/main/examples/integrate.rs#L69 ?
-                output.egui().handle_keyboard(
-                    &[event.key_code()],
-                    event.state() == KeyState::Pressed,
-                    self.input_state.modifiers_state,
-                );
+                // output.egui().handle_keyboard(
+                //     event.key_code(),
+                //     event.state() == KeyState::Pressed,
+                //     self.input_state.modifiers_state,
+                // );
             }
 
             InputEvent::PointerAxis { event, .. } => output.egui().handle_pointer_axis(
@@ -236,7 +237,9 @@ impl Anodium {
 
                     self.update_focused_window(window.as_ref());
 
-                    let surface = window.and_then(|w| w.surface_under(point)).map(|s| s.0);
+                    let surface = window
+                        .and_then(|w| w.surface_under(point, WindowSurfaceType::ALL))
+                        .map(|s| s.0);
 
                     self.input_state
                         .keyboard

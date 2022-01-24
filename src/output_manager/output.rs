@@ -170,6 +170,7 @@ impl Output {
             1.0,
             start_time,
             *modifiers,
+            0,
         )
     }
 

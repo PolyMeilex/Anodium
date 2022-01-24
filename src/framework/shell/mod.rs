@@ -4,7 +4,7 @@ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{DispatchData, Display};
 use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor::{self, TraversalAction};
-use smithay::wayland::seat::{GrabStartData, Seat};
+use smithay::wayland::seat::{PointerGrabStartData, Seat};
 use smithay::wayland::shell::wlr_layer::{
     wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
 };
@@ -44,14 +44,14 @@ pub enum ShellEvent {
 
     WindowMove {
         toplevel: Kind,
-        start_data: GrabStartData,
+        start_data: PointerGrabStartData,
         seat: Seat,
         serial: Serial,
     },
 
     WindowResize {
         toplevel: Kind,
-        start_data: GrabStartData,
+        start_data: PointerGrabStartData,
         seat: Seat,
         edges: ResizeEdge,
         serial: Serial,
@@ -90,7 +90,7 @@ pub enum ShellEvent {
     },
     PopupGrab {
         popup: PopupKind,
-        start_data: GrabStartData,
+        start_data: PointerGrabStartData,
         seat: Seat,
         serial: Serial,
     },

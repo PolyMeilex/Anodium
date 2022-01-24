@@ -10,7 +10,7 @@ use smithay::{
     utils::{Logical, Point, Size},
     wayland::{
         compositor::with_states,
-        seat::{AxisFrame, GrabStartData, PointerGrab, PointerInnerHandle},
+        seat::{AxisFrame, PointerGrab, PointerGrabStartData, PointerInnerHandle},
         shell::xdg::SurfaceCachedState,
         Serial,
     },
@@ -19,7 +19,7 @@ use smithay::{
 use crate::framework::surface_data::{ResizeEdge, ResizeState, SurfaceData};
 
 pub struct ResizeSurfaceGrab {
-    pub start_data: GrabStartData,
+    pub start_data: PointerGrabStartData,
     pub window: desktop::Window,
     pub edges: ResizeEdge,
     pub initial_window_size: Size<i32, Logical>,
@@ -153,7 +153,7 @@ impl PointerGrab for ResizeSurfaceGrab {
         handle.axis(details)
     }
 
-    fn start_data(&self) -> &GrabStartData {
+    fn start_data(&self) -> &PointerGrabStartData {
         &self.start_data
     }
 }

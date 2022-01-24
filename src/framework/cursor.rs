@@ -151,6 +151,7 @@ impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for Poin
         _renderer: &mut Gles2Renderer,
         frame: &mut Gles2Frame,
         scale: f64,
+        _location: Point<i32, Logical>,
         damage: &[Rectangle<i32, Logical>],
         _log: &slog::Logger,
     ) -> Result<(), Gles2Error> {

@@ -5,7 +5,7 @@ use smithay::{
     reexports::wayland_protocols::xdg_shell::server::xdg_toplevel,
     wayland::{
         compositor,
-        seat::{GrabStartData, Seat},
+        seat::{PointerGrabStartData, Seat},
         shell::xdg::{Configure, XdgRequest, XdgToplevelSurfaceRoleAttributes},
         Serial,
     },
@@ -205,7 +205,11 @@ where
     }
 }
 
-fn check_grab<S: AsWlSurface>(seat: &Seat, serial: Serial, surface: &S) -> Option<GrabStartData> {
+fn check_grab<S: AsWlSurface>(
+    seat: &Seat,
+    serial: Serial,
+    surface: &S,
+) -> Option<PointerGrabStartData> {
     let surface = surface.as_surface()?;
     let pointer = seat.get_pointer()?;
 

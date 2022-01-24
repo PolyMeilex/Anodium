@@ -1,5 +1,5 @@
 use smithay::{
-    desktop,
+    desktop::{self, WindowSurfaceType},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
 };
@@ -149,7 +149,7 @@ impl Anodium {
 
         let window_loc = self.workspace.window_geometry(window).unwrap().loc;
         window
-            .surface_under(point - window_loc.to_f64())
+            .surface_under(point - window_loc.to_f64(), WindowSurfaceType::ALL)
             .map(|(s, loc)| (s, loc + window_loc))
     }
 }
