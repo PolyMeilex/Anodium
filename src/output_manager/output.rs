@@ -160,6 +160,7 @@ impl Output {
         let data = self.data();
         data.egui.borrow_mut().run(
             |ctx| {
+                //TODO - fix that in smithay, currently if crashes if egui does not have any element
                 egui::Area::new("main")
                     .anchor(egui::Align2::LEFT_TOP, (10.0, 10.0))
                     .show(ctx, |_ui| {});
