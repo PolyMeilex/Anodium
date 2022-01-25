@@ -160,6 +160,9 @@ impl Output {
         let data = self.data();
         data.egui.borrow_mut().run(
             |ctx| {
+                egui::Area::new("main")
+                    .anchor(egui::Align2::LEFT_TOP, (10.0, 10.0))
+                    .show(ctx, |_ui| {});
                 data.egui_shell.render(ctx, config_tx);
             },
             Rectangle::from_loc_and_size((0, 0), size.to_logical(scale)),
