@@ -92,7 +92,8 @@ impl Output {
         output.change_current_state(Some(mode), Some(transform), None, None);
         output.set_preferred(mode);
 
-        let egui = EguiState::new();
+        let mut egui = EguiState::new();
+        egui.set_zindex(0);
         let mut visuals = egui::style::Visuals {
             window_corner_radius: 0.0,
             ..Default::default()
@@ -167,7 +168,6 @@ impl Output {
             1.0,
             start_time,
             *modifiers,
-            0,
         )
     }
 
