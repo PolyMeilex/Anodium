@@ -796,7 +796,9 @@ where
     renderer.bind(dmabuf)?;
 
     // and draw to our buffer
-    handler.output_render(renderer, output, age as usize, Some(pointer_image));
+    handler
+        .output_render(renderer, output, age as usize, Some(pointer_image))
+        .ok();
 
     surface
         .surface

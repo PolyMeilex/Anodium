@@ -12,6 +12,7 @@ use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     backend::session::auto::AutoSession,
     reexports::{calloop::EventLoop, wayland_server::Display},
+    utils::{Logical, Rectangle},
     wayland,
 };
 
@@ -47,7 +48,7 @@ pub trait OutputHandler {
         output: &Output,
         age: usize,
         pointer_image: Option<&Gles2Texture>,
-    );
+    ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError>;
 }
 
 pub trait InputHandler {
