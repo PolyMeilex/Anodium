@@ -45,6 +45,7 @@ use crate::{
 
 pub struct InputState {
     pub pointer_location: Point<f64, Logical>,
+    pub old_pointer_location: Point<f64, Logical>,
     pub pointer: PointerHandle,
 
     pub keyboard: KeyboardHandle,
@@ -270,6 +271,7 @@ impl Anodium {
 
                 input_state: InputState {
                     pointer_location: (0.0, 0.0).into(),
+                    old_pointer_location: (0.0, 0.0).into(),
                     pointer,
                     keyboard,
                     modifiers_state: Default::default(),
@@ -386,8 +388,10 @@ impl Anodium {
                 elems.push(Box::new(PointerElement::new(
                     texture.clone(),
                     relative_location,
+                    self.input_state.pointer_location != self.input_state.old_pointer_location,
                 )));
             }
+            self.input_state.old_pointer_location = self.input_state.pointer_location;
 
             if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
                 elems.push(Box::new(wl_dnd));
@@ -399,11 +403,9 @@ impl Anodium {
             .render_output(renderer, output, age, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
 
-        if let Some(render_result) = render_result {
-            if !render_result.is_empty() {
-                #[cfg(feature = "debug")]
-                output.tick_fps();
-            }
+        if render_result.is_some() {
+            #[cfg(feature = "debug")]
+            output.tick_fps();
         }
 
         Ok(())

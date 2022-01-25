@@ -103,6 +103,7 @@ impl Output {
         visuals.widgets.hovered.corner_radius = 0.0;
         visuals.widgets.active.corner_radius = 0.0;
         visuals.widgets.open.corner_radius = 0.0;
+        visuals.window_shadow.extrusion = 0.0;
 
         egui.context().set_visuals(visuals);
 
@@ -158,10 +159,6 @@ impl Output {
         let data = self.data();
         data.egui.borrow_mut().run(
             |ctx| {
-                egui::Area::new("main")
-                    .anchor(egui::Align2::LEFT_TOP, (10.0, 10.0))
-                    .show(ctx, |_ui| {});
-
                 data.egui_shell.render(ctx, config_tx);
             },
             Rectangle::from_loc_and_size((0, 0), size.to_logical(scale)),
