@@ -117,15 +117,21 @@ pub struct PointerElement {
     texture: Gles2Texture,
     position: Point<i32, Logical>,
     size: Size<i32, Logical>,
+    damaged: bool,
 }
 
 impl PointerElement {
-    pub fn new(texture: Gles2Texture, relative_pointer_pos: Point<i32, Logical>) -> PointerElement {
+    pub fn new(
+        texture: Gles2Texture,
+        relative_pointer_pos: Point<i32, Logical>,
+        damaged: bool,
+    ) -> PointerElement {
         let size = texture.size().to_logical(1, Transform::Normal);
         PointerElement {
             texture,
             position: relative_pointer_pos,
             size,
+            damaged,
         }
     }
 }
@@ -143,7 +149,11 @@ impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for Poin
         &self,
         _: Option<SpaceOutputTuple<'_, '_>>,
     ) -> Vec<Rectangle<i32, Logical>> {
-        vec![Rectangle::from_loc_and_size((0, 0), self.size)]
+        if self.damaged {
+            vec![Rectangle::from_loc_and_size((0, 0), self.size)]
+        } else {
+            vec![]
+        }
     }
 
     fn draw(
