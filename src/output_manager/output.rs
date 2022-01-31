@@ -92,7 +92,8 @@ impl Output {
         output.change_current_state(Some(mode), Some(transform), None, None);
         output.set_preferred(mode);
 
-        let egui = EguiState::new();
+        let mut egui = EguiState::new();
+        egui.set_zindex(0);
         let mut visuals = egui::style::Visuals {
             window_corner_radius: 0.0,
             ..Default::default()
@@ -159,6 +160,10 @@ impl Output {
         let data = self.data();
         data.egui.borrow_mut().run(
             |ctx| {
+                //TODO - fix that in smithay, currently if crashes if egui does not have any element
+                egui::Area::new("main")
+                    .anchor(egui::Align2::LEFT_TOP, (10.0, 10.0))
+                    .show(ctx, |_ui| {});
                 data.egui_shell.render(ctx, config_tx);
             },
             Rectangle::from_loc_and_size((0, 0), size.to_logical(scale)),
@@ -167,7 +172,6 @@ impl Output {
             1.0,
             start_time,
             *modifiers,
-            0,
         )
     }
 
