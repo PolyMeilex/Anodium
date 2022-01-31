@@ -26,7 +26,7 @@ impl InputHandler for Anodium {
         event: InputEvent<I>,
         output: Option<&Output>,
     ) {
-        match &event {
+        let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
                 if action == KeyAction::Filtred {
@@ -36,12 +36,14 @@ impl InputHandler for Anodium {
                     self.input_state.keyboard.is_focused()
                 } else {
                     true
-                };
+                }
             }
             InputEvent::PointerMotion { event, .. } => {
                 self.input_state.pointer_location =
                     self.clamp_coords(self.input_state.pointer_location + event.delta());
                 self.on_pointer_move(event.time());
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output = output.cloned().unwrap_or_else(|| {
@@ -60,14 +62,20 @@ impl InputHandler for Anodium {
                 self.input_state.pointer_location =
                     event.position_transformed(output_size) + output_pos;
                 self.on_pointer_move(event.time());
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
             InputEvent::PointerButton { event, .. } => {
                 self.on_pointer_button::<I>(event);
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
             InputEvent::PointerAxis { event, .. } => {
                 self.on_pointer_axis::<I>(event);
+                self.surface_under(self.input_state.pointer_location)
+                    .is_none()
             }
-            _ => {}
+            _ => false,
         };
 
         if let Some(output) = self
@@ -77,20 +85,17 @@ impl InputHandler for Anodium {
         {
             let output = Output::wrap(output.clone());
 
-            // NOTE: after desktop abstraction was added egui is always on top (tehnical limitation of desktop abstractions)
-            // If it is on top then it always can grab events
-
-            // if captured {
-            self.process_egui_event(event, &output);
-            // } else {
-            // self.reset_egui_event(&output);
-            // }
+            if captured {
+                self.process_egui_event(event, &output);
+            } else {
+                self.reset_egui_event(&output);
+            }
         }
     }
 }
 
 impl Anodium {
-    fn _reset_egui_event(&self, output: &Output) {
+    fn reset_egui_event(&self, output: &Output) {
         let mut max_point = Point::default();
         max_point.x = i32::MAX;
         max_point.y = i32::MAX;
@@ -117,15 +122,14 @@ impl Anodium {
                 }
             }
 
-            InputEvent::Keyboard { event } => {
-                //TODO - is that enough or do we need the whole code from here https://github.com/Smithay/smithay-egui/blob/main/examples/integrate.rs#L69 ?
-                // output.egui().handle_keyboard(
-                //     event.key_code(),
-                //     event.state() == KeyState::Pressed,
-                //     self.input_state.modifiers_state,
-                // );
-            }
-
+            //InputEvent::Keyboard { event } => {
+            //TODO - is that enough or do we need the whole code from here https://github.com/Smithay/smithay-egui/blob/main/examples/integrate.rs#L69 ?
+            // output.egui().handle_keyboard(
+            //     event.key_code(),
+            //     event.state() == KeyState::Pressed,
+            //     self.input_state.modifiers_state,
+            // );
+            //}
             InputEvent::PointerAxis { event, .. } => output.egui().handle_pointer_axis(
                 event
                     .amount_discrete(input::Axis::Horizontal)
