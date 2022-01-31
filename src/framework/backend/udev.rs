@@ -254,7 +254,7 @@ where
     Ok(())
 }
 
-pub type RenderSurface = GbmBufferedSurface<SessionFd>;
+pub type RenderSurface = GbmBufferedSurface<Rc<RefCell<GbmDevice<SessionFd>>>, SessionFd>;
 
 struct OutputSurfaceData {
     output_descriptor: OutputDescriptor,
@@ -291,7 +291,7 @@ fn scan_connectors<D>(
     inner: InnerRc,
     handle: LoopHandle<'static, D>,
     drm: &mut DrmDevice<SessionFd>,
-    gbm: &GbmDevice<SessionFd>,
+    gbm: &Rc<RefCell<GbmDevice<SessionFd>>>,
     renderer: &mut Gles2Renderer,
     signaler: &Signaler<SessionSignal>,
 ) -> ConnectorScanResult
@@ -533,6 +533,7 @@ fn device_added<D>(
             }
         }
 
+        let gbm = Rc::new(RefCell::new(gbm));
         let ConnectorScanResult {
             backends: outputs,
             backends_order: outputs_order,
