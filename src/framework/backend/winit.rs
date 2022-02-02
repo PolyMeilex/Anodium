@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
-use calloop::ping;
 use smithay::{
     backend::{
         renderer::{ImportDma, ImportEgl},
@@ -139,15 +138,13 @@ where
                 Ok(()) => {
                     let mut backend = backend.borrow_mut();
 
-                    let mut damage = None;
                     if backend.bind().is_ok() {
-                        let age = backend.buffer_age();
-                        damage = handler
+                        let age = backend.buffer_age().unwrap_or(0);
+                        let damage = handler
                             .output_render(backend.renderer(), &output, age, None)
                             .unwrap();
+                        backend.submit(damage.as_deref(), 1.0).unwrap();
                     }
-
-                    backend.submit(damage.as_deref(), 1.0).unwrap();
 
                     handler.send_frames();
 
