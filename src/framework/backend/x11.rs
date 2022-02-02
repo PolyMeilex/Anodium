@@ -243,12 +243,9 @@ where
                     }
 
                     let res: Result<(), ()> = {
-                        handler.output_render(
-                            &mut renderer,
-                            &surface_data.output,
-                            age as usize,
-                            None,
-                        );
+                        handler
+                            .output_render(&mut renderer, &surface_data.output, age as usize, None)
+                            .ok();
                         Ok(())
                     };
 

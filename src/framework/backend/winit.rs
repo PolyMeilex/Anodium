@@ -139,8 +139,11 @@ where
                     let mut backend = backend.borrow_mut();
 
                     if backend.bind().is_ok() {
-                        handler.output_render(backend.renderer(), &output, 0, None);
-                        backend.submit(None, 1.0).unwrap();
+                        let age = backend.buffer_age().unwrap_or(0);
+                        let damage = handler
+                            .output_render(backend.renderer(), &output, age, None)
+                            .unwrap();
+                        backend.submit(damage.as_deref(), 1.0).unwrap();
                     }
 
                     handler.send_frames();
@@ -152,6 +155,5 @@ where
         })
         .unwrap();
     timer_handle.add_timeout(Duration::ZERO, ());
-
     Ok(())
 }

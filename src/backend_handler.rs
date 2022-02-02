@@ -1,5 +1,10 @@
 use anodium_protocol::server::AnodiumProtocol;
-use smithay::{desktop, reexports::wayland_server::Display, wayland::output};
+use smithay::{
+    desktop,
+    reexports::wayland_server::Display,
+    utils::{Logical, Rectangle},
+    wayland::output,
+};
 use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
 
 use crate::{
@@ -50,8 +55,8 @@ impl OutputHandler for Anodium {
         output: &Output,
         age: usize,
         pointer_image: Option<&smithay::backend::renderer::gles2::Gles2Texture>,
-    ) {
-        self.render(renderer, output, age, pointer_image).ok();
+    ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError> {
+        self.render(renderer, output, age, pointer_image)
     }
 }
 
