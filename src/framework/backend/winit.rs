@@ -154,6 +154,6 @@ where
             }
         })
         .unwrap();
-    timer_handle.add_timeout(Duration::from_millis(16), ());
+    timer_handle.add_timeout(Duration::ZERO, ());
     Ok(())
 }
