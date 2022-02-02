@@ -14,9 +14,22 @@ use lazy_static::lazy_static;
 
 const BUFFER_SIZE: usize = 32;
 
+pub struct ShellBuffer {
+    pub buffer: VecDeque<(Level, String)>,
+    pub updated: bool,
+}
+
+impl ShellBuffer {
+    pub fn new() -> Self {
+        Self {
+            buffer: VecDeque::with_capacity(BUFFER_SIZE),
+            updated: true,
+        }
+    }
+}
+
 lazy_static! {
-    pub static ref BUFFER: Mutex<VecDeque<(Level, String)>> =
-        Mutex::new(VecDeque::with_capacity(BUFFER_SIZE));
+    pub static ref BUFFER: Mutex<ShellBuffer> = Mutex::new(ShellBuffer::new());
 }
 
 pub struct ShellDrain {
@@ -90,8 +103,9 @@ impl slog::Drain for ShellDrain {
 
         let mut buffer = BUFFER.lock().unwrap();
 
-        buffer.push_front((info.level(), data));
-        buffer.truncate(BUFFER_SIZE);
+        buffer.buffer.push_front((info.level(), data));
+        buffer.buffer.truncate(BUFFER_SIZE);
+        buffer.updated = true;
 
         Ok(())
     }
