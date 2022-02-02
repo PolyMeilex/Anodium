@@ -72,11 +72,16 @@ impl Logger {
 impl Widget for Logger {
     fn render(&self, ui: &mut Ui, _config_tx: &Sender<ConfigEvent>) {
         let inner = self.inner.borrow();
-        let buffer = BUFFER.lock().unwrap();
+        let mut buffer = BUFFER.lock().unwrap();
+        if buffer.0 {
+            ui.ctx().request_repaint();
+            buffer.0 = false;
+        }
+
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for (level, line) in buffer.iter() {
+                for (level, line) in buffer.1.iter() {
                     let mut label = egui::RichText::new(line);
                     label = match level {
                         Level::Trace => label.color(inner.trace),
