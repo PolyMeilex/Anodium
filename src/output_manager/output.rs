@@ -14,7 +14,7 @@ use smithay::{
     wayland::output::{Mode, PhysicalProperties},
 };
 
-use smithay_egui::{EguiFrame, EguiState};
+use smithay_egui::{EguiFrame, EguiMode, EguiState};
 
 use crate::config::eventloop::ConfigEvent;
 use crate::config::outputs::shell::Shell;
@@ -92,7 +92,7 @@ impl Output {
         output.change_current_state(Some(mode), Some(transform), None, None);
         output.set_preferred(mode);
 
-        let mut egui = EguiState::new();
+        let mut egui = EguiState::new(EguiMode::Reactive);
         egui.set_zindex(0);
         let mut visuals = egui::style::Visuals {
             window_corner_radius: 0.0,
