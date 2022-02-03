@@ -56,14 +56,14 @@ anodize.keyboard.callbacks.register(|| {
 
 // }, "Control_L", ["k"]);
 
-let weather = widget::text("");
-let date = widget::text("");
-let logger_box = container::box(700, 330, 35, 35, layout::vertical());
-let logger = widget::logger();
-logger.c_debug = [255, 26, 255, 128];
+// let weather = widget::text("");
+// let date = widget::text("");
+// let logger_box = container::box(700, 330, 35, 35, layout::vertical());
+// let logger = widget::logger();
+// logger.c_debug = [255, 26, 255, 128];
 
-logger_box.background = false;
-logger_box.add_widget(logger.convert());
+// logger_box.background = false;
+// logger_box.add_widget(logger.convert());
 
 // anodize.keyboard.callbacks.register(|| {
 //     if logger_box.visable {
@@ -196,14 +196,14 @@ anodize.outputs.on_new(|output| {
     anodize.log.info("anodize on_new");
 
     let fps_widget = widget::fps(output);
-    let fps_box = container::box(50, 30, 560, 0, layout::horizontal());
+    let fps_box = container::box(560, 0, 50, 30, layout::horizontal());
     fps_box.add_widget(fps_widget.convert());
     output.shell.add_box(fps_box);
 
     if !logger_added {
         logger_added = true;
 
-        let top_box = container::box(500, 100, 50, 0, layout::vertical());
+        let top_box = container::box(50, 0, 500, 100, layout::vertical());
         top_box.scroll = false;
         top_box.alpha = 0.5;
         top_box.background = false;
