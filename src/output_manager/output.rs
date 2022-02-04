@@ -5,7 +5,7 @@ use anodium_protocol::server::{AnodiumProtocol, AnodiumProtocolOutput};
 use calloop::channel::Sender;
 use smithay::desktop;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
-use smithay::utils::{Logical, Point, Rectangle};
+use smithay::utils::Rectangle;
 use smithay::wayland::output::Output as SmithayOutput;
 
 use smithay::wayland::seat::ModifiersState;

@@ -1,10 +1,14 @@
 use std::fmt;
 
 use smithay::{
-    desktop::{Kind, PopupKind},
+    desktop::{self, Kind, PopupKind},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     wayland::shell::xdg::{self, ToplevelSurface},
 };
+
+use crate::window::Window;
+
+pub mod glow;
 
 pub trait AsWlSurface {
     fn as_surface(&self) -> Option<&WlSurface>;
@@ -13,6 +17,18 @@ pub trait AsWlSurface {
 impl AsWlSurface for WlSurface {
     fn as_surface(&self) -> Option<&WlSurface> {
         Some(self)
+    }
+}
+
+impl AsWlSurface for Window {
+    fn as_surface(&self) -> Option<&WlSurface> {
+        self.toplevel().get_surface()
+    }
+}
+
+impl AsWlSurface for desktop::Window {
+    fn as_surface(&self) -> Option<&WlSurface> {
+        self.toplevel().get_surface()
     }
 }
 

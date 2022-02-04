@@ -1,11 +1,14 @@
+#![allow(dead_code)]
+
+use std::num::NonZeroU32;
+
 use cgmath::Matrix3;
-use glow::HasContext;
 use smithay::{
-    backend::renderer::{gles2::ffi, Transform},
-    utils::{Physical, Rectangle},
+    backend::renderer::gles2::ffi::{self, Gles2},
+    utils::{Physical, Rectangle, Transform},
 };
 
-use super::renderer::RenderContext;
+use crate::utils::glow::{self, Program, Shader};
 
 pub struct QuadPipeline {
     program: glow::Program,
@@ -16,20 +19,18 @@ pub struct QuadPipeline {
 }
 
 impl QuadPipeline {
-    pub fn new(context: &mut RenderContext) -> Self {
+    pub fn new(gl: &Gles2) -> Self {
         let program = create_program(
-            context,
+            gl,
             include_str!("./shaders/quad.vert"),
             include_str!("./shaders/quad.frag"),
         );
 
-        let gl = context.glow;
-
         let (projection, color, position) = unsafe {
             (
-                gl.get_uniform_location(program, "projection").unwrap(),
-                gl.get_uniform_location(program, "color").unwrap(),
-                gl.get_attrib_location(program, "position").unwrap(),
+                glow::get_uniform_location(gl, program, "projection").unwrap(),
+                glow::get_uniform_location(gl, program, "color").unwrap(),
+                glow::get_attrib_location(gl, program, "position").unwrap(),
             )
         };
 
@@ -47,13 +48,10 @@ impl QuadPipeline {
         output_geometry: Rectangle<f64, Physical>,
         mut quad_rect: Rectangle<f64, Physical>,
         transform: Transform,
-        context: &RenderContext,
+        gl: &Gles2,
         alpha: f32,
     ) {
         quad_rect.loc.x -= output_geometry.loc.x;
-
-        let glow = context.glow;
-        let gles = context.gles;
 
         let screen = Matrix3 {
             x: [2.0 / output_geometry.size.w as f32, 0.0, 0.0].into(),
@@ -74,36 +72,41 @@ impl QuadPipeline {
         };
 
         unsafe {
-            glow.use_program(Some(self.program));
+            gl.UseProgram(self.program.0.into());
 
             let mat = transform.matrix() * screen * quad;
             let mat: &[f32; 9] = mat.as_ref();
 
-            glow.uniform_matrix_3_f32_slice(Some(&self.projection), false, mat);
+            gl.UniformMatrix3fv(
+                self.projection.0 as i32,
+                mat.len() as i32 / 9,
+                false as u8,
+                mat.as_ptr(),
+            );
 
-            glow.uniform_4_f32(
-                Some(&self.color),
+            gl.Uniform4f(
+                self.color.0 as i32,
                 26.0 / 255.0,
                 95.0 / 255.0,
                 205.0 / 255.0,
                 alpha,
             );
 
-            gles.VertexAttribPointer(
+            gl.VertexAttribPointer(
                 self.position,
                 2,
                 ffi::FLOAT,
-                ffi::FALSE,
+                ffi::FALSE as u8,
                 0,
                 VERTS.as_ptr() as *const _,
             );
 
-            glow.enable_vertex_attrib_array(self.position);
+            gl.EnableVertexAttribArray(self.position);
 
-            glow.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
+            gl.DrawArrays(ffi::TRIANGLE_STRIP, 0, 4);
 
-            glow.disable_vertex_attrib_array(self.position);
-            glow.use_program(None);
+            gl.DisableVertexAttribArray(self.position);
+            gl.UseProgram(0);
         }
     }
 }
@@ -116,42 +119,49 @@ static VERTS: [ffi::types::GLfloat; 8] = [
 ];
 
 fn create_program(
-    context: &mut RenderContext,
+    gl: &Gles2,
     vertex_shader_source: &str,
     fragment_shader_source: &str,
 ) -> glow::Program {
-    let gl = &context.glow;
     unsafe {
-        let program = gl.create_program().expect("Cannot create program");
+        let program = gl.CreateProgram();
+        let program = Program(NonZeroU32::new(program).unwrap());
 
         let shader_sources = [
-            (glow::VERTEX_SHADER, vertex_shader_source),
-            (glow::FRAGMENT_SHADER, fragment_shader_source),
+            (ffi::VERTEX_SHADER, vertex_shader_source),
+            (ffi::FRAGMENT_SHADER, fragment_shader_source),
         ];
 
         let mut shaders = Vec::with_capacity(shader_sources.len());
 
         for (shader_type, shader_source) in shader_sources.iter() {
-            let shader = gl
-                .create_shader(*shader_type)
-                .expect("Cannot create shader");
-            gl.shader_source(shader, shader_source);
-            gl.compile_shader(shader);
-            if !gl.get_shader_compile_status(shader) {
-                panic!("{}", gl.get_shader_info_log(shader));
+            let shader = gl.CreateShader(*shader_type);
+            let shader = Shader(NonZeroU32::new(shader).unwrap());
+
+            gl.ShaderSource(
+                shader.0.into(),
+                1,
+                &(shader_source.as_ptr() as *const ffi::types::GLchar),
+                &(shader_source.len() as ffi::types::GLint),
+            );
+
+            gl.CompileShader(shader.0.into());
+
+            if !glow::get_shader_compile_status(gl, shader) {
+                panic!("{}", glow::get_shader_info_log(gl, shader));
             }
-            gl.attach_shader(program, shader);
+            gl.AttachShader(program.0.into(), shader.0.into());
             shaders.push(shader);
         }
 
-        gl.link_program(program);
-        if !gl.get_program_link_status(program) {
-            panic!("{}", gl.get_program_info_log(program));
+        gl.LinkProgram(program.0.into());
+        if !glow::get_program_link_status(gl, program) {
+            panic!("{}", glow::get_program_info_log(gl, program));
         }
 
         for shader in shaders {
-            gl.detach_shader(program, shader);
-            gl.delete_shader(shader);
+            gl.DetachShader(program.0.into(), shader.0.into());
+            gl.DeleteShader(shader.0.into());
         }
 
         program
