@@ -5,7 +5,7 @@ use anodium_protocol::server::{AnodiumProtocol, AnodiumProtocolOutput};
 use calloop::channel::Sender;
 use smithay::desktop;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
-use smithay::utils::Rectangle;
+use smithay::utils::{Logical, Point, Rectangle};
 use smithay::wayland::output::Output as SmithayOutput;
 
 use smithay::wayland::seat::ModifiersState;
@@ -167,7 +167,6 @@ impl Output {
                 data.egui_shell.render(ctx, config_tx);
             },
             Rectangle::from_loc_and_size((0, 0), size.to_logical(scale)),
-            size,
             scale as f64,
             1.0,
             start_time,
