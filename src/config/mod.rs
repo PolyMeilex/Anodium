@@ -10,6 +10,7 @@ pub mod eventloop;
 pub mod keyboard;
 mod log;
 pub mod outputs;
+pub mod regions;
 mod system;
 mod windows;
 mod workspace;
@@ -20,6 +21,7 @@ use smithay::reexports::calloop::LoopHandle;
 use smithay::wayland::output::Mode;
 
 use crate::output_manager::{Output, OutputDescriptor, OutputManager};
+use crate::region_manager::RegionManager;
 use crate::state::Anodium;
 
 use self::anodize::Anodize;
@@ -44,6 +46,7 @@ impl ConfigVM {
     pub fn new(
         event_sender: Sender<ConfigEvent>,
         output_map: OutputManager,
+        region_map: RegionManager,
         loop_handle: LoopHandle<'static, Anodium>,
         config: PathBuf,
     ) -> Result<ConfigVM, Box<EvalAltResult>> {
@@ -57,12 +60,14 @@ impl ConfigVM {
         workspace::register(&mut engine);
         windows::register(&mut engine);
         outputs::register(&mut engine);
+        regions::register(&mut engine);
 
         let anodize = anodize::register(
             &mut scope,
             &mut engine,
             event_sender.clone(),
             output_map,
+            region_map,
             loop_handle,
         );
 

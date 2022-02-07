@@ -5,12 +5,14 @@ use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::LoopHandle;
 
 use crate::output_manager::OutputManager;
+use crate::region_manager::RegionManager;
 use crate::state::Anodium;
 
 use super::eventloop::ConfigEvent;
 use super::keyboard::Keyboard;
 use super::log::Log;
 use super::outputs::Outputs;
+use super::regions::Regions;
 use super::system::System;
 use super::windows::Windows;
 use super::workspace::Workspace;
@@ -23,12 +25,14 @@ pub struct Anodize {
     pub windows: Windows,
     log: Log,
     pub outputs: Outputs,
+    pub regions: Regions,
 }
 
 impl Anodize {
     pub fn new(
         event_sender: Sender<ConfigEvent>,
         output_map: OutputManager,
+        region_map: RegionManager,
         loop_handle: LoopHandle<'static, Anodium>,
     ) -> Self {
         Self {
@@ -38,6 +42,7 @@ impl Anodize {
             windows: Windows::new(event_sender),
             log: Log::new(),
             outputs: Outputs::new(output_map),
+            regions: Regions::new(region_map),
         }
     }
 }
@@ -81,6 +86,11 @@ pub mod anodize_module {
     pub fn get_outputs(anodize: &mut Anodize) -> Outputs {
         anodize.outputs.clone()
     }
+
+    #[rhai_fn(get = "regions", pure)]
+    pub fn get_regions(anodize: &mut Anodize) -> Regions {
+        anodize.regions.clone()
+    }
 }
 
 pub fn register(
@@ -88,9 +98,10 @@ pub fn register(
     engine: &mut Engine,
     event_sender: Sender<ConfigEvent>,
     output_map: OutputManager,
+    region_map: RegionManager,
     loop_handle: LoopHandle<'static, Anodium>,
 ) -> Anodize {
-    let anodize = Anodize::new(event_sender, output_map, loop_handle);
+    let anodize = Anodize::new(event_sender, output_map, region_map, loop_handle);
     let module = exported_module!(anodize_module);
 
     engine

@@ -39,6 +39,7 @@ use crate::{
     framework::backend::BackendRequest,
     framework::{cursor::PointerElement, shell::ShellManager},
     output_manager::{Output, OutputManager},
+    region_manager::RegionManager,
     render,
     workspace::Workspace,
 };
@@ -80,6 +81,7 @@ pub struct Anodium {
     // Desktop
     pub anodium_protocol: AnodiumProtocol,
     pub output_manager: OutputManager,
+    pub region_manager: RegionManager,
     pub workspace: Workspace,
 
     pub focused_window: Option<desktop::Window>,
@@ -246,10 +248,12 @@ impl Anodium {
 
         let config_tx = Self::init_config_channel(&handle);
         let output_map = OutputManager::new();
+        let region_map = RegionManager::new();
 
         let config = ConfigVM::new(
             config_tx.clone(),
             output_map.clone(),
+            region_map.clone(),
             handle.clone(),
             options.config.clone(),
         )
@@ -288,6 +292,7 @@ impl Anodium {
 
                 anodium_protocol,
                 output_manager: output_map,
+                region_manager: region_map,
                 workspace: Workspace::new(),
 
                 focused_window: Default::default(),
