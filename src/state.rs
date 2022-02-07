@@ -80,10 +80,8 @@ pub struct Anodium {
     // Desktop
     pub anodium_protocol: AnodiumProtocol,
     pub output_manager: OutputManager,
-
     pub workspace: Workspace,
 
-    pub active_workspace: Option<String>,
     pub focused_window: Option<desktop::Window>,
 
     #[cfg(feature = "xwayland")]
@@ -292,7 +290,6 @@ impl Anodium {
                 output_manager: output_map,
                 workspace: Workspace::new(),
 
-                active_workspace: None,
                 focused_window: Default::default(),
 
                 #[cfg(feature = "xwayland")]

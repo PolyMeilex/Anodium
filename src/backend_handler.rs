@@ -26,7 +26,7 @@ impl OutputHandler for Anodium {
 
     fn output_created(&mut self, output: crate::output_manager::Output) {
         info!("OutputCreated: {}", output.name());
-        self.output_manager.add(&mut self.workspace, &output);
+        self.output_manager.add(&output);
 
         self.config.output_new(output.clone());
 
