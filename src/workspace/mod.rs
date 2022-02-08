@@ -1,6 +1,8 @@
 use smithay::desktop;
 
-#[derive(PartialEq)]
+use crate::output_manager::Output;
+
+#[derive(Debug, PartialEq)]
 pub struct Workspace {
     space: desktop::Space,
 }
@@ -13,9 +15,12 @@ impl Default for Workspace {
 
 impl Workspace {
     pub fn new() -> Self {
-        Self {
-            space: desktop::Space::new(slog_scope::logger()),
-        }
+        let space = desktop::Space::new(slog_scope::logger());
+        Self { space }
+    }
+
+    pub fn output(&self) -> Option<Output> {
+        self.space.outputs().next().cloned().map(Output::wrap)
     }
 }
 

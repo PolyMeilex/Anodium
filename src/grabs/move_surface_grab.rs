@@ -36,7 +36,8 @@ impl PointerGrab for MoveSurfaceGrab {
         let new_location = self.initial_window_location.to_f64() + delta;
 
         anodium
-            .workspace
+            .workspace_map
+            .workspace_for_surface_mut(&self.window)
             .map_window(&self.window, new_location.to_i32_round(), false);
 
         // if let Some(window) = anodium.grabed_window.as_mut() {

@@ -29,6 +29,7 @@ mod shell_handler;
 mod cli;
 
 mod workspace;
+mod workspace_map;
 
 use config::outputs::shell::logger::ShellDrain;
 use state::Anodium;
@@ -77,7 +78,7 @@ fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
-            if state.workspace.outputs().count() == 0 || !state.running.load(Ordering::SeqCst) {
+            if state.workspace_map.outputs().is_empty() || !state.running.load(Ordering::SeqCst) {
                 signal.stop();
             }
 

@@ -260,6 +260,8 @@ where
                             if let Err(err) = surface_data.surface.submit() {
                                 error!("Error submitting buffer for display: {}", err);
                             }
+
+                            handler.send_frames(&surface_data.output);
                         }
                         Err(_) => {
                             todo!();
@@ -270,8 +272,6 @@ where
                         }
                     }
                 }
-
-                handler.send_frames();
             }
         })
         .unwrap();

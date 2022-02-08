@@ -190,18 +190,22 @@ anodize.outputs.on_mode_select(|desc, modes| {
     modes[0]
 });
 
-let logger_added = false;
+let first_monitor = true;
 
 anodize.outputs.on_new(|output| {
     anodize.log.info("anodize on_new");
+    
+    let info_box = container::box(560, 0, 300, 30, layout::horizontal());
 
+    let workspace_widget = widget::current_workspace(output);
     let fps_widget = widget::fps(output);
-    let fps_box = container::box(560, 0, 50, 30, layout::horizontal());
-    fps_box.add_widget(fps_widget.convert());
-    output.shell.add_box(fps_box);
 
-    if !logger_added {
-        logger_added = true;
+    info_box.add_widget(workspace_widget.convert());
+    info_box.add_widget(fps_widget.convert());
+    output.shell.add_box(info_box);
+
+    if first_monitor  {
+        first_monitor = false;
 
         let top_box = container::box(50, 0, 500, 100, layout::vertical());
         top_box.scroll = false;
@@ -212,15 +216,16 @@ anodize.outputs.on_new(|output| {
         top_box.add_widget(logger.convert());
 
         output.shell.add_box(top_box);
+
+        let panel = container::panel(40, layout::horizontal(), position::left());
+        
+        let menu = widget::menu("Menu");
+        menu.add_item(menu::label("weston-terminal", || { anodize.system.exec("weston-terminal") }).convert());
+
+        panel.add_widget(menu.convert());
+        output.shell.add_panel(panel);
     }
 
-    let panel = container::panel(40, layout::horizontal(), position::left());
-    
-    let menu = widget::menu("Menu");
-    menu.add_item(menu::label("weston-terminal", || { anodize.system.exec("weston-terminal") }).convert());
-
-    panel.add_widget(menu.convert());
-    output.shell.add_panel(panel);
 });
 
 // anodize.system.add_timeout(|| {

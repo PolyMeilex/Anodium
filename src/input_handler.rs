@@ -46,16 +46,13 @@ impl InputHandler for Anodium {
                     .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output = output.cloned().unwrap_or_else(|| {
-                    self.workspace
-                        .outputs()
-                        .next()
-                        .cloned()
-                        .map(Output::wrap)
-                        .unwrap()
-                });
+                let output = output
+                    .cloned()
+                    .unwrap_or_else(|| self.workspace_map.outputs().first().cloned().unwrap());
 
-                let output_geometry = self.workspace.output_geometry(&output).unwrap();
+                let workspace = self.workspace_map.visible_workspace_for_output(&output);
+
+                let output_geometry = workspace.output_geometry(&output).unwrap();
                 let output_pos = output_geometry.loc.to_f64();
                 let output_size = output_geometry.size;
 
@@ -79,12 +76,10 @@ impl InputHandler for Anodium {
         };
 
         if let Some(output) = self
-            .workspace
+            .workspace_map
             .output_under(self.input_state.pointer_location)
-            .next()
+            .cloned()
         {
-            let output = Output::wrap(output.clone());
-
             if captured {
                 self.process_egui_event(event, &output);
             } else {
@@ -105,7 +100,8 @@ impl Anodium {
     fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
         match event {
             InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
-                let output_loc = self.workspace.output_geometry(output).unwrap().loc;
+                let workspace = self.workspace_map.visible_workspace_for_output(output);
+                let output_loc = workspace.output_geometry(output).unwrap().loc;
                 let mouse_location = self.input_state.pointer_location - output_loc.to_f64();
                 output
                     .egui()
@@ -229,7 +225,16 @@ impl Anodium {
                 if !self.input_state.pointer.is_grabbed() {
                     let point = self.input_state.pointer_location;
                     // let under = self.surface_under(self.input_state.pointer_location);
-                    let window = self.workspace.window_under(point).cloned();
+
+                    // TODO:
+                    let window = self
+                        .workspace_map
+                        .active_workspace()
+                        .window_under(point)
+                        .cloned();
+
+                    self.surface_under(point);
+
                     // let surface = under.as_ref().map(|&(ref s, _)| s);
                     // if let Some(surface) = surface {
                     //     let mut window = None;
@@ -347,15 +352,8 @@ impl Anodium {
     fn on_pointer_move(&mut self, time: u32) {
         let serial = SCOUNTER.next_serial();
 
-        // for (id, w) in self.workspaces.iter_mut() {
-        //     w.on_pointer_move(self.input_state.pointer_location);
-
-        //     if w.geometry()
-        //         .contains(self.input_state.pointer_location.to_i32_round())
-        //     {
-        //         self.active_workspace = Some(id.clone());
-        //     }
-        // }
+        self.workspace_map
+            .update_mouse_pos(self.input_state.pointer_location);
 
         let under = self.surface_under(self.input_state.pointer_location);
         self.input_state.pointer.clone().motion(

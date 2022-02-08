@@ -22,7 +22,12 @@ impl ShellHandler for Anodium {
             // Toplevel
             //
             ShellEvent::WindowCreated { window } => {
-                self.workspace.map_window(&window, (0, 0), false);
+                let space = self.workspace_map.active_workspace_mut();
+
+                let out = space.output().unwrap();
+                let geo = space.output_geometry(&out).unwrap();
+
+                space.map_window(&window, (geo.loc.x, 0), false);
             }
 
             ShellEvent::WindowMove {
@@ -34,12 +39,14 @@ impl ShellHandler for Anodium {
                 let pointer = seat.get_pointer().unwrap();
 
                 let window = self
-                    .workspace
+                    .workspace_map
+                    .workspace_for_surface(&toplevel)
+                    .unwrap()
                     .window_for_surface(toplevel.get_surface().unwrap());
 
                 if let Some(window) = window {
-                    let initial_window_location =
-                        self.workspace.window_geometry(window).unwrap().loc;
+                    let workspace = self.workspace_map.workspace_for_surface(window).unwrap();
+                    let initial_window_location = workspace.window_geometry(window).unwrap().loc;
 
                     let grab = MoveSurfaceGrab {
                         start_data,
@@ -60,10 +67,14 @@ impl ShellHandler for Anodium {
                 let pointer = seat.get_pointer().unwrap();
                 let wl_surface = toplevel.get_surface().unwrap();
 
-                let window = self.workspace.window_for_surface(wl_surface);
+                let workspace = self
+                    .workspace_map
+                    .workspace_for_surface(wl_surface)
+                    .unwrap();
+                let window = workspace.window_for_surface(wl_surface);
 
                 if let Some(window) = window {
-                    let geometry = self.workspace.window_geometry(window).unwrap();
+                    let geometry = workspace.window_geometry(window).unwrap();
                     let (initial_window_location, initial_window_size) =
                         (geometry.loc, geometry.size);
 
@@ -91,7 +102,8 @@ impl ShellHandler for Anodium {
                 window,
                 new_location,
             } => {
-                self.workspace.map_window(&window, new_location, false);
+                let workspace = self.workspace_map.workspace_for_surface_mut(&window);
+                workspace.map_window(&window, new_location, false);
             }
 
             ShellEvent::WindowMaximize { .. } => {}
@@ -109,17 +121,19 @@ impl ShellHandler for Anodium {
             ShellEvent::LayerCreated {
                 surface, output, ..
             } => {
+                let workspace = self.workspace_map.workspace_for_surface(&surface).unwrap();
+
                 let output = output
                     .and_then(|o| Output::from_resource(&o))
-                    .unwrap_or_else(|| {
-                        Output::wrap(self.workspace.outputs().next().unwrap().clone())
-                    });
+                    .unwrap_or_else(|| Output::wrap(workspace.outputs().next().unwrap().clone()));
 
                 let mut map = output.layer_map();
                 map.map_layer(&surface).unwrap();
             }
             ShellEvent::LayerAckConfigure { surface, .. } => {
-                if let Some(output) = self.workspace.outputs().find(|o| {
+                let workspace = self.workspace_map.workspace_for_surface(&surface).unwrap();
+
+                if let Some(output) = workspace.outputs().find(|o| {
                     let map = desktop::layer_map_for_output(o);
                     map.layer_for_surface(&surface).is_some()
                 }) {
@@ -129,14 +143,22 @@ impl ShellHandler for Anodium {
             }
 
             ShellEvent::SurfaceCommit { surface } => {
-                self.workspace.commit(&surface);
+                let workspace = self.workspace_map.workspace_for_surface(&surface);
+                if let Some(space) = workspace {
+                    space.commit(&surface);
+                }
             }
             _ => {}
         }
     }
 
     fn window_location(&self, window: &Window) -> Point<i32, Logical> {
-        self.workspace.window_geometry(window).unwrap().loc
+        self.workspace_map
+            .workspace_for_surface(window)
+            .unwrap()
+            .window_geometry(window)
+            .unwrap()
+            .loc
     }
 }
 
@@ -145,9 +167,10 @@ impl Anodium {
         &self,
         point: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<i32, Logical>)> {
-        let window = self.workspace.window_under(point)?;
+        let workspace = self.workspace_map.active_workspace();
+        let window = workspace.window_under(point)?;
 
-        let window_loc = self.workspace.window_geometry(window).unwrap().loc;
+        let window_loc = workspace.window_geometry(window).unwrap().loc;
         window
             .surface_under(point - window_loc.to_f64(), WindowSurfaceType::ALL)
             .map(|(s, loc)| (s, loc + window_loc))

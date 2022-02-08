@@ -24,26 +24,33 @@ impl OutputHandler for Anodium {
             .unwrap_or_else(|| modes[0])
     }
 
-    fn output_created(&mut self, output: crate::output_manager::Output) {
+    fn output_created(&mut self, output: Output) {
         info!("OutputCreated: {}", output.name());
-        self.output_manager.add(&mut self.workspace, &output);
+        // self.output_manager.add(&mut self.workspace, &output);
 
         self.config.output_new(output.clone());
 
-        if let Some(layout) = self
-            .config
-            .output_rearrange(self.output_manager.outputs().clone())
-        {
-            for (output, pos) in self.output_manager.outputs().iter().zip(layout.iter()) {
-                let scale = self.workspace.output_scale(output).unwrap_or(1.0);
+        self.workspace_map.map_output(output);
 
-                let (x, y) = *pos;
-                self.workspace.map_output(output, scale, (x, y));
-            }
-        }
+        // let id = output.active_workspace();
+        // let workspace = self.workspace_map.workspace_mut(id);
+
+        // TODO:
+        // if let Some(layout) = self
+        //     .config
+        //     .output_rearrange(self.output_manager.outputs().clone())
+        // {
+        //     for (output, pos) in self.output_manager.outputs().iter().zip(layout.iter()) {
+        //         let workspace= self.workspace_map.visible_workspace_for_output(output)
+        //         let scale = workspace.output_scale(output).unwrap_or(1.0);
+
+        //         let (x, y) = *pos;
+        //         workspace.map_output(output, scale, (x, y));
+        //     }
+        // }
     }
 
-    fn output_mode_updated(&mut self, output: &crate::output_manager::Output, mode: output::Mode) {
+    fn output_mode_updated(&mut self, output: &Output, mode: output::Mode) {
         output.change_current_state(Some(mode), None, None, None);
 
         desktop::layer_map_for_output(output).arrange();
@@ -69,10 +76,12 @@ impl BackendHandler for Anodium {
         self.display.clone()
     }
 
-    fn send_frames(&mut self) {
+    fn send_frames(&mut self, output: &Output) {
         let time = self.start_time.elapsed().as_millis() as u32;
 
-        self.workspace.send_frames(false, time);
+        self.workspace_map
+            .visible_workspace_for_output(output)
+            .send_frames(false, time);
     }
 
     fn start_compositor(&mut self) {

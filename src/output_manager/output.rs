@@ -3,9 +3,10 @@ use std::time::Instant;
 
 use anodium_protocol::server::{AnodiumProtocol, AnodiumProtocolOutput};
 use calloop::channel::Sender;
+use generational_arena::Index;
 use smithay::desktop;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
-use smithay::utils::Rectangle;
+use smithay::utils::{Logical, Point, Rectangle};
 use smithay::wayland::output::Output as SmithayOutput;
 
 use smithay::wayland::seat::ModifiersState;
@@ -50,6 +51,8 @@ struct Data {
 
     egui: RefCell<EguiState>,
     egui_shell: Shell,
+
+    workspace: Cell<Option<Index>>,
 
     #[cfg(feature = "debug")]
     fps_ticker: fps_ticker::Fps,
@@ -113,8 +116,12 @@ impl Output {
 
             pending_mode_change: Default::default(),
             possible_modes: RefCell::new(possible_modes),
+
             egui: RefCell::new(egui),
             egui_shell: Shell::new(),
+
+            workspace: Default::default(),
+
             fps_ticker: fps_ticker::Fps::default(),
         });
         assert!(added);
@@ -137,6 +144,14 @@ impl Output {
     pub fn layer_map(&self) -> RefMut<desktop::LayerMap> {
         desktop::layer_map_for_output(&self.output)
     }
+
+    pub fn set_active_workspace(&mut self, workspace: Index) {
+        self.data().workspace.set(Some(workspace));
+    }
+
+    pub fn active_workspace(&self) -> Index {
+        self.data().workspace.get().unwrap()
+    }
 }
 
 impl Output {
@@ -148,8 +163,9 @@ impl Output {
         &self.data().egui_shell
     }
 
-    pub fn render_egui_shell(
+    pub fn render_egui_shell<P: Into<Point<i32, Logical>>>(
         &self,
+        loc: P,
         start_time: &Instant,
         modifiers: &ModifiersState,
         config_tx: &Sender<ConfigEvent>,
@@ -166,7 +182,7 @@ impl Output {
                     .show(ctx, |_ui| {});
                 data.egui_shell.render(ctx, config_tx);
             },
-            Rectangle::from_loc_and_size((0, 0), size.to_logical(scale)),
+            Rectangle::from_loc_and_size(loc, size.to_logical(scale)),
             scale as f64,
             1.0,
             start_time,

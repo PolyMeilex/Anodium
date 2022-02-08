@@ -40,7 +40,7 @@ use crate::{
     framework::{cursor::PointerElement, shell::ShellManager},
     output_manager::{Output, OutputManager},
     render,
-    workspace::Workspace,
+    workspace_map::WorkspaceMap,
 };
 
 pub struct InputState {
@@ -81,7 +81,7 @@ pub struct Anodium {
     pub anodium_protocol: AnodiumProtocol,
     pub output_manager: OutputManager,
 
-    pub workspace: Workspace,
+    pub workspace_map: WorkspaceMap,
 
     pub active_workspace: Option<String>,
     pub focused_window: Option<desktop::Window>,
@@ -290,7 +290,8 @@ impl Anodium {
 
                 anodium_protocol,
                 output_manager: output_map,
-                workspace: Workspace::new(),
+
+                workspace_map: WorkspaceMap::new(),
 
                 active_workspace: None,
                 focused_window: Default::default(),
@@ -308,7 +309,7 @@ impl Anodium {
 impl Anodium {
     pub fn update(&mut self) {
         self.shell_manager.refresh();
-        self.workspace.refresh();
+        self.workspace_map.refresh();
 
         if let Some(focused_window) = &self.focused_window {
             if !focused_window.toplevel().alive() {
@@ -362,11 +363,23 @@ impl Anodium {
         age: usize,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError> {
-        let output_geometry = self.workspace.output_geometry(output).unwrap();
+        let output_geometry = self
+            .workspace_map
+            .visible_workspace_for_output(output)
+            .output_geometry(output)
+            .unwrap();
 
         let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
 
+        let loc = self
+            .workspace_map
+            .visible_workspace_for_output(output)
+            .output_geometry(output)
+            .unwrap()
+            .loc;
+
         let frame = output.render_egui_shell(
+            loc,
             &self.start_time,
             &self.input_state.modifiers_state,
             &self.config_tx,
@@ -395,8 +408,9 @@ impl Anodium {
             }
         }
 
-        let render_result = self
-            .workspace
+        let workspace = self.workspace_map.visible_workspace_for_output_mut(output);
+
+        let render_result = workspace
             .render_output(renderer, output, age, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
 
@@ -411,15 +425,24 @@ impl Anodium {
 
 impl Anodium {
     pub fn update_focused_window(&mut self, window: Option<&desktop::Window>) {
-        self.workspace.windows().for_each(|w| {
-            w.set_activated(false);
-        });
-
+        debug!("Window focused: {:?}", window);
         if let Some(window) = window {
-            window.set_activated(true);
-        }
+            self.workspace_map
+                .visible_workspaces()
+                .iter()
+                .for_each(|id| {
+                    let space = self.workspace_map.workspace_mut(*id);
 
-        self.workspace.windows().for_each(|w| w.configure());
+                    space.windows().for_each(|w| {
+                        w.set_activated(false);
+                    })
+                });
+
+            window.set_activated(true);
+
+            let workspace = self.workspace_map.workspace_for_surface(window).unwrap();
+            workspace.windows().for_each(|w| w.configure());
+        }
 
         self.focused_window = window.cloned();
     }

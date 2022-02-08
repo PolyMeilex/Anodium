@@ -32,6 +32,12 @@ impl AsWlSurface for desktop::Window {
     }
 }
 
+impl AsWlSurface for desktop::LayerSurface {
+    fn as_surface(&self) -> Option<&WlSurface> {
+        self.get_surface()
+    }
+}
+
 impl AsWlSurface for ToplevelSurface {
     fn as_surface(&self) -> Option<&WlSurface> {
         self.get_surface()

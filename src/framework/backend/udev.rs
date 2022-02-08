@@ -718,9 +718,6 @@ where
                 //     .render_timer
                 //     .add_timeout(Duration::from_millis(1000), (device_backend.dev_id, crtc));
             }
-        } else {
-            // Send frame events so that client start drawing their next frame
-            handler.send_frames();
         }
     }
 }
@@ -803,7 +800,12 @@ where
     surface
         .surface
         .queue_buffer()
-        .map_err(Into::<SwapBuffersError>::into)
+        .map_err(Into::<SwapBuffersError>::into)?;
+
+    // Send frame events so that client start drawing their next frame
+    handler.send_frames(output);
+
+    Ok(())
 }
 
 fn initial_render(

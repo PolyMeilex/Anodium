@@ -146,7 +146,7 @@ where
                         backend.submit(damage.as_deref(), 1.0).unwrap();
                     }
 
-                    handler.send_frames();
+                    handler.send_frames(&output);
 
                     timer_handle.add_timeout(Duration::from_millis(16), ());
                 }

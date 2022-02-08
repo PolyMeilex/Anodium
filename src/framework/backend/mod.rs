@@ -68,7 +68,7 @@ pub trait BackendHandler: OutputHandler + InputHandler {
     // so maybe use SmithayOutput only in backend?
     fn anodium_protocol(&mut self) -> &mut AnodiumProtocol;
 
-    fn send_frames(&mut self);
+    fn send_frames(&mut self, output: &Output);
 
     fn start_compositor(&mut self);
     fn close_compositor(&mut self);
