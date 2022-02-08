@@ -1,16 +1,10 @@
 use std::cell::{Ref, RefCell, RefMut};
-use std::fmt::Display;
 use std::hash::{Hash, Hasher};
-use std::ops::Index;
 use std::rc::Rc;
 
-use derivative::Derivative;
-
-use indexmap::Equivalent;
-use smithay::backend::input::Device;
 use smithay::desktop;
 
-#[derive(Derivative)]
+#[derive(derivative::Derivative)]
 #[derivative(Debug)]
 pub struct WorkspaceInner {
     #[derivative(Debug = "ignore")]
