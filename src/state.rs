@@ -378,16 +378,13 @@ impl Anodium {
             .to_f64()
             .contains(self.input_state.pointer_location)
         {
-            let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
-            let relative_location =
-                Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
-
-            if let Some(wl_cursor) = self.prepare_cursor_element(relative_location) {
+            let loc = self.input_state.pointer_location.to_i32_round();
+            if let Some(wl_cursor) = self.prepare_cursor_element(loc) {
                 elems.push(Box::new(wl_cursor));
             } else if let Some(texture) = pointer_image {
                 elems.push(Box::new(PointerElement::new(
                     texture.clone(),
-                    relative_location,
+                    loc,
                     self.input_state.pointer_location != self.input_state.previous_pointer_location,
                 )));
             }
