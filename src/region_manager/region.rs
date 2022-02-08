@@ -33,7 +33,9 @@ impl Region {
     }
 
     pub fn add_workspace(&self, workspace: Workspace) {
-        self.inner.borrow_mut().workspaces.insert(workspace);
+        let mut inner = self.inner.borrow_mut();
+        inner.workspaces.insert(workspace.clone());
+        inner.active_workspace = Some(workspace);
     }
 
     pub fn map_output(&self, output: &Output, scale: f64, location: Point<i32, Logical>) {
