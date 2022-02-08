@@ -46,7 +46,7 @@ impl ShellHandler for Anodium {
                         window: window.clone(),
                         initial_window_location,
                     };
-                    pointer.set_grab(grab, serial);
+                    pointer.set_grab(grab, serial, 0);
                 }
             }
 
@@ -83,7 +83,7 @@ impl ShellHandler for Anodium {
                         last_window_size: initial_window_size,
                     };
 
-                    pointer.set_grab(grab, serial);
+                    pointer.set_grab(grab, serial, 0);
                 }
             }
 

@@ -160,7 +160,7 @@ impl Anodium {
                     DataDeviceEvent::DnDStarted { icon, .. } => {
                         *dnd_icon.lock().unwrap() = icon;
                     }
-                    DataDeviceEvent::DnDDropped => {
+                    DataDeviceEvent::DnDDropped { .. } => {
                         *dnd_icon.lock().unwrap() = None;
                     }
                     _ => {}
