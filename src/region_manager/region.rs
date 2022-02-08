@@ -90,18 +90,6 @@ impl Region {
         false
     }
 
-    pub fn map_window<P: Into<Point<i32, Logical>>>(
-        &self,
-        window: &Window,
-        location: P,
-        activate: bool,
-    ) {
-        self.active_workspace()
-            .unwrap()
-            .space_mut()
-            .map_window(window, location, activate);
-    }
-
     pub fn find_window_workspace(&self, window: &Window) -> Option<Workspace> {
         for workspace in self.inner.borrow().workspaces.iter() {
             for search_window in workspace.space().windows() {
