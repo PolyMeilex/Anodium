@@ -3,7 +3,9 @@ use std::rc::Rc;
 
 use indexmap::IndexSet;
 
-use smithay::utils::{Physical, Point};
+use smithay::utils::{Logical, Physical, Point};
+
+use crate::output_manager::Output;
 
 use super::workspace::Workspace;
 
@@ -32,6 +34,12 @@ impl Region {
 
     pub fn add_workspace(&self, workspace: Workspace) {
         self.inner.borrow_mut().workspaces.insert(workspace);
+    }
+
+    pub fn map_output(&self, output: &Output, scale: f64, location: Point<i32, Logical>) {
+        for workspace in &self.inner.borrow().workspaces {
+            workspace.space_mut().map_output(output, scale, location);
+        }
     }
 
     pub fn set_active_workspace(&self, name: &str) {

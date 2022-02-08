@@ -6,7 +6,11 @@ use rhai::{FnPtr, INT};
 
 use crate::region_manager::{Region, RegionManager, Workspace};
 
-use smithay::utils::{Physical, Point};
+use crate::output_manager::Output;
+
+mod workspace;
+
+use smithay::utils::{Logical, Physical, Point};
 
 #[derive(Debug, Clone)]
 pub struct Regions {
@@ -29,6 +33,16 @@ pub mod region {
     pub fn add_workspace(region: &mut Region, workspace: Workspace) {
         region.add_workspace(workspace);
     }
+
+    #[rhai_fn(global)]
+    pub fn map_output(
+        region: &mut Region,
+        output: Output,
+        scale: f64,
+        position: Point<i32, Logical>,
+    ) {
+        region.map_output(&output, scale, position);
+    }
 }
 
 #[export_module]
@@ -44,6 +58,10 @@ pub mod point {
     pub fn physical(x: INT, y: INT) -> Point<i32, Physical> {
         Point::from((x as i32, y as i32))
     }
+
+    pub fn logical(x: INT, y: INT) -> Point<i32, Logical> {
+        Point::from((x as i32, y as i32))
+    }
 }
 
 pub fn register(engine: &mut Engine) {
@@ -56,4 +74,6 @@ pub fn register(engine: &mut Engine) {
         .register_static_module("point", point_module.into())
         .register_type::<Point<i32, Physical>>()
         .register_type::<Region>();
+
+    workspace::register(engine);
 }
