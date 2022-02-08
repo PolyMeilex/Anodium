@@ -3,7 +3,11 @@ use std::rc::Rc;
 
 use indexmap::IndexSet;
 
-use smithay::utils::{Logical, Physical, Point};
+use smithay::{
+    desktop::WindowSurfaceType,
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    utils::{Logical, Physical, Point},
+};
 
 use crate::output_manager::Output;
 
@@ -11,7 +15,7 @@ use super::workspace::Workspace;
 
 #[derive(Debug)]
 struct RegionInner {
-    position: Point<i32, Physical>,
+    position: Point<i32, Logical>,
     active_workspace: Option<Workspace>,
     workspaces: IndexSet<Workspace>,
 }
@@ -22,7 +26,7 @@ pub struct Region {
 }
 
 impl Region {
-    pub fn new(position: Point<i32, Physical>) -> Self {
+    pub fn new(position: Point<i32, Logical>) -> Self {
         Self {
             inner: Rc::new(RefCell::new(RegionInner {
                 position,
@@ -52,5 +56,21 @@ impl Region {
     pub fn active_workspace(&self) -> Option<Workspace> {
         let inner = self.inner.borrow();
         inner.active_workspace.clone()
+    }
+
+    pub fn surface_under(
+        &self,
+        point: Point<f64, Logical>,
+    ) -> Option<(WlSurface, Point<i32, Logical>)> {
+        let inner = self.inner.borrow();
+        let active_workspace = inner.active_workspace.as_ref().unwrap();
+        let space = active_workspace.space();
+        point += inner.position.to_f64();
+        let window = space.window_under(point)?;
+
+        let window_loc = space.window_geometry(window).unwrap().loc;
+        window
+            .surface_under(point - window_loc.to_f64(), WindowSurfaceType::ALL)
+            .map(|(s, loc)| (s, loc + window_loc))
     }
 }

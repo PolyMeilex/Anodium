@@ -145,11 +145,6 @@ impl Anodium {
         &self,
         point: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<i32, Logical>)> {
-        let window = self.workspace.window_under(point)?;
-
-        let window_loc = self.workspace.window_geometry(window).unwrap().loc;
-        window
-            .surface_under(point - window_loc.to_f64(), WindowSurfaceType::ALL)
-            .map(|(s, loc)| (s, loc + window_loc))
+        self.region_manager.surface_under(point)
     }
 }

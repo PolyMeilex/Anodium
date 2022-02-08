@@ -82,8 +82,7 @@ pub struct Anodium {
     pub anodium_protocol: AnodiumProtocol,
     pub output_manager: OutputManager,
     pub region_manager: RegionManager,
-    pub workspace: Workspace,
-
+    //pub workspace: Workspace,
     pub focused_window: Option<desktop::Window>,
 
     #[cfg(feature = "xwayland")]
@@ -293,8 +292,7 @@ impl Anodium {
                 anodium_protocol,
                 output_manager: output_map,
                 region_manager: region_map,
-                workspace: Workspace::new(),
-
+                //workspace: Workspace::new(),
                 focused_window: Default::default(),
 
                 #[cfg(feature = "xwayland")]

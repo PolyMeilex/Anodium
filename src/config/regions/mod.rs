@@ -25,7 +25,7 @@ impl Regions {
 
 #[export_module]
 pub mod region {
-    pub fn create(position: Point<i32, Physical>) -> Region {
+    pub fn create(position: Point<i32, Logical>) -> Region {
         Region::new(position)
     }
 
