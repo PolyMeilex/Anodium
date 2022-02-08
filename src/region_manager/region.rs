@@ -101,4 +101,15 @@ impl Region {
             .space_mut()
             .map_window(window, location, activate);
     }
+
+    pub fn find_window_workspace(&self, window: &Window) -> Option<Workspace> {
+        for workspace in self.inner.borrow().workspaces.iter() {
+            for search_window in workspace.space().windows() {
+                if window == search_window {
+                    return Some(workspace.clone());
+                }
+            }
+        }
+        None
+    }
 }

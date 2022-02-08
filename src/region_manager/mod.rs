@@ -4,6 +4,7 @@ use std::rc::Rc;
 mod region;
 mod workspace;
 
+use smithay::desktop::Window;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 
@@ -44,6 +45,15 @@ impl RegionManager {
         for region in self.regions.borrow().iter() {
             if region.contains(point) {
                 return Some(region.clone());
+            }
+        }
+        None
+    }
+
+    pub fn find_window_workspace(&self, window: &Window) -> Option<Workspace> {
+        for region in self.regions.borrow().iter() {
+            if let Some(workspace) = region.find_window_workspace(window) {
+                return Some(workspace);
             }
         }
         None
