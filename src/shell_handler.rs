@@ -40,12 +40,13 @@ impl ShellHandler for Anodium {
                 let pointer = seat.get_pointer().unwrap();
 
                 let window = self
-                    .workspace
+                    .region_manager
                     .window_for_surface(toplevel.get_surface().unwrap());
 
                 if let Some(window) = window {
+                    let workspace = self.region_manager.find_window_workspace(&window).unwrap();
                     let initial_window_location =
-                        self.workspace.window_geometry(window).unwrap().loc;
+                        workspace.space().window_geometry(&window).unwrap().loc;
 
                     let grab = MoveSurfaceGrab {
                         start_data,
@@ -66,10 +67,12 @@ impl ShellHandler for Anodium {
                 let pointer = seat.get_pointer().unwrap();
                 let wl_surface = toplevel.get_surface().unwrap();
 
-                let window = self.workspace.window_for_surface(wl_surface);
+                let window = self.region_manager.window_for_surface(wl_surface);
 
                 if let Some(window) = window {
-                    let geometry = self.workspace.window_geometry(window).unwrap();
+                    let workspace = self.region_manager.find_window_workspace(&window).unwrap();
+                    let geometry = workspace.space().window_geometry(&window).unwrap();
+
                     let (initial_window_location, initial_window_size) =
                         (geometry.loc, geometry.size);
 

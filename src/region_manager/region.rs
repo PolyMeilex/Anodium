@@ -100,4 +100,13 @@ impl Region {
         }
         None
     }
+
+    pub fn window_for_surface(&self, surface: &WlSurface) -> Option<Window> {
+        for workspace in self.inner.borrow().workspaces.iter() {
+            if let Some(window) = workspace.space().window_for_surface(surface) {
+                return Some(window.clone());
+            }
+        }
+        None
+    }
 }

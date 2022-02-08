@@ -58,4 +58,13 @@ impl RegionManager {
         }
         None
     }
+
+    pub fn window_for_surface(&self, surface: &WlSurface) -> Option<Window> {
+        for region in self.regions.borrow().iter() {
+            if let Some(window) = region.window_for_surface(surface) {
+                return Some(window);
+            }
+        }
+        None
+    }
 }
