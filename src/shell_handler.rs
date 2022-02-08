@@ -22,7 +22,10 @@ impl ShellHandler for Anodium {
             // Toplevel
             //
             ShellEvent::WindowCreated { window } => {
-                self.workspace.map_window(&window, (0, 0), false);
+                self.region_manager
+                    .region_under(self.input_state.pointer_location)
+                    .unwrap_or(self.region_manager.first().unwrap())
+                    .map_window(&window, (0, 0), false);
             }
 
             ShellEvent::WindowMove {

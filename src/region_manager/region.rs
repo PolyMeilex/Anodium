@@ -4,7 +4,7 @@ use std::rc::Rc;
 use indexmap::IndexSet;
 
 use smithay::{
-    desktop::WindowSurfaceType,
+    desktop::{Window, WindowSurfaceType},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Physical, Point},
 };
@@ -72,5 +72,33 @@ impl Region {
         window
             .surface_under(point - window_loc.to_f64(), WindowSurfaceType::ALL)
             .map(|(s, loc)| (s, loc + window_loc))
+    }
+
+    pub fn contains(&self, point: Point<f64, Logical>) -> bool {
+        let inner = self.inner.borrow();
+        let active_workspace = inner.active_workspace.as_ref().unwrap();
+        let space = active_workspace.space();
+
+        for output in space.outputs() {
+            let mut geometry = space.output_geometry(output).unwrap();
+            geometry.loc += inner.position;
+            if geometry.to_f64().contains(point) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn map_window<P: Into<Point<i32, Logical>>>(
+        &self,
+        window: &Window,
+        location: P,
+        activate: bool,
+    ) {
+        self.active_workspace()
+            .unwrap()
+            .space_mut()
+            .map_window(window, location, activate);
     }
 }

@@ -24,6 +24,10 @@ impl RegionManager {
         self.regions.borrow_mut().push(region)
     }
 
+    pub fn first(&self) -> Option<Region> {
+        self.regions.borrow().first().cloned()
+    }
+
     pub fn surface_under(
         &self,
         point: Point<f64, Logical>,
@@ -31,6 +35,15 @@ impl RegionManager {
         for region in self.regions.borrow().iter() {
             if let Some((surface, point)) = region.surface_under(point) {
                 return Some((surface, point));
+            }
+        }
+        None
+    }
+
+    pub fn region_under(&self, point: Point<f64, Logical>) -> Option<Region> {
+        for region in self.regions.borrow().iter() {
+            if region.contains(point) {
+                return Some(region.clone());
             }
         }
         None
