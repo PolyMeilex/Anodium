@@ -39,7 +39,7 @@ use crate::{
     framework::backend::BackendRequest,
     framework::{cursor::PointerElement, shell::ShellManager},
     output_manager::{Output, OutputManager},
-    render,
+    render::{self, quad::QuadElement},
     workspace_map::WorkspaceMap,
 };
 
@@ -82,6 +82,8 @@ pub struct Anodium {
     pub output_manager: OutputManager,
 
     pub workspace_map: WorkspaceMap,
+
+    pub grab_gost: Option<Rectangle<i32, Logical>>,
 
     pub active_workspace: Option<String>,
     pub focused_window: Option<desktop::Window>,
@@ -293,6 +295,8 @@ impl Anodium {
 
                 workspace_map: WorkspaceMap::new(),
 
+                grab_gost: None,
+
                 active_workspace: None,
                 focused_window: Default::default(),
 
@@ -384,6 +388,19 @@ impl Anodium {
             &self.input_state.modifiers_state,
             &self.config_tx,
         );
+
+        if let Some(ref geo) = self.grab_gost {
+            renderer
+                .with_context(|_, gl| {
+                    elems.push(Box::new(QuadElement::new(
+                        gl,
+                        *geo,
+                        output_geometry.to_physical(1).to_f64(),
+                    )));
+                })
+                .unwrap();
+        }
+
         elems.push(Box::new(frame));
 
         // Pointer Related:

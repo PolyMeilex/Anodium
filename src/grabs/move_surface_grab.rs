@@ -35,6 +35,10 @@ impl PointerGrab for MoveSurfaceGrab {
         let delta = location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
 
+        let mut geo = self.window.geometry();
+        geo.loc += new_location.to_i32_round();
+
+        anodium.grab_gost = Some(geo);
         anodium
             .workspace_map
             .workspace_for_surface_mut(&self.window)
@@ -88,7 +92,7 @@ impl PointerGrab for MoveSurfaceGrab {
         state: ButtonState,
         serial: Serial,
         time: u32,
-        _ddata: DispatchData,
+        mut ddata: DispatchData,
     ) {
         handle.button(button, state, serial, time);
         if handle.current_pressed().is_empty() {
@@ -125,6 +129,8 @@ impl PointerGrab for MoveSurfaceGrab {
             //     }
             // }
 
+            let anodium = ddata.get::<Anodium>().unwrap();
+            anodium.grab_gost.take();
             // No more buttons are pressed, release the grab.
             handle.unset_grab(serial, time);
         }

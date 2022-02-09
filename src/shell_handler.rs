@@ -1,7 +1,13 @@
+use std::sync::Mutex;
+
 use smithay::{
-    desktop::{self, WindowSurfaceType},
+    desktop::{self, Kind, WindowSurfaceType},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
-    utils::{Logical, Point},
+    utils::{Logical, Point, Rectangle},
+    wayland::{
+        compositor,
+        shell::xdg::{SurfaceCachedState, XdgToplevelSurfaceRoleAttributes},
+    },
 };
 
 use crate::{
@@ -46,7 +52,15 @@ impl ShellHandler for Anodium {
 
                 if let Some(window) = window {
                     let workspace = self.workspace_map.workspace_for_surface(window).unwrap();
+
+                    let window_bbox = workspace.window_bbox(window).unwrap();
                     let initial_window_location = workspace.window_geometry(window).unwrap().loc;
+
+                    let mut geo = window.geometry();
+                    geo.loc += initial_window_location;
+
+                    // self.grab_gost = Some(window_bbox);
+                    self.grab_gost = Some(geo);
 
                     let grab = MoveSurfaceGrab {
                         start_data,

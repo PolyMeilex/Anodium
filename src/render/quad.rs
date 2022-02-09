@@ -125,13 +125,13 @@ pub struct QuadElement {
 impl QuadElement {
     pub fn new(
         gl: &Gles2,
-        position: Point<i32, Logical>,
+        rect: Rectangle<i32, Logical>,
         output_geometry: Rectangle<f64, Physical>,
     ) -> Self {
         Self {
             pipeline: QuadPipeline::new(gl),
-            position,
-            size: (100, 100).into(),
+            position: rect.loc,
+            size: rect.size,
             output_geometry,
         }
     }
@@ -171,7 +171,7 @@ impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for Quad
                 ),
                 Transform::Flipped180,
                 gl,
-                1.0,
+                0.1,
             )
         })
     }
