@@ -4,8 +4,12 @@ use std::num::NonZeroU32;
 
 use cgmath::Matrix3;
 use smithay::{
-    backend::renderer::gles2::ffi::{self, Gles2},
-    utils::{Physical, Rectangle, Transform},
+    backend::renderer::gles2::{
+        ffi::{self, Gles2},
+        Gles2Error, Gles2Frame, Gles2Renderer, Gles2Texture,
+    },
+    desktop::space::{RenderElement, SpaceOutputTuple},
+    utils::{Logical, Physical, Point, Rectangle, Size, Transform},
 };
 
 use crate::utils::glow::{self, Program, Shader};
@@ -108,6 +112,68 @@ impl QuadPipeline {
             gl.DisableVertexAttribArray(self.position);
             gl.UseProgram(0);
         }
+    }
+}
+
+pub struct QuadElement {
+    pipeline: QuadPipeline,
+    position: Point<i32, Logical>,
+    size: Size<i32, Logical>,
+    output_geometry: Rectangle<f64, Physical>,
+}
+
+impl QuadElement {
+    pub fn new(
+        gl: &Gles2,
+        position: Point<i32, Logical>,
+        output_geometry: Rectangle<f64, Physical>,
+    ) -> Self {
+        Self {
+            pipeline: QuadPipeline::new(gl),
+            position,
+            size: (100, 100).into(),
+            output_geometry,
+        }
+    }
+}
+
+impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for QuadElement {
+    fn id(&self) -> usize {
+        0
+    }
+
+    fn geometry(&self) -> Rectangle<i32, Logical> {
+        Rectangle::from_loc_and_size(self.position, self.size)
+    }
+
+    fn accumulated_damage(
+        &self,
+        _: Option<SpaceOutputTuple<'_, '_>>,
+    ) -> Vec<Rectangle<i32, Logical>> {
+        vec![Rectangle::from_loc_and_size((0, 0), self.size)]
+    }
+
+    fn draw(
+        &self,
+        renderer: &mut Gles2Renderer,
+        _frame: &mut Gles2Frame,
+        scale: f64,
+        location: Point<i32, Logical>,
+        _damage: &[Rectangle<i32, Logical>],
+        _log: &slog::Logger,
+    ) -> Result<(), Gles2Error> {
+        renderer.with_context(|_, gl| {
+            self.pipeline.render(
+                self.output_geometry,
+                Rectangle::from_loc_and_size(
+                    self.output_geometry.loc.to_f64() + location.to_f64().to_physical(scale),
+                    self.size.to_f64().to_physical(scale),
+                ),
+                Transform::Flipped180,
+                gl,
+                1.0,
+            )
+        })
     }
 }
 
