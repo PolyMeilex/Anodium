@@ -34,12 +34,13 @@ impl OutputHandler for Anodium {
             .config
             .output_rearrange(self.output_manager.outputs().clone())
         {
-            for (output, pos) in self.output_manager.outputs().iter().zip(layout.iter()) {
+            //mapping is now done in rhai scripts, no need to do that here
+            /*for (output, pos) in self.output_manager.outputs().iter().zip(layout.iter()) {
                 let scale = self.workspace.output_scale(output).unwrap_or(1.0);
 
                 let (x, y) = *pos;
                 self.workspace.map_output(output, scale, (x, y));
-            }
+            }*/
         }
     }
 
@@ -72,7 +73,7 @@ impl BackendHandler for Anodium {
     fn send_frames(&mut self) {
         let time = self.start_time.elapsed().as_millis() as u32;
 
-        self.workspace.send_frames(false, time);
+        self.region_manager.send_frames(false, time);
     }
 
     fn start_compositor(&mut self) {

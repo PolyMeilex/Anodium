@@ -83,4 +83,14 @@ impl RegionManager {
         }
         None
     }
+
+    pub fn send_frames(&self, all: bool, time: u32) {
+        for region in self.regions.borrow().iter() {
+            region
+                .active_workspace()
+                .unwrap()
+                .space()
+                .send_frames(all, time);
+        }
+    }
 }
