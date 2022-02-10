@@ -125,31 +125,62 @@ impl ShellHandler for Anodium {
                 let output = output
                     .and_then(|o| Output::from_resource(&o))
                     .unwrap_or_else(|| {
-                        Output::wrap(self.workspace.outputs().next().unwrap().clone())
+                        Output::wrap(
+                            self.region_manager
+                                .first()
+                                .unwrap()
+                                .active_workspace()
+                                .unwrap()
+                                .space()
+                                .outputs()
+                                .next()
+                                .unwrap()
+                                .clone(),
+                        )
                     });
 
                 let mut map = output.layer_map();
                 map.map_layer(&surface).unwrap();
             }
             ShellEvent::LayerAckConfigure { surface, .. } => {
-                if let Some(output) = self.workspace.outputs().find(|o| {
-                    let map = desktop::layer_map_for_output(o);
-                    map.layer_for_surface(&surface).is_some()
-                }) {
+                if let Some(output) = self
+                    .region_manager
+                    .find_surface_workspace(&surface)
+                    .unwrap()
+                    .space()
+                    .outputs()
+                    .find(|o| {
+                        let map = desktop::layer_map_for_output(o);
+                        map.layer_for_surface(&surface).is_some()
+                    })
+                {
                     let mut map = desktop::layer_map_for_output(output);
                     map.arrange();
                 }
             }
 
             ShellEvent::SurfaceCommit { surface } => {
-                self.workspace.commit(&surface);
+                self.region_manager
+                    .find_surface_workspace(&surface)
+                    .unwrap()
+                    .space()
+                    .commit(&surface);
             }
             _ => {}
         }
     }
 
     fn window_location(&self, window: &Window) -> Point<i32, Logical> {
-        self.workspace.window_geometry(window).unwrap().loc
+        let region = self.region_manager.find_window_region(&window).unwrap();
+
+        region
+            .find_window_workspace(&window)
+            .unwrap()
+            .space()
+            .window_geometry(window)
+            .unwrap()
+            .loc
+            + region.position()
     }
 }
 

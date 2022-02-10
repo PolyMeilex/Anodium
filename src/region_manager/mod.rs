@@ -50,9 +50,25 @@ impl RegionManager {
         None
     }
 
+    pub fn find_window_region(&self, window: &Window) -> Option<Region> {
+        for region in self.regions.borrow().iter() {
+            return Some(region.clone());
+        }
+        None
+    }
+
     pub fn find_window_workspace(&self, window: &Window) -> Option<Workspace> {
         for region in self.regions.borrow().iter() {
             if let Some(workspace) = region.find_window_workspace(window) {
+                return Some(workspace);
+            }
+        }
+        None
+    }
+
+    pub fn find_surface_workspace(&self, surface: &WlSurface) -> Option<Workspace> {
+        for region in self.regions.borrow().iter() {
+            if let Some(workspace) = region.find_surface_workspace(surface) {
                 return Some(workspace);
             }
         }

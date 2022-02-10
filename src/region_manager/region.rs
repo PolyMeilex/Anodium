@@ -101,6 +101,19 @@ impl Region {
         None
     }
 
+    pub fn find_surface_workspace(&self, surface: &WlSurface) -> Option<Workspace> {
+        for workspace in self.inner.borrow().workspaces.iter() {
+            let space = workspace.space();
+            if space.window_for_surface(surface).is_some() {
+                return Some(workspace.clone());
+            }
+            if space.layer_for_surface(surface).is_some() {
+                return Some(workspace.clone());
+            }
+        }
+        None
+    }
+
     pub fn window_for_surface(&self, surface: &WlSurface) -> Option<Window> {
         for workspace in self.inner.borrow().workspaces.iter() {
             if let Some(window) = workspace.space().window_for_surface(surface) {
@@ -108,5 +121,9 @@ impl Region {
             }
         }
         None
+    }
+
+    pub fn position(&self) -> Point<i32, Logical> {
+        self.inner.borrow().position
     }
 }
