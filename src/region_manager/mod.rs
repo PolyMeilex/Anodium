@@ -7,6 +7,7 @@ mod workspace;
 use smithay::desktop::Window;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
+use smithay::wayland::output::Output;
 
 pub use self::region::Region;
 pub use self::workspace::Workspace;
@@ -70,6 +71,15 @@ impl RegionManager {
         for region in self.regions.borrow().iter() {
             if let Some(workspace) = region.find_surface_workspace(surface) {
                 return Some(workspace);
+            }
+        }
+        None
+    }
+
+    pub fn find_output_region(&self, output: &Output) -> Option<Region> {
+        for region in self.regions.borrow().iter() {
+            if region.has_output(output) {
+                return Some(region.clone());
             }
         }
         None

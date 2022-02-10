@@ -362,7 +362,14 @@ impl Anodium {
         age: usize,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError> {
-        let output_geometry = self.workspace.output_geometry(output).unwrap();
+        let region = if let Some(region) = self.region_manager.find_output_region(output) {
+            region
+        } else {
+            return Ok(None);
+        };
+
+        let workspace = region.active_workspace().unwrap();
+        let output_geometry = workspace.space().output_geometry(output).unwrap();
 
         let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
 
@@ -398,8 +405,8 @@ impl Anodium {
             }
         }
 
-        let render_result = self
-            .workspace
+        let render_result = workspace
+            .space_mut()
             .render_output(renderer, output, age, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
 

@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use indexmap::IndexSet;
 
+use smithay::wayland::output::Output as SmithayOutput;
 use smithay::{
     desktop::{Window, WindowSurfaceType},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
@@ -112,6 +113,15 @@ impl Region {
             }
         }
         None
+    }
+
+    pub fn has_output(&self, output: &SmithayOutput) -> bool {
+        self.active_workspace()
+            .unwrap()
+            .space()
+            .outputs()
+            .find(|o| o == &output)
+            .is_some()
     }
 
     pub fn window_for_surface(&self, surface: &WlSurface) -> Option<Window> {
