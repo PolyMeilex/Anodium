@@ -160,11 +160,9 @@ impl ShellHandler for Anodium {
             }
 
             ShellEvent::SurfaceCommit { surface } => {
-                self.region_manager
-                    .find_surface_workspace(&surface)
-                    .unwrap()
-                    .space()
-                    .commit(&surface);
+                if let Some(workspace) = self.region_manager.find_surface_workspace(&surface) {
+                    workspace.space().commit(&surface);
+                }
             }
             _ => {}
         }
