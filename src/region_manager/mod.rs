@@ -55,7 +55,9 @@ impl RegionManager {
 
     pub fn find_window_region(&self, window: &Window) -> Option<Region> {
         for region in self.regions.borrow().iter() {
-            return Some(region.clone());
+            if region.find_window_workspace(window).is_some() {
+                return Some(region.clone());
+            }
         }
         None
     }

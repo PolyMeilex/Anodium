@@ -62,7 +62,7 @@ impl Region {
 
     pub fn surface_under(
         &self,
-        point: Point<f64, Logical>,
+        mut point: Point<f64, Logical>,
     ) -> Option<(WlSurface, Point<i32, Logical>)> {
         let inner = self.inner.borrow();
         let active_workspace = inner.active_workspace.as_ref().unwrap();
@@ -138,7 +138,8 @@ impl Region {
         self.inner.borrow().position
     }
 
-    pub fn for_each_workspace<F>(self, f: F)
+    //TODO: returning just an iterator would be better
+    pub fn for_each_workspace<F>(&self, mut f: F)
     where
         F: FnMut(&Workspace),
     {

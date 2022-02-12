@@ -78,7 +78,7 @@ impl<'a> Iterator for VisibleWorkspaceIterMut<'a> {
 }*/
 
 pub struct RefIter<'a, T> {
-    inner: Option<Ref<'a, [T]>>,
+    pub inner: Option<Ref<'a, [T]>>,
 }
 
 impl<'a, T> Iterator for RefIter<'a, T> {

@@ -27,7 +27,7 @@ impl ShellHandler for Anodium {
                     .unwrap_or(self.region_manager.first().unwrap())
                     .active_workspace()
                     .unwrap()
-                    .space()
+                    .space_mut()
                     .map_window(&window, (0, 0), false);
             }
 
@@ -103,7 +103,7 @@ impl ShellHandler for Anodium {
                 self.region_manager
                     .find_window_workspace(&window)
                     .unwrap()
-                    .space()
+                    .space_mut()
                     .map_window(&window, new_location, false);
             }
 

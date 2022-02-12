@@ -47,15 +47,27 @@ impl InputHandler for Anodium {
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output = output.cloned().unwrap_or_else(|| {
-                    self.workspace
-                        .outputs()
-                        .next()
-                        .cloned()
-                        .map(Output::wrap)
-                        .unwrap()
+                    Output::wrap(
+                        self.region_manager
+                            .first()
+                            .unwrap()
+                            .active_workspace()
+                            .unwrap()
+                            .space()
+                            .outputs()
+                            .next()
+                            .unwrap()
+                            .clone(),
+                    )
                 });
 
-                let output_geometry = self.workspace.output_geometry(&output).unwrap();
+                let workspace = self
+                    .region_manager
+                    .find_output_region(&output)
+                    .unwrap()
+                    .active_workspace()
+                    .unwrap();
+                let output_geometry = workspace.space().output_geometry(&output).unwrap();
                 let output_pos = output_geometry.loc.to_f64();
                 let output_size = output_geometry.size;
 
@@ -78,17 +90,24 @@ impl InputHandler for Anodium {
             _ => false,
         };
 
-        if let Some(output) = self
-            .workspace
-            .output_under(self.input_state.pointer_location)
-            .next()
+        if let Some(region) = self
+            .region_manager
+            .region_under(self.input_state.pointer_location)
         {
-            let output = Output::wrap(output.clone());
+            if let Some(output) = region
+                .active_workspace()
+                .unwrap()
+                .space()
+                .output_under(self.input_state.pointer_location)
+                .next()
+            {
+                let output = Output::wrap(output.clone());
 
-            if captured {
-                self.process_egui_event(event, &output);
-            } else {
-                self.reset_egui_event(&output);
+                if captured {
+                    self.process_egui_event(event, &output);
+                } else {
+                    self.reset_egui_event(&output);
+                }
             }
         }
     }
@@ -105,7 +124,16 @@ impl Anodium {
     fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
         match event {
             InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
-                let output_loc = self.workspace.output_geometry(output).unwrap().loc;
+                let output_loc = self
+                    .region_manager
+                    .find_output_region(&output)
+                    .unwrap()
+                    .active_workspace()
+                    .unwrap()
+                    .space()
+                    .output_geometry(output)
+                    .unwrap()
+                    .loc;
                 let mouse_location = self.input_state.pointer_location - output_loc.to_f64();
                 output
                     .egui()
@@ -229,7 +257,15 @@ impl Anodium {
                 if !self.input_state.pointer.is_grabbed() {
                     let point = self.input_state.pointer_location;
                     // let under = self.surface_under(self.input_state.pointer_location);
-                    let window = self.workspace.window_under(point).cloned();
+                    let window = self
+                        .region_manager
+                        .region_under(point)
+                        .unwrap()
+                        .active_workspace()
+                        .unwrap()
+                        .space()
+                        .window_under(point)
+                        .cloned();
                     // let surface = under.as_ref().map(|&(ref s, _)| s);
                     // if let Some(surface) = surface {
                     //     let mut window = None;
