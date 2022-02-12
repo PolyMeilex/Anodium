@@ -437,6 +437,11 @@ impl Anodium {
             r.for_each_workspace(|w| {
                 w.space().windows().for_each(|w| w.configure());
             });
+            if let Some(window) = window {
+                if let Some(workspace) = r.find_window_workspace(window) {
+                    workspace.space_mut().raise_window(window, true);
+                }
+            }
         });
 
         self.focused_window = window.cloned();
