@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 
 use indexmap::IndexSet;
@@ -11,6 +11,7 @@ use smithay::{
 };
 
 use crate::output_manager::Output;
+use crate::utils::iterators::RefIter;
 
 use super::workspace::Workspace;
 
@@ -135,5 +136,14 @@ impl Region {
 
     pub fn position(&self) -> Point<i32, Logical> {
         self.inner.borrow().position
+    }
+
+    pub fn for_each_workspace<F>(self, f: F)
+    where
+        F: FnMut(&Workspace),
+    {
+        for workspace in self.inner.borrow().workspaces.iter() {
+            f(workspace);
+        }
     }
 }

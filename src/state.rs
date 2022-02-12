@@ -308,7 +308,7 @@ impl Anodium {
 impl Anodium {
     pub fn update(&mut self) {
         self.shell_manager.refresh();
-        self.workspace.refresh();
+        self.region_manager.refresh();
 
         if let Some(focused_window) = &self.focused_window {
             if !focused_window.toplevel().alive() {
@@ -421,15 +421,23 @@ impl Anodium {
 
 impl Anodium {
     pub fn update_focused_window(&mut self, window: Option<&desktop::Window>) {
-        self.workspace.windows().for_each(|w| {
-            w.set_activated(false);
+        self.region_manager.iter().for_each(|r| {
+            r.for_each_workspace(|w| {
+                w.space().windows().for_each(|w| {
+                    w.set_activated(false);
+                });
+            });
         });
 
         if let Some(window) = window {
             window.set_activated(true);
         }
 
-        self.workspace.windows().for_each(|w| w.configure());
+        self.region_manager.iter().for_each(|r| {
+            r.for_each_workspace(|w| {
+                w.space().windows().for_each(|w| w.configure());
+            });
+        });
 
         self.focused_window = window.cloned();
     }

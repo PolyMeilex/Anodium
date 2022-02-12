@@ -9,6 +9,7 @@ use smithay::{
 use crate::window::Window;
 
 pub mod glow;
+pub mod iterators;
 
 pub trait AsWlSurface {
     fn as_surface(&self) -> Option<&WlSurface>;

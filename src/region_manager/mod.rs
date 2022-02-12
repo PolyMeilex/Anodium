@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 
 mod region;
@@ -8,6 +8,8 @@ use smithay::desktop::Window;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 use smithay::wayland::output::Output;
+
+use crate::utils::iterators::RefIter;
 
 pub use self::region::Region;
 pub use self::workspace::Workspace;
@@ -101,6 +103,18 @@ impl RegionManager {
                 .unwrap()
                 .space()
                 .send_frames(all, time);
+        }
+    }
+
+    pub fn iter(&self) -> RefIter<Region> {
+        RefIter {
+            inner: Some(Ref::map(self.regions.borrow(), |v| &v[..])),
+        }
+    }
+
+    pub fn refresh(&self) {
+        for region in self.regions.borrow().iter() {
+            region.active_workspace().unwrap().space_mut().refresh();
         }
     }
 }
