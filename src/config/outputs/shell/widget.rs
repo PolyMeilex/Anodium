@@ -22,9 +22,10 @@ impl Clone for Box<dyn Widget> {
 
 #[export_module]
 pub mod widget {
+    use crate::config::input::InputState;
     use crate::config::outputs::shell::{
-        button::Button, fps::Fps, logger::Logger, menu::Menu, output::OutputGeometry, text::Text,
-        workspace::CurrentWorkspace,
+        button::Button, fps::Fps, logger::Logger, menu::Menu, output::OutputGeometry,
+        pointer::PointerPosition, text::Text, workspace::CurrentWorkspace,
     };
     use crate::output_manager::Output;
 
@@ -42,6 +43,10 @@ pub mod widget {
 
     pub fn fps(output: Output) -> Fps {
         Fps::new(output)
+    }
+
+    pub fn pointer_position(input: InputState) -> PointerPosition {
+        PointerPosition::new(input)
     }
 
     pub fn logger() -> Logger {

@@ -242,6 +242,12 @@ anodize.outputs.on_new(|output| {
 
     panel.add_widget(menu.convert());
     output.shell.add_panel(panel);
+
+    let pointer_position_box = container::box(610, 0, 150, 30, layout::horizontal());
+    let pointer_position_widget = widget::pointer_position(anodize.input);
+    pointer_position_box.add_widget(pointer_position_widget.convert());
+
+    output.shell.add_box(pointer_position_box);
 });
 
 // anodize.system.add_timeout(|| {

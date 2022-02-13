@@ -67,7 +67,7 @@ pub struct Anodium {
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
     pub cursor_status: Arc<Mutex<CursorImageStatus>>,
 
-    pub input_state: InputState,
+    pub input_state: Rc<RefCell<InputState>>,
 
     pub seat: Seat,
 
@@ -248,12 +248,22 @@ impl Anodium {
         let config_tx = Self::init_config_channel(&handle);
         let output_map = OutputManager::new();
         let region_map = RegionManager::new();
+        let input_state = Rc::new(RefCell::new(InputState {
+            pointer_location: (0.0, 0.0).into(),
+            previous_pointer_location: (0.0, 0.0).into(),
+            pointer,
+            keyboard,
+            modifiers_state: Default::default(),
+            suppressed_keys: Vec::new(),
+            pressed_keys: HashSet::new(),
+        }));
 
         let config = ConfigVM::new(
             config_tx.clone(),
             output_map.clone(),
             region_map.clone(),
             handle.clone(),
+            input_state.clone(),
             options.config.clone(),
         )
         .unwrap();
@@ -270,15 +280,7 @@ impl Anodium {
                 dnd_icon,
                 cursor_status,
 
-                input_state: InputState {
-                    pointer_location: (0.0, 0.0).into(),
-                    previous_pointer_location: (0.0, 0.0).into(),
-                    pointer,
-                    keyboard,
-                    modifiers_state: Default::default(),
-                    suppressed_keys: Vec::new(),
-                    pressed_keys: HashSet::new(),
-                },
+                input_state,
 
                 seat,
 
@@ -372,20 +374,19 @@ impl Anodium {
         let output_geometry = workspace.space().output_geometry(output).unwrap();
 
         let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
-
-        let frame = output.render_egui_shell(
-            &self.start_time,
-            &self.input_state.modifiers_state,
-            &self.config_tx,
-        );
-        elems.push(Box::new(frame));
-
-        // Pointer Related:
-        if output_geometry
-            .to_f64()
-            .contains(self.input_state.pointer_location)
         {
-            let (ptr_x, ptr_y) = self.input_state.pointer_location.into();
+            let input_state = self.input_state.borrow();
+            let frame = output.render_egui_shell(
+                &self.start_time,
+                &input_state.modifiers_state,
+                &self.config_tx,
+            );
+            elems.push(Box::new(frame));
+        }
+        let mut input_state = self.input_state.borrow_mut();
+        // Pointer Related:
+        if region.contains(input_state.pointer_location) {
+            let (ptr_x, ptr_y) = input_state.pointer_location.into();
             let relative_location =
                 Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
 
@@ -395,10 +396,11 @@ impl Anodium {
                 elems.push(Box::new(PointerElement::new(
                     texture.clone(),
                     relative_location,
-                    self.input_state.pointer_location != self.input_state.previous_pointer_location,
+                    input_state.pointer_location != input_state.previous_pointer_location,
                 )));
             }
-            self.input_state.previous_pointer_location = self.input_state.pointer_location;
+
+            input_state.previous_pointer_location = input_state.pointer_location;
 
             if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
                 elems.push(Box::new(wl_dnd));

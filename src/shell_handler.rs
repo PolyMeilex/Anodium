@@ -23,7 +23,7 @@ impl ShellHandler for Anodium {
             //
             ShellEvent::WindowCreated { window } => {
                 self.region_manager
-                    .region_under(self.input_state.pointer_location)
+                    .region_under(self.input_state.borrow().pointer_location)
                     .unwrap_or(self.region_manager.first().unwrap())
                     .active_workspace()
                     .unwrap()

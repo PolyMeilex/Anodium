@@ -7,6 +7,7 @@ use rhai::{Dynamic, Engine, EvalAltResult, FnPtr, FuncArgs, Scope, AST};
 
 mod anodize;
 pub mod eventloop;
+mod input;
 pub mod keyboard;
 mod log;
 pub mod outputs;
@@ -22,7 +23,7 @@ use smithay::wayland::output::Mode;
 
 use crate::output_manager::{Output, OutputDescriptor, OutputManager};
 use crate::region_manager::RegionManager;
-use crate::state::Anodium;
+use crate::state::{Anodium, InputState};
 
 use self::anodize::Anodize;
 use self::eventloop::ConfigEvent;
@@ -48,6 +49,7 @@ impl ConfigVM {
         output_map: OutputManager,
         region_map: RegionManager,
         loop_handle: LoopHandle<'static, Anodium>,
+        input_state: Rc<RefCell<InputState>>,
         config: PathBuf,
     ) -> Result<ConfigVM, Box<EvalAltResult>> {
         let mut engine = Engine::new();
@@ -61,6 +63,7 @@ impl ConfigVM {
         windows::register(&mut engine);
         outputs::register(&mut engine);
         regions::register(&mut engine);
+        input::register(&mut engine);
 
         let anodize = anodize::register(
             &mut scope,
@@ -69,6 +72,7 @@ impl ConfigVM {
             output_map,
             region_map,
             loop_handle,
+            input_state,
         );
 
         let ast = engine.compile_file(config)?;
