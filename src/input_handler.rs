@@ -61,21 +61,20 @@ impl InputHandler for Anodium {
                     )
                 });
 
-                let workspace = self
-                    .region_manager
-                    .find_output_region(&output)
-                    .unwrap()
-                    .active_workspace()
-                    .unwrap();
-                let output_geometry = workspace.space().output_geometry(&output).unwrap();
-                let output_pos = output_geometry.loc.to_f64();
-                let output_size = output_geometry.size;
+                if let Some(region) = self.region_manager.find_output_region(&output) {
+                    let workspace = region.active_workspace().unwrap();
+                    let output_geometry = workspace.space().output_geometry(&output).unwrap();
+                    let output_pos = output_geometry.loc.to_f64();
+                    let output_size = output_geometry.size;
 
-                self.input_state.pointer_location =
-                    event.position_transformed(output_size) + output_pos;
-                self.on_pointer_move(event.time());
-                self.surface_under(self.input_state.pointer_location)
-                    .is_none()
+                    self.input_state.pointer_location =
+                        event.position_transformed(output_size) + output_pos;
+                    self.on_pointer_move(event.time());
+                    self.surface_under(self.input_state.pointer_location)
+                        .is_none()
+                } else {
+                    false
+                }
             }
             InputEvent::PointerButton { event, .. } => {
                 self.on_pointer_button::<I>(event);
@@ -257,33 +256,34 @@ impl Anodium {
                 if !self.input_state.pointer.is_grabbed() {
                     let point = self.input_state.pointer_location;
                     // let under = self.surface_under(self.input_state.pointer_location);
-                    let window = self
-                        .region_manager
-                        .region_under(point)
-                        .unwrap()
-                        .active_workspace()
-                        .unwrap()
-                        .space()
-                        .window_under(point)
-                        .cloned();
-                    // let surface = under.as_ref().map(|&(ref s, _)| s);
-                    // if let Some(surface) = surface {
-                    //     let mut window = None;
-                    //     if let Some(space) = self.find_workspace_by_surface_mut(surface) {
-                    //         window = space.find_window(surface).cloned();
-                    //     }
-                    //     self.update_focused_window(window);
-                    // }
+                    if let Some(region) = self.region_manager.region_under(point) {
+                        let window = region
+                            .active_workspace()
+                            .unwrap()
+                            .space()
+                            .window_under(point)
+                            .cloned();
+                        // let surface = under.as_ref().map(|&(ref s, _)| s);
+                        // if let Some(surface) = surface {
+                        //     let mut window = None;
+                        //     if let Some(space) = self.find_workspace_by_surface_mut(surface) {
+                        //         window = space.find_window(surface).cloned();
+                        //     }
+                        //     self.update_focused_window(window);
+                        // }
 
-                    self.update_focused_window(window.as_ref());
+                        self.update_focused_window(window.as_ref());
 
-                    let surface = window
-                        .and_then(|w| w.surface_under(point, WindowSurfaceType::ALL))
-                        .map(|s| s.0);
+                        let surface = window
+                            .and_then(|w| w.surface_under(point, WindowSurfaceType::ALL))
+                            .map(|s| s.0);
 
-                    self.input_state
-                        .keyboard
-                        .set_focus(surface.as_ref(), serial);
+                        self.input_state
+                            .keyboard
+                            .set_focus(surface.as_ref(), serial);
+                    } else {
+                        error!("got a button press without a region under it, this shouldn't be possible: {:?}", point);
+                    }
                 }
                 wl_pointer::ButtonState::Pressed
             }

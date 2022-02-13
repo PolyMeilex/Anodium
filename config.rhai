@@ -192,7 +192,28 @@ anodize.outputs.on_mode_select(|desc, modes| {
 
 let logger_added = false;
 
+let region_0 = region::create(point::logical(0, 0));
+region_0.add_workspace(workspace::create("im"));
+region_0.add_workspace(workspace::create("terminal"));
+
+let region_1 = region::create(point::logical(1920, 0));
+region_1.add_workspace(workspace::create("www"));
+region_1.add_workspace(workspace::create("code"));
+
+anodize.regions.push(region_0);
+anodize.regions.push(region_1);
+
+let region_0_used = false;
 anodize.outputs.on_new(|output| {
+    
+    if region_0_used {
+        region_1.map_output(output, 1.0, point::logical(0, 0));
+    } else {
+        region_0.map_output(output, 1.0, point::logical(0, 0));
+        region_0_used = true;
+    }
+    
+    
     anodize.log.info("anodize on_new");
 
     let fps_widget = widget::fps(output);
