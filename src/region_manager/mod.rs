@@ -1,5 +1,6 @@
 use std::cell::{Ref, RefCell};
 use std::rc::Rc;
+use std::vec::IntoIter;
 
 mod region;
 mod workspace;
@@ -112,6 +113,10 @@ impl RegionManager {
         RefIter {
             inner: Some(Ref::map(self.regions.borrow(), |v| &v[..])),
         }
+    }
+
+    pub fn into_iter(&self) -> IntoIter<Region> {
+        self.regions.borrow().clone().into_iter()
     }
 
     pub fn refresh(&self) {

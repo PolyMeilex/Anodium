@@ -29,19 +29,7 @@ impl OutputHandler for Anodium {
         self.output_manager.add(&output);
 
         self.config.output_new(output.clone());
-
-        if let Some(layout) = self
-            .config
-            .output_rearrange(self.output_manager.outputs().clone())
-        {
-            //mapping is now done in rhai scripts, no need to do that here
-            /*for (output, pos) in self.output_manager.outputs().iter().zip(layout.iter()) {
-                let scale = self.workspace.output_scale(output).unwrap_or(1.0);
-
-                let (x, y) = *pos;
-                self.workspace.map_output(output, scale, (x, y));
-            }*/
-        }
+        self.config.output_rearrange();
     }
 
     fn output_mode_updated(&mut self, output: &crate::output_manager::Output, mode: output::Mode) {

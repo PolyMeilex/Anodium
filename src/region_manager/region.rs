@@ -44,6 +44,10 @@ impl Region {
         inner.active_workspace = Some(workspace);
     }
 
+    pub fn set_position(&self, position: Point<i32, Logical>) {
+        self.inner.borrow_mut().position = position;
+    }
+
     pub fn map_output(&self, output: &Output, scale: f64, location: Point<i32, Logical>) {
         for workspace in &self.inner.borrow().workspaces {
             workspace.space_mut().map_output(output, scale, location);

@@ -166,17 +166,29 @@ anodize.keyboard.callbacks.register(|| {
 //     mode_index += 1;
 // }, "Control_L", ["equal"]);
 
+let on_rearrange_inited = false;
+let on_rearrange_timeout = ();
+anodize.outputs.on_rearrange(|| {
+    anodize.system.clear_timeout(on_rearrange_timeout);
+    if !on_rearrange_inited {
+        on_rearrange_timeout = anodize.system.add_timeout(|| {
+            anodize.log.info("anodize on_rearrange");
+            let w = 0;
+            for output in anodize.outputs {
+                let region = region::create(point::logical(w, 0));
+                region.add_workspace(workspace::create("www"));
+                region.add_workspace(workspace::create("code"));
+                region.map_output(output, 1.0, point::logical(0, 0));
+                anodize.regions.push(region);
 
-anodize.outputs.on_rearrange(|outputs| {
-    anodize.log.info("anodize rearrange");
-    let output_x = 0;
-
-    outputs.map(|output| {
-        let x = output_x;
-        output_x += output.w;
-        
-        return [x, 0];
-    })
+                w += output.w;
+            }
+            return false
+        }, 50);
+    } else {
+        //do some changes to your regions/output map on some disconnect
+        //TODO - add region delete option
+    }
 });
 
 anodize.outputs.on_mode_select(|desc, modes| {
@@ -192,28 +204,8 @@ anodize.outputs.on_mode_select(|desc, modes| {
 
 let logger_added = false;
 
-let region_0 = region::create(point::logical(0, 0));
-region_0.add_workspace(workspace::create("im"));
-region_0.add_workspace(workspace::create("terminal"));
 
-let region_1 = region::create(point::logical(1920, 0));
-region_1.add_workspace(workspace::create("www"));
-region_1.add_workspace(workspace::create("code"));
-
-anodize.regions.push(region_0);
-anodize.regions.push(region_1);
-
-let region_0_used = false;
-anodize.outputs.on_new(|output| {
-    
-    if region_0_used {
-        region_1.map_output(output, 1.0, point::logical(0, 0));
-    } else {
-        region_0.map_output(output, 1.0, point::logical(0, 0));
-        region_0_used = true;
-    }
-    
-    
+anodize.outputs.on_new(|output| {    
     anodize.log.info("anodize on_new");
 
     let fps_widget = widget::fps(output);

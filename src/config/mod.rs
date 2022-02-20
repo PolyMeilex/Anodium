@@ -102,11 +102,9 @@ impl ConfigVM {
             .key_action(self, key, state, keys_pressed)
     }
 
-    pub fn output_rearrange(&self, outputs: Vec<Output>) -> Option<Vec<(i32, i32)>> {
+    pub fn output_rearrange(&self) {
         let inner = &*self.inner.borrow();
-        self.anodize
-            .outputs
-            .on_rearrange(&inner.engine, &inner.ast, outputs)
+        self.anodize.outputs.on_rearrange(&inner.engine, &inner.ast);
     }
 
     pub fn ask_for_output_mode(&self, desc: &OutputDescriptor, modes: &[Mode]) -> Option<Mode> {

@@ -50,27 +50,11 @@ impl Outputs {
         }
     }
 
-    pub fn on_rearrange(
-        &self,
-        engine: &Engine,
-        ast: &AST,
-        outputs: Vec<Output>,
-    ) -> Option<Vec<(i32, i32)>> {
+    pub fn on_rearrange(&self, engine: &Engine, ast: &AST) {
         if let Some(on_rearrange) = self.on_rearrange.borrow().clone() {
-            let outputs: Array = outputs.into_iter().map(Dynamic::from).collect();
-
-            let res: Array = on_rearrange.call(engine, ast, (outputs,)).unwrap();
-            let res: Vec<(i32, i32)> = res
-                .into_iter()
-                .map(|item| item.try_cast().unwrap())
-                .map(|pos: Array| pos.into_iter().map(|p| p.try_cast().unwrap()).collect())
-                .map(|pos: Vec<INT>| (pos[0] as _, pos[1] as _))
-                .collect();
-
-            Some(res)
+            let _: Dynamic = on_rearrange.call(engine, ast, ()).unwrap();
         } else {
             warn!("on_rearrange not configured");
-            None
         }
     }
 
@@ -175,18 +159,6 @@ pub mod outputs {
         output.current_mode().unwrap().size.h as _
     }
 
-    // #[rhai_fn(get = "x", pure)]
-    // pub fn get_x(output: &mut Output) -> INT {
-    //     // output.geometry().loc.x as _
-    //     todo!();
-    // }
-
-    // #[rhai_fn(get = "y", pure)]
-    // pub fn y(output: &mut Output) -> INT {
-    //     // output.geometry().loc.y as _
-    //     todo!();
-    // }
-
     #[rhai_fn(get = "modes", pure)]
     pub fn modes(output: &mut Output) -> Modes {
         Modes(output.possible_modes())
@@ -196,16 +168,6 @@ pub mod outputs {
     pub fn shell(output: &mut Output) -> shell::Shell {
         output.egui_shell().clone()
     }
-
-    // #[rhai_fn(set = "x", pure)]
-    // pub fn x(output: &mut Output, x: INT) {
-    //     todo!();
-    //     // let mut location = output.location();
-    //     // location.x = x as _;
-    //     // output.set_location(location);
-    //     // let geometry = output.geometry();
-    //     // output.layer_map_mut().arange(geometry);
-    // }
 
     #[rhai_fn(global)]
     pub fn set_wallpaper(_output: &mut Output, _path: &str) {
@@ -240,8 +202,7 @@ impl IntoIterator for Outputs {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        todo!();
-        // self.output_map.iter()
+        self.output_map.into_iter()
     }
 }
 

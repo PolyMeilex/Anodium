@@ -23,6 +23,15 @@ impl Regions {
     }
 }
 
+impl IntoIterator for Regions {
+    type Item = Region;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.regions_map.into_iter()
+    }
+}
+
 #[export_module]
 pub mod region {
     pub fn create(position: Point<i32, Logical>) -> Region {
@@ -42,6 +51,16 @@ pub mod region {
         position: Point<i32, Logical>,
     ) {
         region.map_output(&output, scale, position);
+    }
+
+    #[rhai_fn(set = "position", pure)]
+    pub fn set_position(region: &mut Region, position: Point<i32, Logical>) {
+        region.set_position(position);
+    }
+
+    #[rhai_fn(get = "position", pure)]
+    pub fn get_position(region: &mut Region) -> Point<i32, Logical> {
+        region.position()
     }
 }
 
@@ -73,7 +92,8 @@ pub fn register(engine: &mut Engine) {
         .register_static_module("region", region_module.into())
         .register_static_module("point", point_module.into())
         .register_type::<Point<i32, Physical>>()
-        .register_type::<Region>();
+        .register_type::<Region>()
+        .register_iterator::<Regions>();
 
     workspace::register(engine);
 }
