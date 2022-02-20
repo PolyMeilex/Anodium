@@ -56,7 +56,7 @@ pub trait InputHandler {
     fn process_input_event<I: InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        output: Option<&Output>,
+        absolute_output: Option<&Output>,
     );
 }
 

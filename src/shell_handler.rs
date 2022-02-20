@@ -86,7 +86,7 @@ impl ShellHandler for Anodium {
 
                     let grab = ResizeSurfaceGrab {
                         start_data,
-                        window: window.clone(),
+                        window,
                         edges,
                         initial_window_size,
                         last_window_size: initial_window_size,

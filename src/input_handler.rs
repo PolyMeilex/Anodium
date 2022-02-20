@@ -3,6 +3,7 @@ use std::sync::atomic::Ordering;
 use crate::{
     framework::backend::{BackendRequest, InputHandler},
     output_manager::Output,
+    region_manager::Region,
     Anodium,
 };
 
@@ -24,7 +25,7 @@ impl InputHandler for Anodium {
     fn process_input_event<I: InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        output: Option<&Output>,
+        absolute_output: Option<&Output>,
     ) {
         let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
@@ -39,42 +40,46 @@ impl InputHandler for Anodium {
                 }
             }
             InputEvent::PointerMotion { event, .. } => {
+                let pointer_location;
                 {
                     let mut input_state = self.input_state.borrow_mut();
                     input_state.pointer_location =
                         self.clamp_coords(input_state.pointer_location + event.delta());
+                    pointer_location = input_state.pointer_location;
                 }
-                self.on_pointer_move(event.time());
-                self.surface_under(self.input_state.borrow().pointer_location)
-                    .is_none()
-            }
-            InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output = output.cloned().unwrap_or_else(|| {
-                    Output::wrap(
-                        self.region_manager
-                            .first()
-                            .unwrap()
-                            .active_workspace()
-                            .unwrap()
-                            .space()
-                            .outputs()
-                            .next()
-                            .unwrap()
-                            .clone(),
-                    )
-                });
 
-                if let Some(region) = self.region_manager.find_output_region(&output) {
-                    let workspace = region.active_workspace().unwrap();
-                    let output_geometry = workspace.space().output_geometry(&output).unwrap();
-                    let output_pos = output_geometry.loc.to_f64();
-                    let output_size = output_geometry.size;
-
-                    self.input_state.borrow_mut().pointer_location =
-                        event.position_transformed(output_size) + output_pos;
-                    self.on_pointer_move(event.time());
+                if let Some(region) = self.region_manager.region_under(pointer_location) {
+                    {
+                        let mut input_state = self.input_state.borrow_mut();
+                        input_state.pointer_location =
+                            self.clamp_coords(input_state.pointer_location + event.delta());
+                    }
+                    let region_pos = region.position().to_f64();
+                    self.on_pointer_move(event.time(), region_pos);
                     self.surface_under(self.input_state.borrow().pointer_location)
                         .is_none()
+                } else {
+                    false
+                }
+            }
+            InputEvent::PointerMotionAbsolute { event, .. } => {
+                if let Some(absolute_output) = absolute_output {
+                    if let Some(region) = self.region_manager.find_output_region(absolute_output) {
+                        let workspace = region.active_workspace().unwrap();
+                        let output_geometry =
+                            workspace.space().output_geometry(absolute_output).unwrap();
+                        let output_pos = output_geometry.loc.to_f64();
+                        let region_pos = region.position().to_f64();
+                        let output_size = output_geometry.size;
+
+                        self.input_state.borrow_mut().pointer_location =
+                            event.position_transformed(output_size) + output_pos + region_pos;
+                        self.on_pointer_move(event.time(), region_pos);
+                        self.surface_under(self.input_state.borrow().pointer_location)
+                            .is_none()
+                    } else {
+                        false
+                    }
                 } else {
                     false
                 }
@@ -91,25 +96,23 @@ impl InputHandler for Anodium {
             }
             _ => false,
         };
-
-        if let Some(region) = self
-            .region_manager
-            .region_under(self.input_state.borrow().pointer_location)
-        {
+        let pointer_location = self.input_state.borrow().pointer_location;
+        if let Some(region) = self.region_manager.region_under(pointer_location) {
             if let Some(output) = region
                 .active_workspace()
                 .unwrap()
                 .space()
-                .output_under(self.input_state.borrow().pointer_location)
+                .output_under(pointer_location - region.position().to_f64())
                 .next()
             {
-                let output = Output::wrap(output.clone());
-
+                let output = &Output::wrap(output.clone());
                 if captured {
-                    self.process_egui_event(event, &output);
+                    self.process_egui_event(event, &region, output);
                 } else {
-                    self.reset_egui_event(&output);
+                    self.reset_egui_event(output);
                 }
+            } else {
+                error!("output under egui not found!");
             }
         }
     }
@@ -123,21 +126,25 @@ impl Anodium {
         output.egui().handle_pointer_motion(max_point);
     }
 
-    fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
+    fn process_egui_event<I: InputBackend>(
+        &self,
+        event: InputEvent<I>,
+        region: &Region,
+        output: &Output,
+    ) {
         match event {
             InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
-                let output_loc = self
-                    .region_manager
-                    .find_output_region(&output)
-                    .unwrap()
+                let output_loc = region
                     .active_workspace()
                     .unwrap()
                     .space()
                     .output_geometry(output)
                     .unwrap()
                     .loc;
-                let mouse_location =
-                    self.input_state.borrow().pointer_location - output_loc.to_f64();
+                let mouse_location = self.input_state.borrow().pointer_location
+                    - output_loc.to_f64()
+                    - region.position().to_f64();
+
                 output
                     .egui()
                     .handle_pointer_motion(mouse_location.to_i32_round());
@@ -268,7 +275,7 @@ impl Anodium {
                             .active_workspace()
                             .unwrap()
                             .space()
-                            .window_under(point)
+                            .window_under(point - region.position().to_f64())
                             .cloned();
                         // let surface = under.as_ref().map(|&(ref s, _)| s);
                         // if let Some(surface) = surface {
@@ -282,7 +289,12 @@ impl Anodium {
                         self.update_focused_window(window.as_ref());
 
                         let surface = window
-                            .and_then(|w| w.surface_under(point, WindowSurfaceType::ALL))
+                            .and_then(|w| {
+                                w.surface_under(
+                                    point - region.position().to_f64(),
+                                    WindowSurfaceType::ALL,
+                                )
+                            })
                             .map(|s| s.0);
 
                         input_state.keyboard.set_focus(surface.as_ref(), serial);
@@ -386,7 +398,7 @@ impl Anodium {
         }
     }
 
-    fn on_pointer_move(&mut self, time: u32) {
+    fn on_pointer_move(&mut self, time: u32, offset: Point<f64, Logical>) {
         let serial = SCOUNTER.next_serial();
 
         // for (id, w) in self.workspaces.iter_mut() {
@@ -401,10 +413,13 @@ impl Anodium {
         let input_state = self.input_state.clone();
         let input_state = input_state.borrow();
         let under = self.surface_under(input_state.pointer_location);
-        input_state
-            .pointer
-            .clone()
-            .motion(input_state.pointer_location, under, serial, time, self);
+        input_state.pointer.clone().motion(
+            input_state.pointer_location - offset,
+            under,
+            serial,
+            time,
+            self,
+        );
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {

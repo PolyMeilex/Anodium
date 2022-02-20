@@ -423,6 +423,7 @@ impl Anodium {
 
 impl Anodium {
     pub fn update_focused_window(&mut self, window: Option<&desktop::Window>) {
+        info!("update focused window: {:?}", window);
         self.region_manager.iter().for_each(|r| {
             r.for_each_workspace(|w| {
                 w.space().windows().for_each(|w| {

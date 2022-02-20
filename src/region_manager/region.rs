@@ -67,7 +67,7 @@ impl Region {
         let inner = self.inner.borrow();
         let active_workspace = inner.active_workspace.as_ref().unwrap();
         let space = active_workspace.space();
-        point += inner.position.to_f64();
+        point -= inner.position.to_f64();
         let window = space.window_under(point)?;
 
         let window_loc = space.window_geometry(window).unwrap().loc;
