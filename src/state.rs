@@ -387,8 +387,9 @@ impl Anodium {
         // Pointer Related:
         if region.contains(input_state.pointer_location) {
             let (ptr_x, ptr_y) = input_state.pointer_location.into();
-            let relative_location =
-                Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32)) - output_geometry.loc;
+            let relative_location = Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32))
+                - output_geometry.loc
+                - region.position();
 
             if let Some(wl_cursor) = self.prepare_cursor_element(relative_location) {
                 elems.push(Box::new(wl_cursor));

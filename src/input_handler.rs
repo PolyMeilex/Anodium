@@ -423,21 +423,7 @@ impl Anodium {
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {
-        // let (pos_x, pos_y) = pos.into();
-        // let output_map = &self.output_map;
-        // let max_x = output_map.width();
-        // let clamped_x = pos_x.max(0.0).min(max_x as f64);
-        // let max_y = output_map.height(clamped_x as i32);
-
-        // if let Some(max_y) = max_y {
-        //     let clamped_y = pos_y.max(0.0).min(max_y as f64);
-
-        //     (clamped_x, clamped_y).into()
-        // } else {
-        //     (clamped_x, pos_y).into()
-        // }
-
-        pos
+        self.region_manager.clamp_coords(pos)
     }
 }
 

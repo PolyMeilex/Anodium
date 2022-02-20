@@ -115,13 +115,65 @@ impl RegionManager {
         }
     }
 
-    pub fn into_iter(&self) -> IntoIter<Region> {
+    pub fn into_iter(self) -> IntoIter<Region> {
         self.regions.borrow().clone().into_iter()
     }
 
     pub fn refresh(&self) {
         for region in self.regions.borrow().iter() {
             region.active_workspace().unwrap().space_mut().refresh();
+        }
+    }
+
+    pub fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {
+        //TODO: that logic can be smarter, it will probaly fail if we have a non linear argument of regions or outputs in it
+
+        let (pos_x, pos_y) = pos.into();
+        let mut global_max_x = 0;
+        let mut global_max_y = 0;
+        for region in self.regions.borrow().iter() {
+            let region_position = region.position();
+            let workspace = region.active_workspace().unwrap();
+
+            let space = workspace.space();
+            let max_x = space
+                .outputs()
+                .fold(0, |acc, o| acc + space.output_geometry(o).unwrap().size.w)
+                + region_position.x;
+            if max_x > global_max_x {
+                global_max_x = max_x;
+            }
+        }
+
+        let clamped_x = pos_x.max(0.0).min(global_max_x as f64);
+
+        for region in self.regions.borrow().iter() {
+            let region_position = region.position();
+            let workspace = region.active_workspace().unwrap();
+
+            let space = workspace.space();
+            let max_y = space
+                .outputs()
+                .find(|o| {
+                    let geo = space.output_geometry(o).unwrap();
+                    geo.contains((clamped_x as i32 - region_position.x, 0))
+                })
+                .map(|o| space.output_geometry(o).unwrap().size.h);
+
+            if let Some(mut max_y) = max_y {
+                info!("max_y: {:?}", max_y);
+                max_y += region_position.y;
+                if max_y > global_max_y {
+                    global_max_y = max_y;
+                }
+            }
+        }
+
+        if global_max_y != 0 {
+            let clamped_y = pos_y.max(0.0).min(global_max_y as f64);
+            (clamped_x, clamped_y).into()
+        } else {
+            (clamped_x, pos_y).into()
         }
     }
 }
