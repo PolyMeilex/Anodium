@@ -38,7 +38,12 @@ impl OutputHandler for Anodium {
     }
 
     fn output_created(&mut self, output: SmithayOutput, possible_modes: Vec<output::Mode>) {
-        let output = Output::new(output, &mut self.anodium_protocol, possible_modes);
+        let output = Output::new(
+            output,
+            &mut self.anodium_protocol,
+            possible_modes,
+            self.config_tx.clone(),
+        );
 
         info!("OutputCreated: {}", output.name());
         self.output_manager.add(&mut self.workspace, &output);

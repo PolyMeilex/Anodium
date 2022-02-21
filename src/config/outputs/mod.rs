@@ -6,6 +6,7 @@ use rhai::{FnPtr, INT};
 
 use smithay::wayland::output::Mode;
 
+use crate::config::ConfigEvent;
 use crate::output_manager::{Output, OutputDescriptor, OutputManager};
 
 pub mod shell;
@@ -189,7 +190,7 @@ pub mod outputs {
 
     #[rhai_fn(get = "modes", pure)]
     pub fn modes(output: &mut Output) -> Modes {
-        Modes(output.possible_modes())
+        Modes(output.possible_modes().to_vec())
     }
 
     #[rhai_fn(get = "shell", pure)]
@@ -214,9 +215,11 @@ pub mod outputs {
     }
 
     #[rhai_fn(global)]
-    pub fn update_mode(_output: &mut Output, _mode: Mode) {
-        todo!("Send event using event emiter");
-        // output.update_mode(mode);
+    pub fn update_mode(output: &mut Output, mode: Mode) {
+        output
+            .config_tx()
+            .send(ConfigEvent::OutputUpdateMode(output.clone(), mode))
+            .unwrap();
     }
 
     #[rhai_fn(global)]
