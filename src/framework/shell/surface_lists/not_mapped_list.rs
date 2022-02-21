@@ -5,7 +5,7 @@ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
-use crate::utils::AsWlSurface;
+use super::super::utils::AsWlSurface;
 
 use smithay::desktop::Window;
 

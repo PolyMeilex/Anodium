@@ -25,6 +25,8 @@ use surface_lists::{NotMappedList, ShellLayerList, ShellWindowList};
 mod wlr_layer;
 mod xdg;
 
+mod utils;
+
 #[cfg(feature = "xwayland")]
 pub mod xwayland;
 #[cfg(feature = "xwayland")]

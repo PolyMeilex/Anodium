@@ -1,4 +1,4 @@
-use crate::utils::AsWlSurface;
+use super::super::utils::AsWlSurface;
 use smithay::desktop::Window;
 
 #[derive(Debug, Default)]
