@@ -17,9 +17,8 @@ mod workspace;
 use smithay::backend::input::KeyState;
 use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::LoopHandle;
-use smithay::wayland::output::Mode;
 
-use crate::output_manager::{Output, OutputDescriptor, OutputManager};
+use crate::output_manager::{Output, OutputManager};
 use crate::state::Anodium;
 
 use self::anodize::Anodize;
@@ -98,13 +97,6 @@ impl ConfigVM {
         self.anodize
             .outputs
             .on_rearrange(&inner.engine, &inner.ast, outputs)
-    }
-
-    pub fn ask_for_output_mode(&self, desc: &OutputDescriptor, modes: &[Mode]) -> Option<Mode> {
-        let inner = &*self.inner.borrow();
-        self.anodize
-            .outputs
-            .on_mode_select(&inner.engine, &inner.ast, desc, modes)
     }
 
     pub fn output_new(&self, output: Output) {

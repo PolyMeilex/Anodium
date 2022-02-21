@@ -75,27 +75,6 @@ impl Outputs {
         }
     }
 
-    pub fn on_mode_select(
-        &self,
-        engine: &Engine,
-        ast: &AST,
-        desc: &OutputDescriptor,
-        modes: &[Mode],
-    ) -> Option<Mode> {
-        if let Some(on_mode_select) = self.on_mode_select.borrow().clone() {
-            let modes = Modes(modes.to_vec());
-
-            let res: Mode = on_mode_select
-                .call(engine, ast, (desc.clone(), modes))
-                .unwrap();
-
-            Some(res)
-        } else {
-            warn!("on_mode_select not configured");
-            None
-        }
-    }
-
     pub fn on_new(&self, engine: &Engine, ast: &AST, output: Output) {
         if let Some(on_new) = self.on_new.borrow().clone() {
             let _result: () = on_new.call(engine, ast, (output,)).unwrap();

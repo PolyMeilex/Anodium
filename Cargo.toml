@@ -3,6 +3,9 @@ name = "anodium"
 version = "0.1.0"
 edition = "2018"
 
+[workspace]
+members=["anodium-backend"]
+
 [dependencies]
 anodium-protocol = { path = "./anodium-protocol", features = ["server"] }
 anodium-backend = { path = "./anodium-backend" }

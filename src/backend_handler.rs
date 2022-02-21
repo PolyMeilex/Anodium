@@ -3,40 +3,15 @@ use smithay::{
     reexports::wayland_server::Display,
     utils::{Logical, Rectangle},
     wayland::output,
-    wayland::output::{Output as SmithayOutput, PhysicalProperties},
+    wayland::output::Output as SmithayOutput,
 };
 use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
 
 use anodium_backend::{BackendHandler, OutputHandler};
 
-use crate::{
-    output_manager::{Output, OutputDescriptor},
-    state::Anodium,
-};
+use crate::{output_manager::Output, state::Anodium};
 
 impl OutputHandler for Anodium {
-    fn ask_for_output_mode(
-        &mut self,
-        name: &str,
-        physical_properties: &PhysicalProperties,
-        modes: &[output::Mode],
-    ) -> output::Mode {
-        self.config
-            .ask_for_output_mode(
-                &OutputDescriptor {
-                    name: name.to_owned(),
-                    physical_properties: PhysicalProperties {
-                        size: physical_properties.size,
-                        subpixel: physical_properties.subpixel,
-                        make: physical_properties.make.clone(),
-                        model: physical_properties.model.clone(),
-                    },
-                },
-                modes,
-            )
-            .unwrap_or_else(|| modes[0])
-    }
-
     fn output_created(&mut self, output: SmithayOutput, possible_modes: Vec<output::Mode>) {
         let output = Output::new(
             output,

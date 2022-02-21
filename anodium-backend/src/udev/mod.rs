@@ -39,7 +39,7 @@ use smithay::{
                 connector::{self, Info as ConnectorInfo, State as ConnectorState},
                 crtc,
                 encoder::Info as EncoderInfo,
-                Device as ControlDevice, Mode as DrmMode,
+                Device as ControlDevice, Mode as DrmMode, ModeTypeFlags,
             },
         },
         gbm::Device as GbmDevice,
@@ -309,7 +309,6 @@ struct ConnectorScanResult {
 }
 
 fn scan_connectors<D>(
-    handler: &mut D,
     inner: InnerRc,
     handle: LoopHandle<'static, D>,
     drm: &mut DrmDevice<SessionFd>,
@@ -394,11 +393,12 @@ where
                         model: "Generic DRM".into(),
                     };
 
-                    let wl_mode =
-                        handler.ask_for_output_mode(&output_name, &physical_properties, &wl_modes);
+                    let mode_id = drm_modes
+                        .iter()
+                        .position(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
+                        .unwrap_or(0);
 
-                    let mode_id = wl_modes.iter().position(|m| m == &wl_mode).unwrap();
-
+                    let wl_mode = wl_modes[mode_id];
                     let drm_mode = drm_modes[mode_id];
 
                     let mut surface =
@@ -553,7 +553,6 @@ fn device_added<D>(
             backends: outputs,
             backends_order: outputs_order,
         } = scan_connectors(
-            handler,
             inner.clone(),
             handle.clone(),
             &mut drm,

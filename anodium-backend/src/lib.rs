@@ -17,23 +17,13 @@ use smithay::{
     backend::session::auto::AutoSession,
     reexports::{calloop::EventLoop, wayland_server::Display},
     utils::{Logical, Rectangle},
+    wayland,
     wayland::output::Output as SmithayOutput,
-    wayland::{self, output::PhysicalProperties},
 };
 
 use std::{cell::RefCell, rc::Rc};
 
 pub trait OutputHandler {
-    /// Request output mode for output that is being built
-    fn ask_for_output_mode(
-        &mut self,
-        _name: &str,
-        _physical_properties: &PhysicalProperties,
-        modes: &[wayland::output::Mode],
-    ) -> wayland::output::Mode {
-        modes[0]
-    }
-
     /// Output was created
     fn output_created(&mut self, output: SmithayOutput, possible_modes: Vec<wayland::output::Mode>);
 

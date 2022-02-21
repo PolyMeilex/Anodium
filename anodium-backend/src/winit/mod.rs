@@ -92,8 +92,6 @@ where
         model: "Winit".into(),
     };
 
-    let mode = handler.ask_for_output_mode(OUTPUT_NAME, &physical_properties, &[mode]);
-
     let (output, _) = SmithayOutput::new(
         &mut *display.borrow_mut(),
         OUTPUT_NAME.to_owned(),

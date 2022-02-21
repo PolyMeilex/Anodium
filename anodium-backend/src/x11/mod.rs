@@ -69,10 +69,7 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build<D>(self, handler: &mut D, display: &mut Display) -> OutputSurface
-    where
-        D: BackendHandler,
-    {
+    fn build(self, display: &mut Display) -> OutputSurface {
         let size = {
             let s = self.window.size();
             (s.w as i32, s.h as i32).into()
@@ -89,8 +86,6 @@ impl OutputSurfaceBuilder {
             make: "Smithay".into(),
             model: "Winit".into(),
         };
-
-        let mode = handler.ask_for_output_mode(OUTPUT_NAME, &physical_properties, &[mode]);
 
         let (output, _) =
             SmithayOutput::new(display, OUTPUT_NAME.to_owned(), physical_properties, None);
@@ -195,7 +190,7 @@ where
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| o.build(handler, &mut display.borrow_mut()))
+        .map(|o| o.build(&mut display.borrow_mut()))
         .collect();
 
     for surface_data in surface_datas.iter() {
