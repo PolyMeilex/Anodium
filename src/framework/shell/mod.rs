@@ -15,8 +15,7 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Mutex;
 
-use crate::popup::Popup;
-use crate::window::Window;
+use smithay::desktop::Window;
 
 use super::surface_data::{MoveAfterResizeState, ResizeData, ResizeEdge, ResizeState, SurfaceData};
 
@@ -85,7 +84,7 @@ pub enum ShellEvent {
     // Popup
     //
     PopupCreated {
-        popup: Popup,
+        popup: PopupKind,
         // positioner: PositionerState,
     },
     PopupGrab {
@@ -140,8 +139,6 @@ where
     // Try to updated mapped surface
     fn try_update_mapped(&mut self, surface: &WlSurface, handler: &mut D) {
         if let Some(window) = self.windows.find_mut(surface) {
-            window.refresh();
-
             let geometry = window.geometry();
             let location = handler.window_location(window);
 
@@ -194,7 +191,7 @@ where
 
             if let Some(new_location) = new_location {
                 handler.on_shell_event(ShellEvent::WindowGotResized {
-                    window: window.desktop_window().clone(),
+                    window: window.clone(),
                     new_location,
                 })
             }

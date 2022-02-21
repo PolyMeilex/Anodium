@@ -2,11 +2,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use rhai::plugin::*;
 
+use smithay::desktop::Window as AndiumWindow;
 use smithay::reexports::calloop::channel::Sender;
 
 use super::eventloop::ConfigEvent;
-
-use crate::window::Window as AndiumWindow;
 
 #[derive(Debug, Clone)]
 pub struct Window {

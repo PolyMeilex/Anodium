@@ -1,7 +1,7 @@
 use rhai::FnPtr;
 
 use crate::output_manager::Output;
-use crate::window::Window;
+use smithay::desktop::Window;
 
 use smithay::wayland::output::Mode;
 

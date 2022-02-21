@@ -7,7 +7,7 @@ use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
 use crate::utils::AsWlSurface;
 
-use crate::window::Window;
+use smithay::desktop::Window;
 
 #[derive(Default)]
 pub struct NotMappedList {
@@ -43,8 +43,6 @@ impl NotMappedList {
 
     pub fn try_window_map(&mut self, surface: &WlSurface) -> Option<Window> {
         let toplevel = self.find_window_mut(surface).and_then(|win| {
-            win.refresh();
-
             let toplevel = win.toplevel();
             // send the initial configure if relevant
             if let Kind::Xdg(ref toplevel) = toplevel {

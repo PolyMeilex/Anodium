@@ -1,4 +1,5 @@
-use crate::{utils::AsWlSurface, window::Window};
+use crate::utils::AsWlSurface;
+use smithay::desktop::Window;
 
 #[derive(Debug, Default)]
 pub struct ShellWindowList {
@@ -32,9 +33,5 @@ impl ShellWindowList {
     pub fn refresh(&mut self) {
         // self.windows.retain(|w| !w.animation().exited());
         self.windows.retain(|w| w.toplevel().alive());
-
-        for w in self.windows.iter_mut() {
-            w.refresh();
-        }
     }
 }

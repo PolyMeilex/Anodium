@@ -18,9 +18,6 @@ mod config;
 
 mod output_manager;
 
-mod popup;
-mod window;
-
 mod state;
 
 mod backend_handler;

@@ -6,8 +6,6 @@ use smithay::{
     wayland::shell::xdg::{self, ToplevelSurface},
 };
 
-use crate::window::Window;
-
 pub mod glow;
 
 pub trait AsWlSurface {
@@ -17,12 +15,6 @@ pub trait AsWlSurface {
 impl AsWlSurface for WlSurface {
     fn as_surface(&self) -> Option<&WlSurface> {
         Some(self)
-    }
-}
-
-impl AsWlSurface for Window {
-    fn as_surface(&self) -> Option<&WlSurface> {
-        self.toplevel().get_surface()
     }
 }
 
