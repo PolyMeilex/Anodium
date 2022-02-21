@@ -35,6 +35,7 @@ where
         .insert_source(rx, move |event, _, _| match event {
             channel::Event::Msg(event) => match event {
                 BackendRequest::ChangeVT(_) => {}
+                BackendRequest::UpdateMode(_, _) => {}
             },
             channel::Event::Closed => {}
         })

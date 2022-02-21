@@ -203,13 +203,39 @@ where
 
     event_loop
         .handle()
-        .insert_source(rx, move |event, _, _| match event {
-            channel::Event::Msg(event) => match event {
-                BackendRequest::ChangeVT(id) => {
-                    session.change_vt(id).ok();
-                }
-            },
-            channel::Event::Closed => {}
+        .insert_source(rx, {
+            let inner = inner.clone();
+            move |event, _, _| match event {
+                channel::Event::Msg(event) => match event {
+                    BackendRequest::ChangeVT(id) => {
+                        session.change_vt(id).ok();
+                    }
+                    BackendRequest::UpdateMode(output, mode) => {
+                        let inner = inner.borrow();
+
+                        let id = output.user_data().get::<UdevOutputId>().unwrap();
+
+                        let device = inner.udev_devices.get(&id.device_id).unwrap();
+
+                        let mut data = device.surfaces.borrow_mut();
+                        let data = data.get_mut(&id.crtc).unwrap();
+
+                        let mut data = data.borrow_mut();
+                        let pos = data.wl_modes.iter().position(|m| m == &mode);
+
+                        let mode = pos.and_then(|id| data._drm_modes.get(id)).copied();
+
+                        if let Some(mode) = mode {
+                            if let Err(err) = data.surface.use_mode(mode) {
+                                error!("Mode: {:?} failed: {:?}", mode, err);
+                            }
+                        } else {
+                            error!("Mode: {:?} not found in drm", mode);
+                        }
+                    }
+                },
+                channel::Event::Closed => {}
+            }
         })
         .unwrap();
 
@@ -774,23 +800,6 @@ where
         // Somehow we got called with a non existing output
         return Ok(());
     };
-
-    // TODO: ?
-    // if output.pending_mode_change() {
-    //     let current_mode = output.current_mode().unwrap();
-    //     if let Some(drm_mode) = surface.drm_modes.iter().find(|m| {
-    //         m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
-    //             && m.vrefresh() == (current_mode.refresh / 1000) as u32
-    //     }) {
-    //         if let Err(err) = surface.surface.use_mode(*drm_mode) {
-    //             error!("pending mode: {:?} failed: {:?}", current_mode, err);
-    //         } else {
-    //             surface.wl_mode = current_mode;
-    //         }
-    //     } else {
-    //         error!("pending mode: {:?} not found in drm", current_mode);
-    //     }
-    // }
 
     let (dmabuf, age) = surface.surface.next_buffer()?;
     renderer.bind(dmabuf)?;

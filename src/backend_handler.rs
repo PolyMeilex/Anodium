@@ -26,8 +26,8 @@ impl OutputHandler for Anodium {
                 &OutputDescriptor {
                     name: name.to_owned(),
                     physical_properties: PhysicalProperties {
-                        size: physical_properties.size.clone(),
-                        subpixel: physical_properties.subpixel.clone(),
+                        size: physical_properties.size,
+                        subpixel: physical_properties.subpixel,
                         make: physical_properties.make.clone(),
                         model: physical_properties.model.clone(),
                     },

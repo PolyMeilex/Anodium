@@ -73,6 +73,7 @@ pub trait BackendHandler: OutputHandler + InputHandler {
 #[derive(Debug)]
 pub enum BackendRequest {
     ChangeVT(i32),
+    UpdateMode(SmithayOutput, wayland::output::Mode),
 }
 
 #[derive(Debug, Clone)]
