@@ -20,10 +20,7 @@ use smithay::{
             gles2::{Gles2Renderer, Gles2Texture},
             Bind, Frame, ImportDma, ImportEgl, Renderer,
         },
-        session::{
-            auto::{AutoSession, AutoSessionNotifier},
-            Session, Signal as SessionSignal,
-        },
+        session::{auto::AutoSession, Session, Signal as SessionSignal},
         udev::{primary_gpu, UdevBackend, UdevEvent},
         SwapBuffersError,
     },
@@ -92,13 +89,13 @@ type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
 pub fn run_udev<D>(
     event_loop: &mut EventLoop<'static, D>,
     handler: &mut D,
-    mut session: AutoSession,
-    notifier: AutoSessionNotifier,
     rx: channel::Channel<BackendRequest>,
 ) -> Result<(), ()>
 where
     D: BackendHandler + 'static,
 {
+    let (mut session, notifier) = AutoSession::new(None).expect("Could not init session!");
+
     let session_signal = notifier.signaler();
 
     let display = handler.wl_display();
@@ -211,14 +208,13 @@ where
                         session.change_vt(id).ok();
                     }
                     BackendRequest::UpdateMode(output, mode) => {
-                        let inner = inner.borrow();
+                        let mut inner = inner.borrow_mut();
 
                         let id = output.user_data().get::<UdevOutputId>().unwrap();
 
-                        let device = inner.udev_devices.get(&id.device_id).unwrap();
+                        let device = inner.udev_devices.get_mut(&id.device_id).unwrap();
 
-                        let mut data = device.surfaces.borrow_mut();
-                        let data = data.get_mut(&id.crtc).unwrap();
+                        let data = device.surfaces.get_mut(&id.crtc).unwrap();
 
                         let mut data = data.borrow_mut();
                         let pos = data.wl_modes.iter().position(|m| m == &mode);
@@ -294,7 +290,7 @@ struct OutputSurfaceData {
 
 pub struct UdevDeviceData {
     _restart_token: SignalToken,
-    surfaces: Rc<RefCell<HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>>>,
+    surfaces: HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
     renderer: Rc<RefCell<Gles2Renderer>>,
     // gbm: GbmDevice<SessionFd>,
@@ -604,8 +600,6 @@ fn device_added<D>(
             }
         }
 
-        let outputs = Rc::new(RefCell::new(outputs));
-
         let dev_id = drm.device_id();
         let restart_token = session_signal.register({
             let handle = handle.clone();
@@ -639,8 +633,8 @@ fn device_added<D>(
             .register_dispatcher(event_dispatcher.clone())
             .unwrap();
 
-        trace!("Backends: {:?}", outputs.borrow().keys());
-        for output in outputs.borrow_mut().values() {
+        trace!("Backends: {:?}", outputs.keys());
+        for output in outputs.values() {
             // render first frame
             trace!("Scheduling frame");
             schedule_initial_render(output.clone(), renderer.clone(), &handle);
@@ -678,7 +672,7 @@ where
     // setup two iterators on the stack, one over all surfaces for this backend, and
     // one containing only the one given as argument.
     // They make a trait-object to dynamically choose between the two
-    let surfaces = device_backend.surfaces.borrow();
+    let surfaces = &device_backend.surfaces;
     let mut surfaces_iter = surfaces.iter();
     let mut option_iter = crtc
         .iter()

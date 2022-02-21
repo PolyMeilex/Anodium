@@ -100,11 +100,7 @@ pub fn init<D>(
             winit::run_winit(event_loop, handler, rx).expect("Failed to initialize winit backend.")
         }
         PreferedBackend::Udev => {
-            // TODO: Call new_seat cb here and pass seat name to it
-            let (session, notifier) = AutoSession::new(None).expect("Could not init session!");
-
-            udev::run_udev(event_loop, handler, session, notifier, rx)
-                .expect("Failed to initialize tty backend.");
+            udev::run_udev(event_loop, handler, rx).expect("Failed to initialize tty backend.");
         }
     }
 }
