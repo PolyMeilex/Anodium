@@ -95,6 +95,9 @@ impl OutputSurfaceBuilder {
         let (output, _) =
             SmithayOutput::new(display, OUTPUT_NAME.to_owned(), physical_properties, None);
 
+        output.set_preferred(mode);
+        output.change_current_state(Some(mode), Some(wl_output::Transform::Normal), None, None);
+
         OutputSurface {
             surface: self.surface,
             window: self.window,
