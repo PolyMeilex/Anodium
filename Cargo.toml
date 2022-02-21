@@ -5,42 +5,39 @@ edition = "2018"
 
 [dependencies]
 anodium-protocol = { path = "./anodium-protocol", features = ["server"] }
+anodium-backend = { path = "./anodium-backend" }
 
-bitflags = "1.2.1"
-input = { version = "0.7.0", features = ["udev"], optional = true }
+bitflags = "1.3"
 thiserror = "1"
-xcursor = { version = "0.3.3", optional = true }
-image = { version = "0.23.14", default-features = false, optional = true, features = [
-  "png",
-] }
-fps_ticker = "1.0.0"
-rand = "0.8.4"
-slog = { version = "2.1.1" }
+fps_ticker = "1.0"
+rand = "0.8"
+
+slog = { version = "2.1" }
 slog-term = "2.8"
 slog-async = "2.2"
-slog-stdlog = "4.1.0"
-slog-envlogger = "2.2.0"
-slog-scope = "4.4.0"
-slog-stream = "1.2.1"
-slog-json = "2.4.0"
+slog-stdlog = "4.1"
+slog-envlogger = "2.2"
+slog-scope = "4.4"
+slog-stream = "1.2"
+slog-json = "2.4"
 
-xkbcommon = "0.4.0"
-generational-arena = "0.2.8"
-cgmath = "0.18.0"
+xkbcommon = "0.4"
+generational-arena = "0.2"
+cgmath = "0.18"
 
-rhai = "1.3.0"
+rhai = "1.3"
 
 futures = "0.3"
-shell-words = "1.0.0"
+shell-words = "1.0"
 
-lazy_static = "1.4.0"
+lazy_static = "1.4"
 
 chrono = "0.4"
 
-egui = "0.16.1"
+egui = "0.16"
 
-derivative = "2.2.0"
-gumdrop = "0.8.0"
+derivative = "2.2"
+gumdrop = "0.8"
 strum = { version = "0.23", features = ["derive"] }
 
 [dependencies.smithay]
@@ -59,12 +56,12 @@ features = [
 
 [dependencies.x11rb]
 optional = true
-version = "0.9.0"
+version = "0.9"
 default-features = false
 features = ["composite"]
 
 [dependencies.calloop]
-version = "0.9.0"
+version = "0.9"
 features = ["executor", "futures-io"]
 
 [dependencies.smithay-egui]
@@ -72,22 +69,11 @@ git = "https://github.com/Smithay/smithay-egui.git"
 
 [features]
 default = ["udev", "winit", "x11", "debug"]
-# default = ["udev","winit", "xwayland"]
-#default = ["udev","winit"]
-x11 = ["smithay/backend_x11", "x11rb"]
 
-winit = ["smithay/backend_winit"]
-udev = [
-  "smithay/backend_libinput",
-  "smithay/backend_udev",
-  "smithay/backend_drm",
-  "smithay/backend_gbm",
-  "smithay/backend_session",
-  "smithay/backend_session_logind",
-  "input",
-  "image",
-  "xcursor",
-]
+x11 = ["anodium-backend/x11", "x11rb"]
+winit = ["anodium-backend/winit"]
+udev = ["anodium-backend/udev"]
+
 debug = []
 #xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
 

@@ -1,6 +1,8 @@
 use image::{ImageBuffer, Rgba};
 use smithay::backend::renderer::gles2::{Gles2Error, Gles2Renderer, Gles2Texture};
 
+pub mod cursor;
+
 pub fn import_bitmap<C: std::ops::Deref<Target = [u8]>>(
     renderer: &mut Gles2Renderer,
     image: &ImageBuffer<Rgba<u8>, C>,
