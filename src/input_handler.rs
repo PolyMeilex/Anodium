@@ -1,10 +1,8 @@
 use std::sync::atomic::Ordering;
 
-use crate::{
-    framework::backend::{BackendRequest, InputHandler},
-    output_manager::Output,
-    Anodium,
-};
+use anodium_backend::{BackendRequest, InputHandler};
+
+use crate::{output_manager::Output, Anodium};
 
 use smithay::{
     backend::input::{
@@ -15,6 +13,7 @@ use smithay::{
     reexports::wayland_server::protocol::wl_pointer,
     utils::{Logical, Point},
     wayland::{
+        output::Output as SmithayOutput,
         seat::{keysyms as xkb, AxisFrame, FilterResult, Keysym, ModifiersState},
         SERIAL_COUNTER as SCOUNTER,
     },
@@ -24,8 +23,10 @@ impl InputHandler for Anodium {
     fn process_input_event<I: InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        output: Option<&Output>,
+        output: Option<&SmithayOutput>,
     ) {
+        let output = output.map(|o| Output::wrap(o.clone()));
+
         let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
                 let action = self.keyboard_key_to_action::<I>(event);
@@ -46,7 +47,7 @@ impl InputHandler for Anodium {
                     .is_none()
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output = output.cloned().unwrap_or_else(|| {
+                let output = output.unwrap_or_else(|| {
                     self.workspace
                         .outputs()
                         .next()

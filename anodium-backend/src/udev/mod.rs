@@ -57,21 +57,18 @@ use smithay::{
     },
 };
 
+use super::utils::{cursor, import_bitmap};
 use super::{BackendHandler, BackendRequest};
-use crate::{
-    framework,
-    output_manager::{Output, OutputDescriptor},
-    render::renderer::import_bitmap,
-};
+use smithay::wayland::output::Output as SmithayOutput;
 
 struct Inner {
     display: Rc<RefCell<Display>>,
     primary_gpu: Option<PathBuf>,
     session: AutoSession,
-    pointer_image: framework::cursor::Cursor,
+    pointer_image: cursor::Cursor,
     udev_devices: HashMap<dev_t, UdevDeviceData>,
 
-    outputs: Vec<Output>,
+    outputs: Vec<SmithayOutput>,
 }
 
 type InnerRc = Rc<RefCell<Inner>>;
@@ -102,8 +99,6 @@ pub fn run_udev<D>(
 where
     D: BackendHandler + 'static,
 {
-    let log = slog_scope::logger();
-
     let session_signal = notifier.signaler();
 
     let display = handler.wl_display();
@@ -119,7 +114,7 @@ where
         display: display.clone(),
         primary_gpu,
         session: session.clone(),
-        pointer_image: framework::cursor::Cursor::load(&log),
+        pointer_image: cursor::Cursor::load(),
         udev_devices: Default::default(),
         outputs: Default::default(),
     }));
@@ -127,7 +122,7 @@ where
     /*
      * Initialize the udev backend
      */
-    let udev_backend = UdevBackend::new(session.seat(), log.clone()).map_err(|_| ())?;
+    let udev_backend = UdevBackend::new(session.seat(), None).map_err(|_| ())?;
 
     /*
      * Initialize libinput backend
@@ -135,7 +130,7 @@ where
     let mut libinput_context =
         Libinput::new_with_udev::<LibinputSessionInterface<AutoSession>>(session.clone().into());
     libinput_context.udev_assign_seat(&session.seat()).unwrap();
-    let mut libinput_backend = LibinputInputBackend::new(libinput_context, log.clone());
+    let mut libinput_backend = LibinputInputBackend::new(libinput_context, None);
     libinput_backend.link(session_signal.clone());
 
     /*
@@ -202,19 +197,45 @@ where
                     false
                 }
             },
-            slog_scope::logger(),
+            None,
         );
     }
 
     event_loop
         .handle()
-        .insert_source(rx, move |event, _, _| match event {
-            channel::Event::Msg(event) => match event {
-                BackendRequest::ChangeVT(id) => {
-                    session.change_vt(id).ok();
-                }
-            },
-            channel::Event::Closed => {}
+        .insert_source(rx, {
+            let inner = inner.clone();
+            move |event, _, _| match event {
+                channel::Event::Msg(event) => match event {
+                    BackendRequest::ChangeVT(id) => {
+                        session.change_vt(id).ok();
+                    }
+                    BackendRequest::UpdateMode(output, mode) => {
+                        let inner = inner.borrow();
+
+                        let id = output.user_data().get::<UdevOutputId>().unwrap();
+
+                        let device = inner.udev_devices.get(&id.device_id).unwrap();
+
+                        let mut data = device.surfaces.borrow_mut();
+                        let data = data.get_mut(&id.crtc).unwrap();
+
+                        let mut data = data.borrow_mut();
+                        let pos = data.wl_modes.iter().position(|m| m == &mode);
+
+                        let mode = pos.and_then(|id| data._drm_modes.get(id)).copied();
+
+                        if let Some(mode) = mode {
+                            if let Err(err) = data.surface.use_mode(mode) {
+                                error!("Mode: {:?} failed: {:?}", mode, err);
+                            }
+                        } else {
+                            error!("Mode: {:?} not found in drm", mode);
+                        }
+                    }
+                },
+                channel::Event::Closed => {}
+            }
         })
         .unwrap();
 
@@ -257,12 +278,13 @@ where
 pub type RenderSurface = GbmBufferedSurface<Rc<RefCell<GbmDevice<SessionFd>>>, SessionFd>;
 
 struct OutputSurfaceData {
-    output_descriptor: OutputDescriptor,
+    output_name: String,
+    physical_properties: PhysicalProperties,
 
     wl_mode: Mode,
     wl_modes: Vec<Mode>,
 
-    drm_modes: Vec<DrmMode>,
+    _drm_modes: Vec<DrmMode>,
 
     surface: RenderSurface,
     _render_timer: RenderTimerHandle,
@@ -365,17 +387,15 @@ where
                         })
                         .collect();
 
-                    let descriptor = OutputDescriptor {
-                        name: output_name,
-                        physical_properties: PhysicalProperties {
-                            size: (phys_w as i32, phys_h as i32).into(),
-                            subpixel: wl_output::Subpixel::Unknown,
-                            make: "Smithay".into(),
-                            model: "Generic DRM".into(),
-                        },
+                    let physical_properties = PhysicalProperties {
+                        size: (phys_w as i32, phys_h as i32).into(),
+                        subpixel: wl_output::Subpixel::Unknown,
+                        make: "Smithay".into(),
+                        model: "Generic DRM".into(),
                     };
 
-                    let wl_mode = handler.ask_for_output_mode(&descriptor, &wl_modes);
+                    let wl_mode =
+                        handler.ask_for_output_mode(&output_name, &physical_properties, &wl_modes);
 
                     let mode_id = wl_modes.iter().position(|m| m == &wl_mode).unwrap();
 
@@ -394,28 +414,26 @@ where
                     let renderer_formats = Bind::<Dmabuf>::supported_formats(renderer)
                         .expect("Dmabuf renderer without formats");
 
-                    let gbm_surface = match GbmBufferedSurface::new(
-                        surface,
-                        gbm.clone(),
-                        renderer_formats,
-                        slog_scope::logger(),
-                    ) {
-                        Ok(renderer) => renderer,
-                        Err(err) => {
-                            warn!("Failed to create rendering surface: {}", err);
-                            continue;
-                        }
-                    };
+                    let gbm_surface =
+                        match GbmBufferedSurface::new(surface, gbm.clone(), renderer_formats, None)
+                        {
+                            Ok(renderer) => renderer,
+                            Err(err) => {
+                                warn!("Failed to create rendering surface: {}", err);
+                                continue;
+                            }
+                        };
 
                     let timer = Timer::new().unwrap();
 
                     entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
-                        output_descriptor: descriptor,
+                        output_name,
+                        physical_properties,
 
                         wl_mode,
                         wl_modes,
 
-                        drm_modes: drm_modes.to_owned(),
+                        _drm_modes: drm_modes.to_owned(),
 
                         surface: gbm_surface,
                         _render_timer: timer.handle(),
@@ -457,10 +475,7 @@ fn open_device(
         .ok()
         .and_then(|fd| {
             let fd = SessionFd(fd);
-            match (
-                DrmDevice::new(fd.clone(), true, slog_scope::logger()),
-                GbmDevice::new(fd),
-            ) {
+            match (DrmDevice::new(fd.clone(), true, None), GbmDevice::new(fd)) {
                 (Ok(drm), Ok(gbm)) => Some((drm, gbm)),
                 (Err(err), _) => {
                     warn!(
@@ -497,7 +512,7 @@ fn device_added<D>(
 
     // Try to open the device
     if let Some((mut drm, gbm)) = ret {
-        let egl = match EGLDisplay::new(&gbm, slog_scope::logger()) {
+        let egl = match EGLDisplay::new(&gbm, None) {
             Ok(display) => display,
             Err(err) => {
                 warn!(
@@ -508,7 +523,7 @@ fn device_added<D>(
             }
         };
 
-        let context = match EGLContext::new(&egl, slog_scope::logger()) {
+        let context = match EGLContext::new(&egl, None) {
             Ok(context) => context,
             Err(err) => {
                 warn!(
@@ -519,7 +534,7 @@ fn device_added<D>(
             }
         };
 
-        let renderer = unsafe { Gles2Renderer::new(context, slog_scope::logger()).unwrap() };
+        let renderer = unsafe { Gles2Renderer::new(context, None).unwrap() };
         let renderer = Rc::new(RefCell::new(renderer));
 
         if path.canonicalize().ok() == inner.borrow().primary_gpu {
@@ -551,19 +566,29 @@ fn device_added<D>(
             let mut inner = inner.borrow_mut();
 
             for output_handle in outputs_order {
-                let output = {
+                let (output, modes) = {
                     let output_surface = outputs.get(&output_handle).unwrap();
                     let output_surface = output_surface.borrow();
 
-                    let output_descriptor = &output_surface.output_descriptor;
-
-                    let output = Output::new(
+                    let (output, _output_global) = SmithayOutput::new(
                         &mut inner.display.borrow_mut(),
-                        handler.anodium_protocol(),
-                        output_descriptor.clone(),
-                        wl_output::Transform::Normal,
-                        output_surface.wl_mode,
-                        output_surface.wl_modes.clone(),
+                        output_surface.output_name.clone(),
+                        // TODO: Add PhysicalProperties::Clone to smithay
+                        PhysicalProperties {
+                            size: output_surface.physical_properties.size,
+                            subpixel: output_surface.physical_properties.subpixel,
+                            make: output_surface.physical_properties.make.clone(),
+                            model: output_surface.physical_properties.model.clone(),
+                        },
+                        None,
+                    );
+
+                    output.set_preferred(output_surface.wl_mode);
+                    output.change_current_state(
+                        Some(output_surface.wl_mode),
+                        Some(wl_output::Transform::Normal),
+                        None,
+                        None,
                     );
 
                     output.user_data().insert_if_missing(|| UdevOutputId {
@@ -571,12 +596,12 @@ fn device_added<D>(
                         device_id: drm.device_id(),
                     });
 
-                    output
+                    (output, output_surface.wl_modes.clone())
                 };
 
                 inner.outputs.push(output.clone());
 
-                handler.output_created(output);
+                handler.output_created(output, modes);
             }
         }
 
@@ -753,7 +778,7 @@ fn schedule_initial_render<Data: 'static>(
 #[allow(clippy::too_many_arguments)]
 fn render_output_surface<D>(
     handler: &mut D,
-    outputs: &[Output],
+    outputs: &[SmithayOutput],
     surface: &mut OutputSurfaceData,
     renderer: &mut Gles2Renderer,
     device_id: dev_t,
@@ -775,22 +800,6 @@ where
         // Somehow we got called with a non existing output
         return Ok(());
     };
-
-    if output.pending_mode_change() {
-        let current_mode = output.current_mode().unwrap();
-        if let Some(drm_mode) = surface.drm_modes.iter().find(|m| {
-            m.size() == (current_mode.size.w as u16, current_mode.size.h as u16)
-                && m.vrefresh() == (current_mode.refresh / 1000) as u32
-        }) {
-            if let Err(err) = surface.surface.use_mode(*drm_mode) {
-                error!("pending mode: {:?} failed: {:?}", current_mode, err);
-            } else {
-                surface.wl_mode = current_mode;
-            }
-        } else {
-            error!("pending mode: {:?} not found in drm", current_mode);
-        }
-    }
 
     let (dmabuf, age) = surface.surface.next_buffer()?;
     renderer.bind(dmabuf)?;

@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell, RefMut};
+use std::cell::{RefCell, RefMut};
 use std::time::Instant;
 
 use anodium_protocol::server::{AnodiumProtocol, AnodiumProtocolOutput};
@@ -8,11 +8,8 @@ use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::utils::Rectangle;
 use smithay::wayland::output::Output as SmithayOutput;
 
+use smithay::wayland::output::{Mode, PhysicalProperties};
 use smithay::wayland::seat::ModifiersState;
-use smithay::{
-    reexports::wayland_server::{protocol::wl_output, Display},
-    wayland::output::{Mode, PhysicalProperties},
-};
 
 use smithay_egui::{EguiFrame, EguiMode, EguiState};
 
@@ -45,14 +42,15 @@ impl Clone for OutputDescriptor {
 struct Data {
     _anodium_protocol_output: AnodiumProtocolOutput,
 
-    pending_mode_change: Cell<bool>,
-    possible_modes: RefCell<Vec<Mode>>,
+    possible_modes: Vec<Mode>,
 
     egui: RefCell<EguiState>,
     egui_shell: Shell,
 
     #[cfg(feature = "debug")]
     fps_ticker: fps_ticker::Fps,
+
+    config_tx: Sender<ConfigEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,25 +70,13 @@ impl Output {
 
 impl Output {
     pub fn new(
-        display: &mut Display,
+        output: SmithayOutput,
         anodium_protocol: &mut AnodiumProtocol,
-        desc: OutputDescriptor,
-        transform: wl_output::Transform,
-        mode: Mode,
         possible_modes: Vec<Mode>,
+        config_tx: Sender<ConfigEvent>,
     ) -> Self {
-        let (output, _global) = SmithayOutput::new(
-            display,
-            desc.name,
-            desc.physical_properties,
-            slog_scope::logger(),
-        );
-
         let mut anodium_protocol_output = anodium_protocol.new_output();
         anodium_protocol_output.set_name(output.name());
-
-        output.change_current_state(Some(mode), Some(transform), None, None);
-        output.set_preferred(mode);
 
         let mut egui = EguiState::new(EguiMode::Reactive);
         egui.set_zindex(0);
@@ -111,11 +97,12 @@ impl Output {
         let added = output.user_data().insert_if_missing(move || Data {
             _anodium_protocol_output: anodium_protocol_output,
 
-            pending_mode_change: Default::default(),
-            possible_modes: RefCell::new(possible_modes),
+            possible_modes,
             egui: RefCell::new(egui),
             egui_shell: Shell::new(),
             fps_ticker: fps_ticker::Fps::default(),
+
+            config_tx,
         });
         assert!(added);
 
@@ -126,16 +113,21 @@ impl Output {
         self.output.user_data().get().unwrap()
     }
 
-    pub fn pending_mode_change(&self) -> bool {
-        self.data().pending_mode_change.get()
-    }
-
-    pub fn possible_modes(&self) -> Vec<Mode> {
-        self.data().possible_modes.borrow().clone()
+    pub fn possible_modes(&self) -> &[Mode] {
+        &self.data().possible_modes
     }
 
     pub fn layer_map(&self) -> RefMut<desktop::LayerMap> {
         desktop::layer_map_for_output(&self.output)
+    }
+
+    pub fn config_tx(&self) -> &Sender<ConfigEvent> {
+        &self.data().config_tx
+    }
+
+    pub fn mode(&mut self, mode: Mode) {
+        self.output
+            .change_current_state(Some(mode), None, None, None)
     }
 }
 
