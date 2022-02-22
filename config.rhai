@@ -190,17 +190,6 @@ anodize.outputs.on_rearrange(|| {
     }
 });
 
-anodize.outputs.on_mode_select(|desc, modes| {
-    if desc.name == "Virtual-1" {
-        let mode = modes.find(1440, 900, 60);
-        if mode != () {
-            return mode;
-        }
-    }
-
-    modes[0]
-});
-
 let logger_added = false;
 
 

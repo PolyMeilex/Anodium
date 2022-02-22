@@ -37,7 +37,6 @@ impl IntoIterator for Modes {
 pub struct Outputs {
     output_map: OutputManager,
     on_rearrange: Rc<RefCell<Option<FnPtr>>>,
-    on_mode_select: Rc<RefCell<Option<FnPtr>>>,
     on_new: Rc<RefCell<Option<FnPtr>>>,
 }
 
@@ -46,7 +45,6 @@ impl Outputs {
         Self {
             output_map,
             on_rearrange: Default::default(),
-            on_mode_select: Default::default(),
             on_new: Default::default(),
         }
     }
@@ -166,11 +164,6 @@ pub mod outputs {
     #[rhai_fn(global)]
     pub fn on_rearrange(output: &mut Outputs, fnptr: FnPtr) {
         *output.on_rearrange.borrow_mut() = Some(fnptr);
-    }
-
-    #[rhai_fn(global)]
-    pub fn on_mode_select(output: &mut Outputs, fnptr: FnPtr) {
-        *output.on_mode_select.borrow_mut() = Some(fnptr);
     }
 
     #[rhai_fn(global)]
