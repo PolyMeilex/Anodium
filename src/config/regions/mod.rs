@@ -1,8 +1,5 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use rhai::{plugin::*, Array, AST};
-use rhai::{FnPtr, INT};
+use rhai::plugin::*;
+use rhai::INT;
 
 use crate::region_manager::{Region, RegionManager, Workspace};
 

@@ -14,7 +14,6 @@ use calloop::channel::Channel;
 use smithay::{
     backend::input::{InputBackend, InputEvent},
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
-    backend::session::auto::AutoSession,
     reexports::{calloop::EventLoop, wayland_server::Display},
     utils::{Logical, Rectangle},
     wayland,

@@ -10,7 +10,7 @@ use crate::state::InputState as AnodiumInputState;
 pub struct InputState(Rc<RefCell<AnodiumInputState>>);
 
 impl std::fmt::Debug for InputState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Ok(())
     }
 }

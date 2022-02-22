@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell, RefMut};
+use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Instant;
@@ -7,7 +7,7 @@ use anodium_protocol::server::{AnodiumProtocol, AnodiumProtocolOutput};
 use calloop::channel::Sender;
 use smithay::desktop;
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
-use smithay::utils::{Logical, Rectangle, Size};
+use smithay::utils::Rectangle;
 use smithay::wayland::output::Output as SmithayOutput;
 
 use smithay::wayland::output::{Mode, PhysicalProperties};

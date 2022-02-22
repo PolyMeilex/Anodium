@@ -1,5 +1,5 @@
 use smithay::{
-    desktop::{self, Window, WindowSurfaceType},
+    desktop::{self, Window},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
 };
@@ -23,7 +23,7 @@ impl ShellHandler for Anodium {
             ShellEvent::WindowCreated { window } => {
                 self.region_manager
                     .region_under(self.input_state.borrow().pointer_location)
-                    .unwrap_or(self.region_manager.first().unwrap())
+                    .unwrap_or_else(|| self.region_manager.first().unwrap())
                     .active_workspace()
                     .space_mut()
                     .map_window(&window, (0, 0), false);
@@ -48,7 +48,7 @@ impl ShellHandler for Anodium {
 
                     let grab = MoveSurfaceGrab {
                         start_data,
-                        window: window.clone(),
+                        window,
                         initial_window_location,
                     };
                     pointer.set_grab(grab, serial, 0);
@@ -166,10 +166,10 @@ impl ShellHandler for Anodium {
     }
 
     fn window_location(&self, window: &Window) -> Point<i32, Logical> {
-        let region = self.region_manager.find_window_region(&window).unwrap();
+        let region = self.region_manager.find_window_region(window).unwrap();
 
         region
-            .find_window_workspace(&window)
+            .find_window_workspace(window)
             .unwrap()
             .space()
             .window_geometry(window)

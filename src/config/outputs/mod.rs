@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rhai::{plugin::*, Array, AST};
+use rhai::{plugin::*, AST};
 use rhai::{FnPtr, INT};
 
 use smithay::wayland::output::Mode;

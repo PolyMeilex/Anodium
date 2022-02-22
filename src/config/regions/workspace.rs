@@ -1,12 +1,6 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use rhai::{plugin::*, Array, AST};
-use rhai::{FnPtr, INT};
+use rhai::plugin::*;
 
 use crate::region_manager::Workspace;
-
-use smithay::utils::{Physical, Point};
 
 #[export_module]
 pub mod workspace {

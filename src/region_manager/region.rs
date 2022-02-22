@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use indexmap::IndexSet;
@@ -7,11 +7,10 @@ use smithay::wayland::output::Output as SmithayOutput;
 use smithay::{
     desktop::{Window, WindowSurfaceType},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
-    utils::{Logical, Physical, Point},
+    utils::{Logical, Point},
 };
 
 use crate::output_manager::Output;
-use crate::utils::iterators::RefIter;
 
 use super::workspace::Workspace;
 
@@ -132,8 +131,7 @@ impl Region {
         self.active_workspace()
             .space()
             .outputs()
-            .find(|o| o == &output)
-            .is_some()
+            .any(|o| *o == *output)
     }
 
     pub fn window_for_surface(&self, surface: &WlSurface) -> Option<Window> {
