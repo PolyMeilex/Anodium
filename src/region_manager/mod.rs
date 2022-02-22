@@ -101,11 +101,7 @@ impl RegionManager {
 
     pub fn send_frames(&self, all: bool, time: u32) {
         for region in self.regions.borrow().iter() {
-            region
-                .active_workspace()
-                .unwrap()
-                .space()
-                .send_frames(all, time);
+            region.active_workspace().space().send_frames(all, time);
         }
     }
 
@@ -121,7 +117,7 @@ impl RegionManager {
 
     pub fn refresh(&self) {
         for region in self.regions.borrow().iter() {
-            region.active_workspace().unwrap().space_mut().refresh();
+            region.active_workspace().space_mut().refresh();
         }
     }
 
@@ -133,7 +129,7 @@ impl RegionManager {
         let mut global_max_y = 0;
         for region in self.regions.borrow().iter() {
             let region_position = region.position();
-            let workspace = region.active_workspace().unwrap();
+            let workspace = region.active_workspace();
 
             let space = workspace.space();
             let max_x = space
@@ -149,7 +145,7 @@ impl RegionManager {
 
         for region in self.regions.borrow().iter() {
             let region_position = region.position();
-            let workspace = region.active_workspace().unwrap();
+            let workspace = region.active_workspace();
 
             let space = workspace.space();
             let max_y = space

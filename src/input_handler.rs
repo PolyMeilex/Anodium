@@ -65,7 +65,7 @@ impl InputHandler for Anodium {
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 if let Some(absolute_output) = absolute_output {
                     if let Some(region) = self.region_manager.find_output_region(absolute_output) {
-                        let workspace = region.active_workspace().unwrap();
+                        let workspace = region.active_workspace();
                         let output_geometry =
                             workspace.space().output_geometry(absolute_output).unwrap();
                         let output_pos = output_geometry.loc.to_f64();
@@ -100,7 +100,6 @@ impl InputHandler for Anodium {
         if let Some(region) = self.region_manager.region_under(pointer_location) {
             if let Some(output) = region
                 .active_workspace()
-                .unwrap()
                 .space()
                 .output_under(pointer_location - region.position().to_f64())
                 .next()
@@ -136,7 +135,6 @@ impl Anodium {
             InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
                 let output_loc = region
                     .active_workspace()
-                    .unwrap()
                     .space()
                     .output_geometry(output)
                     .unwrap()
@@ -273,7 +271,6 @@ impl Anodium {
                     if let Some(region) = self.region_manager.region_under(point) {
                         let window = region
                             .active_workspace()
-                            .unwrap()
                             .space()
                             .window_under(point - region.position().to_f64())
                             .cloned();

@@ -41,7 +41,6 @@ use crate::{
     output_manager::{Output, OutputManager},
     region_manager::RegionManager,
     render,
-    workspace::Workspace,
 };
 
 pub struct InputState {
@@ -370,7 +369,7 @@ impl Anodium {
             return Ok(None);
         };
 
-        let workspace = region.active_workspace().unwrap();
+        let workspace = region.active_workspace();
         let output_geometry = workspace.space().output_geometry(output).unwrap();
 
         let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();

@@ -1,5 +1,5 @@
 use smithay::{
-    desktop::{self, WindowSurfaceType},
+    desktop::{self},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
 };
@@ -26,7 +26,6 @@ impl ShellHandler for Anodium {
                     .region_under(self.input_state.borrow().pointer_location)
                     .unwrap_or(self.region_manager.first().unwrap())
                     .active_workspace()
-                    .unwrap()
                     .space_mut()
                     .map_window(&window, (0, 0), false);
             }
@@ -130,7 +129,6 @@ impl ShellHandler for Anodium {
                                 .first()
                                 .unwrap()
                                 .active_workspace()
-                                .unwrap()
                                 .space()
                                 .outputs()
                                 .next()
