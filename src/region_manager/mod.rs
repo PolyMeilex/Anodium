@@ -157,7 +157,6 @@ impl RegionManager {
                 .map(|o| space.output_geometry(o).unwrap().size.h);
 
             if let Some(mut max_y) = max_y {
-                info!("max_y: {:?}", max_y);
                 max_y += region_position.y;
                 if max_y > global_max_y {
                     global_max_y = max_y;
