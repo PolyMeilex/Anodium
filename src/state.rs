@@ -33,11 +33,12 @@ use smithay::{
 #[cfg(feature = "xwayland")]
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
+use anodium_backend::{utils::cursor::PointerElement, BackendRequest};
+
 use crate::{
     cli::AnodiumOptions,
     config::{eventloop::ConfigEvent, ConfigVM},
-    framework::backend::BackendRequest,
-    framework::{cursor::PointerElement, shell::ShellManager},
+    framework::shell::ShellManager,
     output_manager::{Output, OutputManager},
     region_manager::RegionManager,
     render,
@@ -158,7 +159,7 @@ impl Anodium {
                     DataDeviceEvent::DnDStarted { icon, .. } => {
                         *dnd_icon.lock().unwrap() = icon;
                     }
-                    DataDeviceEvent::DnDDropped => {
+                    DataDeviceEvent::DnDDropped { .. } => {
                         *dnd_icon.lock().unwrap() = None;
                     }
                     _ => {}

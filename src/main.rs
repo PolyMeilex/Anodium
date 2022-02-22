@@ -19,9 +19,6 @@ mod config;
 mod output_manager;
 mod region_manager;
 
-mod popup;
-mod window;
-
 mod state;
 
 mod backend_handler;
@@ -69,7 +66,7 @@ fn main() {
 
     let (mut anodium, rx) = Anodium::new(event_loop.handle(), "seat0".into(), options);
 
-    framework::backend::auto(&mut event_loop, &mut anodium, rx, prefered_backend);
+    anodium_backend::init(&mut event_loop, &mut anodium, rx, prefered_backend.into());
 
     run_loop(anodium, event_loop);
 }

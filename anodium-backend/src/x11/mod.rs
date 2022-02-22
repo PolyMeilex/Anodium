@@ -17,14 +17,12 @@ use smithay::{
         gbm,
         wayland_server::{protocol::wl_output, Display},
     },
-    wayland::output::{Mode, PhysicalProperties},
+    wayland::output::{Mode, Output as SmithayOutput, PhysicalProperties},
 };
 use smithay::{
     backend::{input::InputEvent, renderer::ImportDma},
     wayland::dmabuf::init_dmabuf_global,
 };
-
-use crate::output_manager::{Output, OutputDescriptor};
 
 use super::{BackendHandler, BackendRequest};
 
@@ -34,8 +32,7 @@ struct OutputSurface {
     surface: X11Surface,
     window: smithay::backend::x11::Window,
 
-    _output_name: String,
-    output: Output,
+    output: SmithayOutput,
     mode: Mode,
 
     rerender: bool,
@@ -72,10 +69,7 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build<D>(self, handler: &mut D, display: &mut Display) -> OutputSurface
-    where
-        D: BackendHandler,
-    {
+    fn build(self, display: &mut Display) -> OutputSurface {
         let size = {
             let s = self.window.size();
             (s.w as i32, s.h as i32).into()
@@ -86,32 +80,23 @@ impl OutputSurfaceBuilder {
             refresh: 60_000,
         };
 
-        let descriptor = OutputDescriptor {
-            name: OUTPUT_NAME.to_owned(),
-            physical_properties: PhysicalProperties {
-                size: (0, 0).into(),
-                subpixel: wl_output::Subpixel::Unknown,
-                make: "Smithay".into(),
-                model: "Winit".into(),
-            },
+        let physical_properties = PhysicalProperties {
+            size: (0, 0).into(),
+            subpixel: wl_output::Subpixel::Unknown,
+            make: "Smithay".into(),
+            model: "Winit".into(),
         };
 
-        let mode = handler.ask_for_output_mode(&descriptor, &[mode]);
+        let (output, _) =
+            SmithayOutput::new(display, OUTPUT_NAME.to_owned(), physical_properties, None);
 
-        let output = Output::new(
-            display,
-            handler.anodium_protocol(),
-            descriptor,
-            wl_output::Transform::Normal,
-            mode,
-            vec![mode],
-        );
+        output.set_preferred(mode);
+        output.change_current_state(Some(mode), Some(wl_output::Transform::Normal), None, None);
 
         OutputSurface {
             surface: self.surface,
             window: self.window,
             mode,
-            _output_name: "X11(1)".into(),
             output,
 
             rerender: true,
@@ -135,12 +120,13 @@ where
         .insert_source(rx, move |event, _, _| match event {
             channel::Event::Msg(event) => match event {
                 BackendRequest::ChangeVT(_) => {}
+                BackendRequest::UpdateMode(_, _) => {}
             },
             channel::Event::Closed => {}
         })
         .unwrap();
 
-    let backend = X11Backend::new(slog_scope::logger()).expect("Failed to initilize X11 backend");
+    let backend = X11Backend::new(None).expect("Failed to initilize X11 backend");
     let handle = backend.handle();
 
     // Obtain the DRM node the X server uses for direct rendering.
@@ -151,9 +137,9 @@ where
     // Create the gbm device for buffer allocation.
     let device = gbm::Device::new(drm_node).expect("Failed to create gbm device");
     // Initialize EGL using the GBM device.
-    let egl = EGLDisplay::new(&device, slog_scope::logger()).expect("Failed to create EGLDisplay");
+    let egl = EGLDisplay::new(&device, None).expect("Failed to create EGLDisplay");
     // Create the OpenGL context
-    let context = EGLContext::new(&egl, slog_scope::logger()).expect("Failed to create EGLContext");
+    let context = EGLContext::new(&egl, None).expect("Failed to create EGLContext");
 
     let device = Arc::new(Mutex::new(device));
 
@@ -162,8 +148,8 @@ where
         OutputSurfaceBuilder::new(&handle, device, &context),
     ];
 
-    let renderer = unsafe { Gles2Renderer::new(context, slog_scope::logger()) }
-        .expect("Failed to initialize renderer");
+    let renderer =
+        unsafe { Gles2Renderer::new(context, None) }.expect("Failed to initialize renderer");
     let renderer = Rc::new(RefCell::new(renderer));
 
     new_x11_window(display, event_loop, handler, backend, renderer, x11_outputs)
@@ -198,17 +184,17 @@ where
             &mut *display.borrow_mut(),
             dmabuf_formats,
             move |buffer, _| renderer.borrow_mut().import_dmabuf(buffer).is_ok(),
-            slog_scope::logger(),
+            None,
         );
     }
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| o.build(handler, &mut display.borrow_mut()))
+        .map(|o| o.build(&mut display.borrow_mut()))
         .collect();
 
     for surface_data in surface_datas.iter() {
-        handler.output_created(surface_data.output.clone());
+        handler.output_created(surface_data.output.clone(), vec![surface_data.mode]);
     }
 
     handler.start_compositor();

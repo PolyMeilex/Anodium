@@ -4,6 +4,8 @@ use gumdrop::Options;
 
 use strum::EnumString;
 
+use anodium_backend::PreferedBackend;
+
 #[derive(Debug, Clone, EnumString)]
 pub enum Backend {
     #[strum(serialize = "auto")]
@@ -14,6 +16,17 @@ pub enum Backend {
     Winit,
     #[strum(serialize = "udev")]
     Udev,
+}
+
+impl From<Backend> for PreferedBackend {
+    fn from(from: Backend) -> Self {
+        match from {
+            Backend::Auto => PreferedBackend::Auto,
+            Backend::X11 => PreferedBackend::X11,
+            Backend::Winit => PreferedBackend::Winit,
+            Backend::Udev => PreferedBackend::Udev,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Options)]

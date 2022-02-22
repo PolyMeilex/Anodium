@@ -1,6 +1,9 @@
 use rhai::FnPtr;
 
-use crate::window::Window;
+use crate::output_manager::Output;
+use smithay::desktop::Window;
+
+use smithay::wayland::output::Mode;
 
 #[derive(Debug)]
 pub enum ConfigEvent {
@@ -9,5 +12,6 @@ pub enum ConfigEvent {
     Maximize(Window),
     Unmaximize(Window),
     OutputsRearrange,
+    OutputUpdateMode(Output, Mode),
     Shell(FnPtr),
 }

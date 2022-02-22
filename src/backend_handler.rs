@@ -1,30 +1,25 @@
-use anodium_protocol::server::AnodiumProtocol;
 use smithay::{
     desktop,
     reexports::wayland_server::Display,
     utils::{Logical, Rectangle},
     wayland::output,
+    wayland::output::Output as SmithayOutput,
 };
 use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
 
-use crate::{
-    framework::backend::{BackendHandler, OutputHandler},
-    output_manager::{Output, OutputDescriptor},
-    state::Anodium,
-};
+use anodium_backend::{BackendHandler, OutputHandler};
+
+use crate::{output_manager::Output, state::Anodium};
 
 impl OutputHandler for Anodium {
-    fn ask_for_output_mode(
-        &mut self,
-        desc: &OutputDescriptor,
-        modes: &[output::Mode],
-    ) -> output::Mode {
-        self.config
-            .ask_for_output_mode(desc, modes)
-            .unwrap_or_else(|| modes[0])
-    }
+    fn output_created(&mut self, output: SmithayOutput, possible_modes: Vec<output::Mode>) {
+        let output = Output::new(
+            output,
+            &mut self.anodium_protocol,
+            possible_modes,
+            self.config_tx.clone(),
+        );
 
-    fn output_created(&mut self, output: crate::output_manager::Output) {
         info!("OutputCreated: {}", output.name());
         self.output_manager.add(&output);
 
@@ -32,7 +27,7 @@ impl OutputHandler for Anodium {
         self.config.output_rearrange();
     }
 
-    fn output_mode_updated(&mut self, output: &crate::output_manager::Output, mode: output::Mode) {
+    fn output_mode_updated(&mut self, output: &SmithayOutput, mode: output::Mode) {
         output.change_current_state(Some(mode), None, None, None);
 
         desktop::layer_map_for_output(output).arrange();
@@ -41,19 +36,16 @@ impl OutputHandler for Anodium {
     fn output_render(
         &mut self,
         renderer: &mut smithay::backend::renderer::gles2::Gles2Renderer,
-        output: &Output,
+        output: &SmithayOutput,
         age: usize,
         pointer_image: Option<&smithay::backend::renderer::gles2::Gles2Texture>,
     ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError> {
-        self.render(renderer, output, age, pointer_image)
+        let output = Output::wrap(output.clone());
+        self.render(renderer, &output, age, pointer_image)
     }
 }
 
 impl BackendHandler for Anodium {
-    fn anodium_protocol(&mut self) -> &mut AnodiumProtocol {
-        &mut self.anodium_protocol
-    }
-
     fn wl_display(&mut self) -> Rc<RefCell<Display>> {
         self.display.clone()
     }

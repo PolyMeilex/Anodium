@@ -1,0 +1,56 @@
+[package]
+name = "anodium-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+input = { version = "0.7", features = ["udev"], optional = true }
+xcursor = { version = "0.3", optional = true }
+image = { version = "0.24", default-features = false, optional = true, features = [
+    "png",
+] }
+slog = "2.7"
+log = "0.4"
+thiserror = "1"
+
+[dependencies.smithay]
+git = "https://github.com/Smithay/smithay.git"
+default-features = false
+features = [
+    "use_system_lib",
+    "renderer_gl",
+    "backend_egl",
+    "wayland_frontend",
+    "slog-stdlog",
+    "desktop",
+]
+
+[dependencies.calloop]
+version = "0.9"
+features = ["executor", "futures-io"]
+
+[dependencies.x11rb]
+optional = true
+version = "0.9"
+default-features = false
+features = ["composite"]
+
+
+[features]
+default = ["udev", "winit", "x11"]
+# default = ["udev","winit", "xwayland"]
+#default = ["udev","winit"]
+x11 = ["smithay/backend_x11", "x11rb"]
+
+winit = ["smithay/backend_winit"]
+udev = [
+    "smithay/backend_libinput",
+    "smithay/backend_udev",
+    "smithay/backend_drm",
+    "smithay/backend_gbm",
+    "smithay/backend_session",
+    "smithay/backend_session_logind",
+    "input",
+    "image",
+    "xcursor",
+]

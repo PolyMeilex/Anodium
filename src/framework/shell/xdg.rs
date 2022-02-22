@@ -16,7 +16,7 @@ use super::{
     ShellHandler,
 };
 
-use crate::utils::AsWlSurface;
+use super::utils::AsWlSurface;
 
 use super::ShellEvent;
 

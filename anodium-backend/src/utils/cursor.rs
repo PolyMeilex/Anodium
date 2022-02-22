@@ -13,7 +13,7 @@ use xcursor::{
     CursorTheme,
 };
 
-static FALLBACK_CURSOR_DATA: &[u8] = include_bytes!("../../resources/cursor.rgba");
+static FALLBACK_CURSOR_DATA: &[u8] = include_bytes!("../../../resources/cursor.rgba");
 
 pub struct Cursor {
     icons: Vec<Image>,
@@ -22,7 +22,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn load(log: &::slog::Logger) -> Cursor {
+    pub fn load() -> Cursor {
         let name = std::env::var("XCURSOR_THEME")
             .ok()
             .unwrap_or_else(|| "default".into());
@@ -33,13 +33,7 @@ impl Cursor {
 
         let theme = CursorTheme::load(&name);
         let icons = load_icon(&theme)
-            .map_err(|err| {
-                slog::warn!(
-                    log,
-                    "Unable to load xcursor: {}, using fallback cursor",
-                    err
-                )
-            })
+            .map_err(|err| warn!("Unable to load xcursor: {}, using fallback cursor", err))
             .unwrap_or_else(|_| {
                 vec![Image {
                     size: 32,
@@ -123,13 +117,13 @@ pub struct PointerElement {
 impl PointerElement {
     pub fn new(
         texture: Gles2Texture,
-        relative_pointer_pos: Point<i32, Logical>,
+        position: Point<i32, Logical>,
         damaged: bool,
     ) -> PointerElement {
         let size = texture.size().to_logical(1, Transform::Normal);
         PointerElement {
             texture,
-            position: relative_pointer_pos,
+            position,
             size,
             damaged,
         }
@@ -161,16 +155,13 @@ impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for Poin
         _renderer: &mut Gles2Renderer,
         frame: &mut Gles2Frame,
         scale: f64,
-        _location: Point<i32, Logical>,
+        location: Point<i32, Logical>,
         damage: &[Rectangle<i32, Logical>],
         _log: &slog::Logger,
     ) -> Result<(), Gles2Error> {
         frame.render_texture_at(
             &self.texture,
-            self.position
-                .to_f64()
-                .to_physical(scale as f64)
-                .to_i32_round(),
+            location.to_f64().to_physical(scale),
             1,
             scale as f64,
             Transform::Normal,

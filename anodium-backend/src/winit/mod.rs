@@ -11,13 +11,11 @@ use smithay::{
     },
     wayland::{
         dmabuf::init_dmabuf_global,
-        output::{Mode, PhysicalProperties},
+        output::{Mode, Output as SmithayOutput, PhysicalProperties},
     },
 };
 
 use super::{BackendHandler, BackendRequest};
-
-use crate::output_manager::{Output, OutputDescriptor};
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -37,13 +35,14 @@ where
         .insert_source(rx, move |event, _, _| match event {
             channel::Event::Msg(event) => match event {
                 BackendRequest::ChangeVT(_) => {}
+                BackendRequest::UpdateMode(_, _) => {}
             },
             channel::Event::Closed => {}
         })
         .unwrap();
 
-    let (backend, mut input) = winit::init(slog_scope::logger()).map_err(|err| {
-        crit!("Failed to initialize Winit backend: {}", err);
+    let (backend, mut input) = winit::init(None).map_err(|err| {
+        error!("Failed to initialize Winit backend: {}", err);
     })?;
     let backend = Rc::new(RefCell::new(backend));
 
@@ -71,7 +70,7 @@ where
                     .import_dmabuf(buffer)
                     .is_ok()
             },
-            slog_scope::logger(),
+            None,
         );
     };
 
@@ -86,28 +85,29 @@ where
         refresh: 60_000,
     };
 
-    let descriptor = OutputDescriptor {
-        name: OUTPUT_NAME.to_owned(),
-        physical_properties: PhysicalProperties {
-            size: (0, 0).into(),
-            subpixel: wl_output::Subpixel::Unknown,
-            make: "Smithay".into(),
-            model: "Winit".into(),
-        },
+    let physical_properties = PhysicalProperties {
+        size: (0, 0).into(),
+        subpixel: wl_output::Subpixel::Unknown,
+        make: "Smithay".into(),
+        model: "Winit".into(),
     };
 
-    let mode = handler.ask_for_output_mode(&descriptor, &[mode]);
-
-    let output = Output::new(
+    let (output, _) = SmithayOutput::new(
         &mut *display.borrow_mut(),
-        handler.anodium_protocol(),
-        descriptor,
-        wl_output::Transform::Flipped180,
-        mode,
-        vec![mode],
+        OUTPUT_NAME.to_owned(),
+        physical_properties,
+        None,
     );
 
-    handler.output_created(output.clone());
+    output.set_preferred(mode);
+    output.change_current_state(
+        Some(mode),
+        Some(wl_output::Transform::Flipped180),
+        None,
+        None,
+    );
+
+    handler.output_created(output.clone(), vec![mode]);
     handler.start_compositor();
 
     info!("Initialization completed, starting the main loop.");

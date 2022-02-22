@@ -1,5 +1,5 @@
 use smithay::{
-    desktop::{self},
+    desktop::{self, Window, WindowSurfaceType},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
 };
@@ -12,7 +12,6 @@ use crate::{
     grabs::{MoveSurfaceGrab, ResizeSurfaceGrab},
     output_manager::Output,
     state::Anodium,
-    window::Window,
 };
 
 impl ShellHandler for Anodium {
@@ -52,7 +51,7 @@ impl ShellHandler for Anodium {
                         window: window.clone(),
                         initial_window_location,
                     };
-                    pointer.set_grab(grab, serial);
+                    pointer.set_grab(grab, serial, 0);
                 }
             }
 
@@ -91,7 +90,7 @@ impl ShellHandler for Anodium {
                         last_window_size: initial_window_size,
                     };
 
-                    pointer.set_grab(grab, serial);
+                    pointer.set_grab(grab, serial, 0);
                 }
             }
 

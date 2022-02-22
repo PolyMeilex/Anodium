@@ -153,18 +153,17 @@ anodize.keyboard.callbacks.register(|| {
 // }, "Control_L", ["r"]);
 
 
-// let mode_index = 0;
-// anodize.keyboard.callbacks.register(|| {
-//     let output = anodize.outputs[0];
-//     let mode = output.modes[mode_index];
-//     if mode == () {
-//         mode_index = 0;
-//     } else {
-//         output.update_mode(mode);
-//         output.set_wallpaper("./resources/anocube.png");
-//     }
-//     mode_index += 1;
-// }, "Control_L", ["equal"]);
+let mode_index = 0;
+anodize.keyboard.callbacks.register(|| {
+    let output = anodize.outputs[0];
+    let mode = output.modes[mode_index];
+    if mode == () {
+        mode_index = 0;
+    } else {
+        output.update_mode(mode);
+    }
+    mode_index += 1;
+}, "Control_L", ["equal"]);
 
 let on_rearrange_inited = false;
 let on_rearrange_timeout = ();
