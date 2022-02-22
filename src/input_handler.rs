@@ -64,10 +64,10 @@ impl InputHandler for Anodium {
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 if let Some(absolute_output) = absolute_output {
-                    if let Some(region) = self.region_manager.find_output_region(absolute_output) {
+                    if let Some(region) = self.region_manager.find_output_region(&absolute_output) {
                         let workspace = region.active_workspace();
                         let output_geometry =
-                            workspace.space().output_geometry(absolute_output).unwrap();
+                            workspace.space().output_geometry(&absolute_output).unwrap();
                         let output_pos = output_geometry.loc.to_f64();
                         let region_pos = region.position().to_f64();
                         let output_size = output_geometry.size;
