@@ -31,7 +31,6 @@ impl OutputManager {
     }
 
     pub fn add(&mut self, output: &Output) {
-        output.change_current_state(None, None, None, Some((0, 0).into()));
         self.outputs.borrow_mut().push(output.clone());
     }
 
