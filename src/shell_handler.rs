@@ -1,5 +1,4 @@
 use smithay::{
-    backend::input::TabletToolEvent,
     desktop::{self, Window},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
