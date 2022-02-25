@@ -4,10 +4,8 @@ use std::rc::Rc;
 
 use smithay::desktop;
 
-#[derive(derivative::Derivative)]
-#[derivative(Debug)]
+#[derive(Debug)]
 pub struct WorkspaceInner {
-    #[derivative(Debug = "ignore")]
     space: desktop::Space,
     name: String,
 }

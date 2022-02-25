@@ -39,7 +39,6 @@ chrono = "0.4"
 
 egui = "0.16"
 
-derivative = "2.2"
 gumdrop = "0.8"
 strum = { version = "0.23", features = ["derive"] }
 
