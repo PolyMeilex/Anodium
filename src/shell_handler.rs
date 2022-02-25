@@ -1,4 +1,5 @@
 use smithay::{
+    backend::input::TabletToolEvent,
     desktop::{self, Window},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
@@ -68,11 +69,12 @@ impl ShellHandler for Anodium {
                 let window = self.region_manager.window_for_surface(wl_surface);
 
                 if let Some(window) = window {
-                    let workspace = self.region_manager.find_window_workspace(&window).unwrap();
+                    let region = self.region_manager.find_window_region(&window).unwrap();
+                    let workspace = region.find_window_workspace(&window).unwrap();
                     let geometry = workspace.space().window_geometry(&window).unwrap();
 
                     let (initial_window_location, initial_window_size) =
-                        (geometry.loc, geometry.size);
+                        (geometry.loc + region.position(), geometry.size);
 
                     SurfaceData::with_mut(wl_surface, |data| {
                         data.resize_state = ResizeState::Resizing(ResizeData {
@@ -98,11 +100,15 @@ impl ShellHandler for Anodium {
                 window,
                 new_location,
             } => {
-                self.region_manager
-                    .find_window_workspace(&window)
-                    .unwrap()
-                    .space_mut()
-                    .map_window(&window, new_location, false);
+                if let Some(region) = self.region_manager.find_window_region(&window) {
+                    let new_location = new_location - region.position();
+
+                    region
+                        .find_window_workspace(&window)
+                        .unwrap()
+                        .space_mut()
+                        .map_window(&window, new_location, false);
+                }
             }
 
             ShellEvent::WindowMaximize { .. } => {}
