@@ -49,11 +49,6 @@ impl InputHandler for Anodium {
                 }
 
                 if let Some(region) = self.region_manager.region_under(pointer_location) {
-                    {
-                        let mut input_state = self.input_state.borrow_mut();
-                        input_state.pointer_location =
-                            self.clamp_coords(input_state.pointer_location + event.delta());
-                    }
                     let region_pos = region.position().to_f64();
                     self.on_pointer_move(event.time(), region_pos);
                     self.surface_under(self.input_state.borrow().pointer_location)
