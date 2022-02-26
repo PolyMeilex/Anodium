@@ -88,6 +88,7 @@ type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
 
 pub fn run_udev<D>(
     event_loop: &mut EventLoop<'static, D>,
+    display: Rc<RefCell<Display>>,
     handler: &mut D,
     rx: channel::Channel<BackendRequest>,
 ) -> Result<(), ()>
@@ -97,8 +98,6 @@ where
     let (mut session, notifier) = AutoSession::new(None).expect("Could not init session!");
 
     let session_signal = notifier.signaler();
-
-    let display = handler.wl_display();
 
     /*
      * Initialize the compositor

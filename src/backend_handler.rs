@@ -46,10 +46,6 @@ impl OutputHandler for Anodium {
 }
 
 impl BackendHandler for Anodium {
-    fn wl_display(&mut self) -> Rc<RefCell<Display>> {
-        self.display.clone()
-    }
-
     fn send_frames(&mut self) {
         let time = self.start_time.elapsed().as_millis() as u32;
 

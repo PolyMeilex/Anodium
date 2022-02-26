@@ -33,9 +33,10 @@ use state::Anodium;
 
 use slog::Drain;
 
-use smithay::reexports::calloop::EventLoop;
+use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
 
 use std::sync::atomic::Ordering;
+use std::{cell::RefCell, rc::Rc};
 
 fn main() {
     let options = cli::get_anodium_options();
@@ -63,10 +64,22 @@ fn main() {
     //
 
     let mut event_loop = EventLoop::try_new().unwrap();
+    let display = Rc::new(RefCell::new(Display::new()));
 
-    let (mut anodium, rx) = Anodium::new(event_loop.handle(), "seat0".into(), options);
+    let (mut anodium, rx) = Anodium::new(
+        event_loop.handle(),
+        display.clone(),
+        "seat0".into(),
+        options,
+    );
 
-    anodium_backend::init(&mut event_loop, &mut anodium, rx, prefered_backend.into());
+    anodium_backend::init(
+        &mut event_loop,
+        display,
+        &mut anodium,
+        rx,
+        prefered_backend.into(),
+    );
 
     run_loop(anodium, event_loop);
 }
