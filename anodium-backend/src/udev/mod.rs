@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::hash_map::{Entry, HashMap},
+    collections::hash_map::HashMap,
     io::Error as IoError,
     os::unix::io::{AsRawFd, RawFd},
     path::{Path, PathBuf},
@@ -9,6 +9,7 @@ use std::{
 
 use image::ImageBuffer;
 
+use indexmap::{map::Entry, IndexMap};
 use smithay::{
     backend::{
         allocator::dmabuf::Dmabuf,
@@ -289,7 +290,7 @@ struct OutputSurfaceData {
 
 pub struct UdevDeviceData {
     _restart_token: SignalToken,
-    surfaces: HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
+    surfaces: IndexMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
     renderer: Rc<RefCell<Gles2Renderer>>,
     // gbm: GbmDevice<SessionFd>,
@@ -299,8 +300,7 @@ pub struct UdevDeviceData {
 }
 
 struct ConnectorScanResult {
-    backends: HashMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
-    backends_order: Vec<crtc::Handle>,
+    backends: IndexMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
 }
 
 fn scan_connectors<D>(
@@ -326,7 +326,7 @@ where
         .inspect(|conn| info!("Connected: {:?}", conn.interface()))
         .collect();
 
-    let mut backends = HashMap::new();
+    let mut backends = IndexMap::new();
     let mut backends_order = Vec::new();
 
     // very naive way of finding good crtc/encoder/connector combinations. This problem is np-complete
@@ -450,10 +450,7 @@ where
         }
     }
 
-    ConnectorScanResult {
-        backends,
-        backends_order,
-    }
+    ConnectorScanResult { backends }
 }
 
 /// Try to open the device
@@ -544,10 +541,7 @@ fn device_added<D>(
         }
 
         let gbm = Rc::new(RefCell::new(gbm));
-        let ConnectorScanResult {
-            backends: outputs,
-            backends_order: outputs_order,
-        } = scan_connectors(
+        let ConnectorScanResult { backends: outputs } = scan_connectors(
             inner.clone(),
             handle.clone(),
             &mut drm,
@@ -559,9 +553,8 @@ fn device_added<D>(
         {
             let mut inner = inner.borrow_mut();
 
-            for output_handle in outputs_order {
+            for (_, output_surface) in outputs.iter() {
                 let (output, modes) = {
-                    let output_surface = outputs.get(&output_handle).unwrap();
                     let output_surface = output_surface.borrow();
 
                     let (output, _output_global) = SmithayOutput::new(

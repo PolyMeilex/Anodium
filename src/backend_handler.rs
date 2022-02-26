@@ -1,11 +1,10 @@
 use smithay::{
     desktop,
-    reexports::wayland_server::Display,
     utils::{Logical, Rectangle},
     wayland::output,
     wayland::output::Output as SmithayOutput,
 };
-use std::{cell::RefCell, rc::Rc, sync::atomic::Ordering};
+use std::sync::atomic::Ordering;
 
 use anodium_backend::{BackendHandler, OutputHandler};
 

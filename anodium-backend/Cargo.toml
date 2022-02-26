@@ -12,6 +12,7 @@ image = { version = "0.24", default-features = false, optional = true, features 
 slog = "2.7"
 log = "0.4"
 thiserror = "1"
+indexmap = "1.8"
 
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
