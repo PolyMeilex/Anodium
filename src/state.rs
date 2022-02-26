@@ -40,8 +40,8 @@ use crate::{
     config::{eventloop::ConfigEvent, ConfigVM},
     framework::shell::ShellManager,
     output_manager::{Output, OutputManager},
+    region_manager::RegionManager,
     render,
-    workspace::Workspace,
 };
 
 pub struct InputState {
@@ -67,7 +67,7 @@ pub struct Anodium {
     pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
     pub cursor_status: Arc<Mutex<CursorImageStatus>>,
 
-    pub input_state: InputState,
+    pub input_state: Rc<RefCell<InputState>>,
 
     pub seat: Seat,
 
@@ -81,10 +81,8 @@ pub struct Anodium {
     // Desktop
     pub anodium_protocol: AnodiumProtocol,
     pub output_manager: OutputManager,
-
-    pub workspace: Workspace,
-
-    pub active_workspace: Option<String>,
+    pub region_manager: RegionManager,
+    //pub workspace: Workspace,
     pub focused_window: Option<desktop::Window>,
 
     #[cfg(feature = "xwayland")]
@@ -249,11 +247,23 @@ impl Anodium {
 
         let config_tx = Self::init_config_channel(&handle);
         let output_map = OutputManager::new();
+        let region_map = RegionManager::new();
+        let input_state = Rc::new(RefCell::new(InputState {
+            pointer_location: (0.0, 0.0).into(),
+            previous_pointer_location: (0.0, 0.0).into(),
+            pointer,
+            keyboard,
+            modifiers_state: Default::default(),
+            suppressed_keys: Vec::new(),
+            pressed_keys: HashSet::new(),
+        }));
 
         let config = ConfigVM::new(
             config_tx.clone(),
             output_map.clone(),
+            region_map.clone(),
             handle.clone(),
+            input_state.clone(),
             options.config.clone(),
         )
         .unwrap();
@@ -270,15 +280,7 @@ impl Anodium {
                 dnd_icon,
                 cursor_status,
 
-                input_state: InputState {
-                    pointer_location: (0.0, 0.0).into(),
-                    previous_pointer_location: (0.0, 0.0).into(),
-                    pointer,
-                    keyboard,
-                    modifiers_state: Default::default(),
-                    suppressed_keys: Vec::new(),
-                    pressed_keys: HashSet::new(),
-                },
+                input_state,
 
                 seat,
 
@@ -291,9 +293,8 @@ impl Anodium {
 
                 anodium_protocol,
                 output_manager: output_map,
-                workspace: Workspace::new(),
-
-                active_workspace: None,
+                region_manager: region_map,
+                //workspace: Workspace::new(),
                 focused_window: Default::default(),
 
                 #[cfg(feature = "xwayland")]
@@ -309,7 +310,7 @@ impl Anodium {
 impl Anodium {
     pub fn update(&mut self) {
         self.shell_manager.refresh();
-        self.workspace.refresh();
+        self.region_manager.refresh();
 
         if let Some(focused_window) = &self.focused_window {
             if !focused_window.toplevel().alive() {
@@ -363,41 +364,52 @@ impl Anodium {
         age: usize,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError> {
-        let output_geometry = self.workspace.output_geometry(output).unwrap();
+        let region = if let Some(region) = self.region_manager.find_output_region(output) {
+            region
+        } else {
+            return Ok(None);
+        };
+
+        let workspace = region.active_workspace();
+        let output_geometry = workspace.space().output_geometry(output).unwrap();
 
         let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
-
-        let frame = output.render_egui_shell(
-            &self.start_time,
-            &self.input_state.modifiers_state,
-            &self.config_tx,
-        );
-        elems.push(Box::new(frame));
-
-        // Pointer Related:
-        if output_geometry
-            .to_f64()
-            .contains(self.input_state.pointer_location)
         {
-            let loc = self.input_state.pointer_location.to_i32_round();
-            if let Some(wl_cursor) = self.prepare_cursor_element(loc) {
+            let input_state = self.input_state.borrow();
+            let frame = output.render_egui_shell(
+                &self.start_time,
+                &input_state.modifiers_state,
+                &self.config_tx,
+            );
+            elems.push(Box::new(frame));
+        }
+        let mut input_state = self.input_state.borrow_mut();
+        // Pointer Related:
+        if region.contains(input_state.pointer_location) {
+            let (ptr_x, ptr_y) = input_state.pointer_location.into();
+            let relative_location = Point::<i32, Logical>::from((ptr_x as i32, ptr_y as i32))
+                - output_geometry.loc
+                - region.position();
+
+            if let Some(wl_cursor) = self.prepare_cursor_element(relative_location) {
                 elems.push(Box::new(wl_cursor));
             } else if let Some(texture) = pointer_image {
                 elems.push(Box::new(PointerElement::new(
                     texture.clone(),
-                    loc,
-                    self.input_state.pointer_location != self.input_state.previous_pointer_location,
+                    relative_location,
+                    input_state.pointer_location != input_state.previous_pointer_location,
                 )));
             }
-            self.input_state.previous_pointer_location = self.input_state.pointer_location;
+
+            input_state.previous_pointer_location = input_state.pointer_location;
 
             if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
                 elems.push(Box::new(wl_dnd));
             }
         }
 
-        let render_result = self
-            .workspace
+        let render_result = workspace
+            .space_mut()
             .render_output(renderer, output, age, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
 
@@ -412,15 +424,29 @@ impl Anodium {
 
 impl Anodium {
     pub fn update_focused_window(&mut self, window: Option<&desktop::Window>) {
-        self.workspace.windows().for_each(|w| {
-            w.set_activated(false);
+        info!("update focused window: {:?}", window);
+        self.region_manager.iter().for_each(|r| {
+            r.for_each_workspace(|w| {
+                w.space().windows().for_each(|w| {
+                    w.set_activated(false);
+                });
+            });
         });
 
         if let Some(window) = window {
             window.set_activated(true);
         }
 
-        self.workspace.windows().for_each(|w| w.configure());
+        self.region_manager.iter().for_each(|r| {
+            r.for_each_workspace(|w| {
+                w.space().windows().for_each(|w| w.configure());
+            });
+            if let Some(window) = window {
+                if let Some(workspace) = r.find_window_workspace(window) {
+                    workspace.space_mut().raise_window(window, true);
+                }
+            }
+        });
 
         self.focused_window = window.cloned();
     }

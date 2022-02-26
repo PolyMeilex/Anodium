@@ -1,6 +1,7 @@
 use std::fmt;
 
 pub mod glow;
+pub mod iterators;
 
 pub trait LogResult {
     /// Log if error,

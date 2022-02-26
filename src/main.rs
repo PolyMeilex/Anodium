@@ -17,6 +17,7 @@ mod utils;
 mod config;
 
 mod output_manager;
+mod region_manager;
 
 mod state;
 
@@ -74,7 +75,7 @@ fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
     let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
-            if state.workspace.outputs().count() == 0 || !state.running.load(Ordering::SeqCst) {
+            if !state.running.load(Ordering::SeqCst) {
                 signal.stop();
             }
 

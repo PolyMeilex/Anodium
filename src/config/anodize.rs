@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use rhai::Dynamic;
 use rhai::{plugin::*, Scope};
 
@@ -5,12 +8,16 @@ use smithay::reexports::calloop::channel::Sender;
 use smithay::reexports::calloop::LoopHandle;
 
 use crate::output_manager::OutputManager;
+use crate::region_manager::RegionManager;
 use crate::state::Anodium;
+use crate::state::InputState as AnodiumInputState;
 
 use super::eventloop::ConfigEvent;
+use super::input::InputState;
 use super::keyboard::Keyboard;
 use super::log::Log;
 use super::outputs::Outputs;
+use super::regions::Regions;
 use super::system::System;
 use super::windows::Windows;
 use super::workspace::Workspace;
@@ -23,13 +30,17 @@ pub struct Anodize {
     pub windows: Windows,
     log: Log,
     pub outputs: Outputs,
+    pub regions: Regions,
+    input: InputState,
 }
 
 impl Anodize {
     pub fn new(
         event_sender: Sender<ConfigEvent>,
         output_map: OutputManager,
+        region_map: RegionManager,
         loop_handle: LoopHandle<'static, Anodium>,
+        input_state: Rc<RefCell<AnodiumInputState>>,
     ) -> Self {
         Self {
             keyboard: Keyboard::new(),
@@ -38,6 +49,8 @@ impl Anodize {
             windows: Windows::new(event_sender),
             log: Log::new(),
             outputs: Outputs::new(output_map),
+            regions: Regions::new(region_map),
+            input: InputState::new(input_state),
         }
     }
 }
@@ -81,6 +94,16 @@ pub mod anodize_module {
     pub fn get_outputs(anodize: &mut Anodize) -> Outputs {
         anodize.outputs.clone()
     }
+
+    #[rhai_fn(get = "regions", pure)]
+    pub fn get_regions(anodize: &mut Anodize) -> Regions {
+        anodize.regions.clone()
+    }
+
+    #[rhai_fn(get = "input", pure)]
+    pub fn get_input(anodize: &mut Anodize) -> InputState {
+        anodize.input.clone()
+    }
 }
 
 pub fn register(
@@ -88,9 +111,17 @@ pub fn register(
     engine: &mut Engine,
     event_sender: Sender<ConfigEvent>,
     output_map: OutputManager,
+    region_map: RegionManager,
     loop_handle: LoopHandle<'static, Anodium>,
+    input_state: Rc<RefCell<AnodiumInputState>>,
 ) -> Anodize {
-    let anodize = Anodize::new(event_sender, output_map, loop_handle);
+    let anodize = Anodize::new(
+        event_sender,
+        output_map,
+        region_map,
+        loop_handle,
+        input_state,
+    );
     let module = exported_module!(anodize_module);
 
     engine

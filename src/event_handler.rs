@@ -18,8 +18,7 @@ impl Anodium {
             }
             ConfigEvent::SwitchWorkspace(_workspace) => todo!(),
             ConfigEvent::OutputsRearrange => {
-                self.config
-                    .output_rearrange(self.output_manager.outputs().clone());
+                self.config.output_rearrange();
             }
             ConfigEvent::OutputUpdateMode(output, mode) => {
                 let output: &smithay::wayland::output::Output = &output;

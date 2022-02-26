@@ -165,33 +165,35 @@ anodize.keyboard.callbacks.register(|| {
     mode_index += 1;
 }, "Control_L", ["equal"]);
 
+let on_rearrange_inited = false;
+let on_rearrange_timeout = ();
+anodize.outputs.on_rearrange(|| {
+    anodize.system.clear_timeout(on_rearrange_timeout);
+    if !on_rearrange_inited {
+        on_rearrange_timeout = anodize.system.add_timeout(|| {
+            anodize.log.info("anodize on_rearrange");
+            let w = 0;
+            for output in anodize.outputs {
+                let region = region::create(point::logical(w, 0));
+                region.add_workspace(workspace::create("www"));
+                region.add_workspace(workspace::create("code"));
+                region.map_output(output, 1.0, point::logical(0, 0));
+                anodize.regions.push(region);
 
-anodize.outputs.on_rearrange(|outputs| {
-    anodize.log.info("anodize rearrange");
-    let output_x = 0;
-
-    outputs.map(|output| {
-        let x = output_x;
-        output_x += output.w;
-        
-        return [x, 0];
-    })
-});
-
-anodize.outputs.on_mode_select(|desc, modes| {
-    if desc.name == "Virtual-1" {
-        let mode = modes.find(1440, 900, 60);
-        if mode != () {
-            return mode;
-        }
+                w += output.w;
+            }
+            return false
+        }, 50);
+    } else {
+        //do some changes to your regions/output map on some disconnect
+        //TODO - add region delete option
     }
-
-    modes[0]
 });
 
 let logger_added = false;
 
-anodize.outputs.on_new(|output| {
+
+anodize.outputs.on_new(|output| {    
     anodize.log.info("anodize on_new");
 
     let fps_widget = widget::fps(output);
@@ -220,6 +222,12 @@ anodize.outputs.on_new(|output| {
 
     panel.add_widget(menu.convert());
     output.shell.add_panel(panel);
+
+    /*let pointer_position_box = container::box(610, 0, 150, 30, layout::horizontal());
+    let pointer_position_widget = widget::pointer_position(anodize.input);
+    pointer_position_box.add_widget(pointer_position_widget.convert());
+
+    output.shell.add_box(pointer_position_box);*/
 });
 
 // anodize.system.add_timeout(|| {

@@ -13,6 +13,7 @@ pub mod logger;
 mod menu;
 mod output;
 pub mod panel;
+mod pointer;
 mod text;
 mod widget;
 mod workspace;
@@ -83,4 +84,5 @@ pub fn register(engine: &mut Engine) {
     output::register(engine);
     button::register(engine);
     menu::register(engine);
+    pointer::register(engine);
 }

@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use anodium_backend::{BackendRequest, InputHandler};
 
-use crate::{output_manager::Output, Anodium};
+use crate::{output_manager::Output, region_manager::Region, Anodium};
 
 use smithay::{
     backend::input::{
@@ -23,9 +23,9 @@ impl InputHandler for Anodium {
     fn process_input_event<I: InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        output: Option<&SmithayOutput>,
+        absolute_output: Option<&SmithayOutput>,
     ) {
-        let output = output.map(|o| Output::wrap(o.clone()));
+        let absolute_output = absolute_output.map(|o| Output::wrap(o.clone()));
 
         let captured = match &event {
             InputEvent::Keyboard { event, .. } => {
@@ -34,62 +34,84 @@ impl InputHandler for Anodium {
                     true
                 } else if action != KeyAction::None {
                     self.shortcut_handler(action);
-                    self.input_state.keyboard.is_focused()
+                    self.input_state.borrow().keyboard.is_focused()
                 } else {
                     true
                 }
             }
             InputEvent::PointerMotion { event, .. } => {
-                self.input_state.pointer_location =
-                    self.clamp_coords(self.input_state.pointer_location + event.delta());
-                self.on_pointer_move(event.time());
-                self.surface_under(self.input_state.pointer_location)
-                    .is_none()
+                let pointer_location;
+                {
+                    let mut input_state = self.input_state.borrow_mut();
+                    input_state.pointer_location =
+                        self.clamp_coords(input_state.pointer_location + event.delta());
+                    pointer_location = input_state.pointer_location;
+                }
+
+                if let Some(region) = self.region_manager.region_under(pointer_location) {
+                    {
+                        let mut input_state = self.input_state.borrow_mut();
+                        input_state.pointer_location =
+                            self.clamp_coords(input_state.pointer_location + event.delta());
+                    }
+                    let region_pos = region.position().to_f64();
+                    self.on_pointer_move(event.time(), region_pos);
+                    self.surface_under(self.input_state.borrow().pointer_location)
+                        .is_none()
+                } else {
+                    false
+                }
             }
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output = output.unwrap_or_else(|| {
-                    self.workspace
-                        .outputs()
-                        .next()
-                        .cloned()
-                        .map(Output::wrap)
-                        .unwrap()
-                });
+                if let Some(absolute_output) = absolute_output {
+                    if let Some(region) = self.region_manager.find_output_region(&absolute_output) {
+                        let workspace = region.active_workspace();
+                        let output_geometry =
+                            workspace.space().output_geometry(&absolute_output).unwrap();
+                        let output_pos = output_geometry.loc.to_f64();
+                        let region_pos = region.position().to_f64();
+                        let output_size = output_geometry.size;
 
-                let output_geometry = self.workspace.output_geometry(&output).unwrap();
-                let output_pos = output_geometry.loc.to_f64();
-                let output_size = output_geometry.size;
-
-                self.input_state.pointer_location =
-                    event.position_transformed(output_size) + output_pos;
-                self.on_pointer_move(event.time());
-                self.surface_under(self.input_state.pointer_location)
-                    .is_none()
+                        self.input_state.borrow_mut().pointer_location =
+                            event.position_transformed(output_size) + output_pos + region_pos;
+                        self.on_pointer_move(event.time(), region_pos);
+                        self.surface_under(self.input_state.borrow().pointer_location)
+                            .is_none()
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
             }
             InputEvent::PointerButton { event, .. } => {
                 self.on_pointer_button::<I>(event);
-                self.surface_under(self.input_state.pointer_location)
+                self.surface_under(self.input_state.borrow().pointer_location)
                     .is_none()
             }
             InputEvent::PointerAxis { event, .. } => {
                 self.on_pointer_axis::<I>(event);
-                self.surface_under(self.input_state.pointer_location)
+                self.surface_under(self.input_state.borrow().pointer_location)
                     .is_none()
             }
             _ => false,
         };
-
-        if let Some(output) = self
-            .workspace
-            .output_under(self.input_state.pointer_location)
-            .next()
-        {
-            let output = Output::wrap(output.clone());
-
-            if captured {
-                self.process_egui_event(event, &output);
+        let pointer_location = self.input_state.borrow().pointer_location;
+        if let Some(region) = self.region_manager.region_under(pointer_location) {
+            if let Some(output) = region
+                .active_workspace()
+                .space()
+                .output_under(pointer_location - region.position().to_f64())
+                .next()
+            {
+                let output = &Output::wrap(output.clone());
+                if captured {
+                    self.process_egui_event(event, &region, output);
+                } else {
+                    self.reset_egui_event(output);
+                }
             } else {
-                self.reset_egui_event(&output);
+                error!("output under egui not found!");
             }
         }
     }
@@ -103,11 +125,24 @@ impl Anodium {
         output.egui().handle_pointer_motion(max_point);
     }
 
-    fn process_egui_event<I: InputBackend>(&self, event: InputEvent<I>, output: &Output) {
+    fn process_egui_event<I: InputBackend>(
+        &self,
+        event: InputEvent<I>,
+        region: &Region,
+        output: &Output,
+    ) {
         match event {
             InputEvent::PointerMotion { .. } | InputEvent::PointerMotionAbsolute { .. } => {
-                let output_loc = self.workspace.output_geometry(output).unwrap().loc;
-                let mouse_location = self.input_state.pointer_location - output_loc.to_f64();
+                let output_loc = region
+                    .active_workspace()
+                    .space()
+                    .output_geometry(output)
+                    .unwrap()
+                    .loc;
+                let mouse_location = self.input_state.borrow().pointer_location
+                    - output_loc.to_f64()
+                    - region.position().to_f64();
+
                 output
                     .egui()
                     .handle_pointer_motion(mouse_location.to_i32_round());
@@ -118,7 +153,7 @@ impl Anodium {
                     output.egui().handle_pointer_button(
                         button,
                         event.state() == ButtonState::Pressed,
-                        self.input_state.modifiers_state,
+                        self.input_state.borrow().modifiers_state,
                     );
                 }
             }
@@ -156,20 +191,19 @@ impl Anodium {
         let serial = SCOUNTER.next_serial();
         let time = Event::time(evt);
 
-        let modifiers_state = &mut self.input_state.modifiers_state;
-        let suppressed_keys = &mut self.input_state.suppressed_keys;
-        let pressed_keys = &mut self.input_state.pressed_keys;
+        let mut input_state = self.input_state.borrow_mut();
         let configvm = self.config.clone();
 
-        self.input_state
+        input_state
             .keyboard
+            .clone()
             .input(keycode, state, serial, time, |modifiers, handle| {
                 let keysym = handle.modified_sym();
 
                 if let KeyState::Pressed = state {
-                    pressed_keys.insert(keysym);
+                    input_state.pressed_keys.insert(keysym);
                 } else {
-                    pressed_keys.remove(&keysym);
+                    input_state.pressed_keys.remove(&keysym);
                 }
 
                 let keysym_desc = ::xkbcommon::xkb::keysym_get_name(keysym);
@@ -179,7 +213,7 @@ impl Anodium {
                     "mods" => format!("{:?}", modifiers),
                     "keysym" => &keysym_desc
                 );
-                *modifiers_state = *modifiers;
+                input_state.modifiers_state = *modifiers;
 
                 // If the key is pressed and triggered a action
                 // we will not forward the key to the client.
@@ -191,9 +225,9 @@ impl Anodium {
                     let action = process_keyboard_shortcut(*modifiers, keysym);
 
                     if action.is_some() {
-                        suppressed_keys.push(keysym);
-                    } else if configvm.key_action(keysym, state, pressed_keys) {
-                        suppressed_keys.push(keysym);
+                        input_state.suppressed_keys.push(keysym);
+                    } else if configvm.key_action(keysym, state, &input_state.pressed_keys) {
+                        input_state.suppressed_keys.push(keysym);
                         return FilterResult::Intercept(KeyAction::Filtred);
                     }
 
@@ -201,9 +235,9 @@ impl Anodium {
                         .map(FilterResult::Intercept)
                         .unwrap_or(FilterResult::Forward)
                 } else {
-                    let suppressed = suppressed_keys.contains(&keysym);
+                    let suppressed = input_state.suppressed_keys.contains(&keysym);
                     if suppressed {
-                        suppressed_keys.retain(|k| *k != keysym);
+                        input_state.suppressed_keys.retain(|k| *k != keysym);
                         FilterResult::Intercept(KeyAction::Filtred)
                     } else {
                         FilterResult::Forward
@@ -215,46 +249,61 @@ impl Anodium {
 
     pub fn clear_keyboard_focus(&mut self) {
         let serial = SCOUNTER.next_serial();
-        self.input_state.keyboard.set_focus(None, serial);
+        self.input_state
+            .borrow_mut()
+            .keyboard
+            .set_focus(None, serial);
     }
 
     fn on_pointer_button<I: InputBackend>(&mut self, evt: &I::PointerButtonEvent) {
         let serial = SCOUNTER.next_serial();
 
         debug!("Mouse Event"; "Mouse button" => format!("{:?}", evt.button()));
-
+        let input_state_clone = self.input_state.clone();
+        let input_state = input_state_clone.borrow();
         let button = evt.button_code();
         let state = match evt.state() {
             input::ButtonState::Pressed => {
                 // change the keyboard focus unless the pointer is grabbed
-                if !self.input_state.pointer.is_grabbed() {
-                    let point = self.input_state.pointer_location;
+                if !input_state.pointer.is_grabbed() {
+                    let point = input_state.pointer_location;
                     // let under = self.surface_under(self.input_state.pointer_location);
-                    let window = self.workspace.window_under(point).cloned();
-                    // let surface = under.as_ref().map(|&(ref s, _)| s);
-                    // if let Some(surface) = surface {
-                    //     let mut window = None;
-                    //     if let Some(space) = self.find_workspace_by_surface_mut(surface) {
-                    //         window = space.find_window(surface).cloned();
-                    //     }
-                    //     self.update_focused_window(window);
-                    // }
+                    if let Some(region) = self.region_manager.region_under(point) {
+                        let window = region
+                            .active_workspace()
+                            .space()
+                            .window_under(point - region.position().to_f64())
+                            .cloned();
+                        // let surface = under.as_ref().map(|&(ref s, _)| s);
+                        // if let Some(surface) = surface {
+                        //     let mut window = None;
+                        //     if let Some(space) = self.find_workspace_by_surface_mut(surface) {
+                        //         window = space.find_window(surface).cloned();
+                        //     }
+                        //     self.update_focused_window(window);
+                        // }
 
-                    self.update_focused_window(window.as_ref());
+                        self.update_focused_window(window.as_ref());
 
-                    let surface = window
-                        .and_then(|w| w.surface_under(point, WindowSurfaceType::ALL))
-                        .map(|s| s.0);
+                        let surface = window
+                            .and_then(|w| {
+                                w.surface_under(
+                                    point - region.position().to_f64(),
+                                    WindowSurfaceType::ALL,
+                                )
+                            })
+                            .map(|s| s.0);
 
-                    self.input_state
-                        .keyboard
-                        .set_focus(surface.as_ref(), serial);
+                        input_state.keyboard.set_focus(surface.as_ref(), serial);
+                    } else {
+                        error!("got a button press without a region under it, this shouldn't be possible: {:?}", point);
+                    }
                 }
                 wl_pointer::ButtonState::Pressed
             }
             input::ButtonState::Released => wl_pointer::ButtonState::Released,
         };
-        self.input_state
+        input_state
             .pointer
             .clone()
             .button(button, state, serial, evt.time(), self);
@@ -341,11 +390,12 @@ impl Anodium {
             } else if source == wl_pointer::AxisSource::Finger {
                 frame = frame.stop(wl_pointer::Axis::VerticalScroll);
             }
-            self.input_state.pointer.clone().axis(frame, self);
+            let input_state = self.input_state.clone();
+            input_state.borrow().pointer.clone().axis(frame, self);
         }
     }
 
-    fn on_pointer_move(&mut self, time: u32) {
+    fn on_pointer_move(&mut self, time: u32, offset: Point<f64, Logical>) {
         let serial = SCOUNTER.next_serial();
 
         // for (id, w) in self.workspaces.iter_mut() {
@@ -357,10 +407,11 @@ impl Anodium {
         //         self.active_workspace = Some(id.clone());
         //     }
         // }
-
-        let under = self.surface_under(self.input_state.pointer_location);
-        self.input_state.pointer.clone().motion(
-            self.input_state.pointer_location,
+        let input_state = self.input_state.clone();
+        let input_state = input_state.borrow();
+        let under = self.surface_under(input_state.pointer_location);
+        input_state.pointer.clone().motion(
+            input_state.pointer_location - offset,
             under,
             serial,
             time,
@@ -369,21 +420,7 @@ impl Anodium {
     }
 
     fn clamp_coords(&self, pos: Point<f64, Logical>) -> Point<f64, Logical> {
-        // let (pos_x, pos_y) = pos.into();
-        // let output_map = &self.output_map;
-        // let max_x = output_map.width();
-        // let clamped_x = pos_x.max(0.0).min(max_x as f64);
-        // let max_y = output_map.height(clamped_x as i32);
-
-        // if let Some(max_y) = max_y {
-        //     let clamped_y = pos_y.max(0.0).min(max_y as f64);
-
-        //     (clamped_x, clamped_y).into()
-        // } else {
-        //     (clamped_x, pos_y).into()
-        // }
-
-        pos
+        self.region_manager.clamp_coords(pos)
     }
 }
 

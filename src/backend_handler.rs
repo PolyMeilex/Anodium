@@ -21,21 +21,10 @@ impl OutputHandler for Anodium {
         );
 
         info!("OutputCreated: {}", output.name());
-        self.output_manager.add(&mut self.workspace, &output);
+        self.output_manager.add(&output);
 
         self.config.output_new(output.clone());
-
-        if let Some(layout) = self
-            .config
-            .output_rearrange(self.output_manager.outputs().clone())
-        {
-            for (output, pos) in self.output_manager.outputs().iter().zip(layout.iter()) {
-                let scale = self.workspace.output_scale(output).unwrap_or(1.0);
-
-                let (x, y) = *pos;
-                self.workspace.map_output(output, scale, (x, y));
-            }
-        }
+        self.config.output_rearrange();
     }
 
     fn output_mode_updated(&mut self, output: &SmithayOutput, mode: output::Mode) {
@@ -64,7 +53,7 @@ impl BackendHandler for Anodium {
     fn send_frames(&mut self) {
         let time = self.start_time.elapsed().as_millis() as u32;
 
-        self.workspace.send_frames(false, time);
+        self.region_manager.send_frames(false, time);
     }
 
     fn start_compositor(&mut self) {
