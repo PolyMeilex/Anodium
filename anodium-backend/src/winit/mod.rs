@@ -7,7 +7,7 @@ use smithay::{
     },
     reexports::{
         calloop::{channel, timer::Timer, EventLoop},
-        wayland_server::protocol::wl_output,
+        wayland_server::{protocol::wl_output, Display},
     },
     wayland::{
         dmabuf::init_dmabuf_global,
@@ -21,6 +21,7 @@ pub const OUTPUT_NAME: &str = "winit";
 
 pub fn run_winit<D>(
     event_loop: &mut EventLoop<'static, D>,
+    display: Rc<RefCell<Display>>,
     handler: &mut D,
 
     rx: channel::Channel<BackendRequest>,
@@ -28,8 +29,6 @@ pub fn run_winit<D>(
 where
     D: BackendHandler + 'static,
 {
-    let display = handler.wl_display();
-
     event_loop
         .handle()
         .insert_source(rx, move |event, _, _| match event {

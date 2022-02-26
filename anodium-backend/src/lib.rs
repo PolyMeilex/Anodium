@@ -51,8 +51,6 @@ pub trait InputHandler {
 }
 
 pub trait BackendHandler: OutputHandler + InputHandler {
-    fn wl_display(&mut self) -> Rc<RefCell<Display>>;
-
     fn send_frames(&mut self);
 
     fn start_compositor(&mut self);
@@ -75,6 +73,7 @@ pub enum PreferedBackend {
 
 pub fn init<D>(
     event_loop: &mut EventLoop<'static, D>,
+    display: Rc<RefCell<Display>>,
     handler: &mut D,
     rx: Channel<BackendRequest>,
     backend: PreferedBackend,
@@ -85,21 +84,21 @@ pub fn init<D>(
         PreferedBackend::Auto => {
             if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
                 info!("Starting with winit backend");
-                winit::run_winit(event_loop, handler, rx)
+                winit::run_winit(event_loop, display, handler, rx)
                     .expect("Failed to initialize winit backend.");
             } else {
                 info!("Starting with x11 backend");
-                x11::run_x11(event_loop, handler, rx).expect("Failed to initialize x11 backend.");
+                x11::run_x11(event_loop, display, handler, rx)
+                    .expect("Failed to initialize x11 backend.");
             }
         }
-        PreferedBackend::X11 => {
-            x11::run_x11(event_loop, handler, rx).expect("Failed to initialize x11 backend.")
-        }
-        PreferedBackend::Winit => {
-            winit::run_winit(event_loop, handler, rx).expect("Failed to initialize winit backend.")
-        }
+        PreferedBackend::X11 => x11::run_x11(event_loop, display, handler, rx)
+            .expect("Failed to initialize x11 backend."),
+        PreferedBackend::Winit => winit::run_winit(event_loop, display, handler, rx)
+            .expect("Failed to initialize winit backend."),
         PreferedBackend::Udev => {
-            udev::run_udev(event_loop, handler, rx).expect("Failed to initialize tty backend.");
+            udev::run_udev(event_loop, display, handler, rx)
+                .expect("Failed to initialize tty backend.");
         }
     }
 }

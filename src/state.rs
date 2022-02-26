@@ -217,14 +217,13 @@ impl Anodium {
 
     pub fn new(
         handle: LoopHandle<'static, Self>,
+        display: Rc<RefCell<Display>>,
         seat_name: String,
         options: AnodiumOptions,
     ) -> (Self, Channel<BackendRequest>) {
         let log = slog_scope::logger();
 
         let (backend_tx, backend_rx) = channel::channel();
-
-        let display = Rc::new(RefCell::new(Display::new()));
 
         // init the wayland connection
         Self::init_wayland_connection(&handle, &display);
