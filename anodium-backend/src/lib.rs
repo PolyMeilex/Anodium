@@ -87,9 +87,9 @@ pub fn init<D>(
                 winit::run_winit(event_loop, display, handler, rx)
                     .expect("Failed to initialize winit backend.");
             } else {
-                info!("Starting with x11 backend");
-                x11::run_x11(event_loop, display, handler, rx)
-                    .expect("Failed to initialize x11 backend.");
+                info!("Starting with udev backend");
+                udev::run_udev(event_loop, display, handler, rx)
+                    .expect("Failed to initialize tty backend.");
             }
         }
         PreferedBackend::X11 => x11::run_x11(event_loop, display, handler, rx)
