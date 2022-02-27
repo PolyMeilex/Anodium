@@ -24,15 +24,15 @@ use super::SessionFd;
 #[derive(thiserror::Error, Debug)]
 pub enum DeviceOpenError {
     #[error("Session error: {0}")]
-    SessionError(#[from] auto::Error),
+    Session(#[from] auto::Error),
     #[error("Drm error: {0}")]
-    DrmError(#[from] DrmError),
+    Drm(#[from] DrmError),
     #[error("Gbm error: {0}")]
-    GbmError(#[from] io::Error),
+    Gbm(#[from] io::Error),
     #[error("Egl error: {0}")]
-    EglError(#[from] egl::Error),
+    Egl(#[from] egl::Error),
     #[error("Gles error: {0}")]
-    GlesError(#[from] Gles2Error),
+    Gles(#[from] Gles2Error),
 }
 
 pub struct Device<D> {
