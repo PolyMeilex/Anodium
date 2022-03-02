@@ -32,12 +32,7 @@ use smithay::{
         },
         drm::{
             self,
-            control::{
-                connector::{self, Info as ConnectorInfo, State as ConnectorState},
-                crtc,
-                encoder::Info as EncoderInfo,
-                Device as ControlDevice, Mode as DrmMode, ModeTypeFlags,
-            },
+            control::{connector, crtc, Device as _, Mode as DrmMode, ModeTypeFlags},
         },
         gbm::Device as GbmDevice,
         input::Libinput,
@@ -301,10 +296,6 @@ pub struct UdevDeviceData {
     device_id: u64,
 }
 
-struct ConnectorScanResult {
-    backends: IndexMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
-}
-
 pub fn format_connector_name(interface: connector::Interface, interface_id: u32) -> String {
     let other_short_name;
     let interface_short_name = match interface {
@@ -330,135 +321,112 @@ fn scan_connectors<D>(
     handle: LoopHandle<'static, D>,
     device: &mut Device<D>,
     signaler: &Signaler<SessionSignal>,
-) -> ConnectorScanResult
+) -> IndexMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>
 where
     D: BackendHandler + 'static,
 {
-    let drm: &mut DrmDevice<SessionFd> = &mut *device.drm.as_source_mut();
-    let gbm: &Rc<RefCell<GbmDevice<SessionFd>>> = &mut device.gbm;
-    let renderer: &mut Gles2Renderer = &mut *device.renderer.borrow_mut();
+    let scan_result = device.scan_connectors();
 
-    // Get a set of all modesetting resource handles (excluding planes):
-    let res_handles = drm.resource_handles().unwrap();
-
-    // Use first connected connector
-    let connector_infos: Vec<ConnectorInfo> = res_handles
-        .connectors()
-        .iter()
-        .map(|conn| drm.get_connector(*conn).unwrap())
-        .filter(|conn| conn.state() == ConnectorState::Connected)
-        .inspect(|conn| info!("Connected: {:?}", conn.interface()))
-        .collect();
+    let drm: &DrmDevice<SessionFd> = &*device.drm.as_source_ref();
 
     let mut backends = IndexMap::new();
 
-    // very naive way of finding good crtc/encoder/connector combinations. This problem is np-complete
-    for connector_info in connector_infos {
-        let encoder_infos = connector_info
-            .encoders()
-            .iter()
-            .filter_map(|e| *e)
-            .flat_map(|encoder_handle| drm.get_encoder(encoder_handle))
-            .collect::<Vec<EncoderInfo>>();
-        'outer: for encoder_info in encoder_infos {
-            for crtc in res_handles.filter_crtcs(encoder_info.possible_crtcs()) {
-                if let Entry::Vacant(entry) = backends.entry(crtc) {
-                    info!(
-                        "Trying to setup connector {:?}-{} with crtc {:?}",
-                        connector_info.interface(),
-                        connector_info.interface_id(),
-                        crtc,
-                    );
+    for (conn, crtc) in scan_result.map {
+        let connector_info = drm.get_connector(conn).unwrap();
 
-                    let output_name = format_connector_name(
-                        connector_info.interface(),
-                        connector_info.interface_id(),
-                    );
+        if let Entry::Vacant(entry) = backends.entry(crtc) {
+            info!(
+                "Trying to setup connector {:?}-{} with crtc {:?}",
+                connector_info.interface(),
+                connector_info.interface_id(),
+                crtc,
+            );
 
-                    let drm_modes = connector_info.modes();
+            let output_name =
+                format_connector_name(connector_info.interface(), connector_info.interface_id());
 
-                    let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
+            let drm_modes = connector_info.modes();
 
-                    let wl_modes: Vec<Mode> = drm_modes
-                        .iter()
-                        .map(|m| {
-                            let size = m.size();
-                            Mode {
-                                size: (size.0 as i32, size.1 as i32).into(),
-                                refresh: (m.vrefresh() * 1000) as i32,
-                            }
-                        })
-                        .collect();
+            let (phys_w, phys_h) = connector_info.size().unwrap_or((0, 0));
 
-                    let physical_properties = PhysicalProperties {
-                        size: (phys_w as i32, phys_h as i32).into(),
-                        subpixel: wl_output::Subpixel::Unknown,
-                        make: "Smithay".into(),
-                        model: "Generic DRM".into(),
-                    };
+            let wl_modes: Vec<Mode> = drm_modes
+                .iter()
+                .map(|m| {
+                    let size = m.size();
+                    Mode {
+                        size: (size.0 as i32, size.1 as i32).into(),
+                        refresh: (m.vrefresh() * 1000) as i32,
+                    }
+                })
+                .collect();
 
-                    let mode_id = drm_modes
-                        .iter()
-                        .position(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
-                        .unwrap_or(0);
+            let physical_properties = PhysicalProperties {
+                size: (phys_w as i32, phys_h as i32).into(),
+                subpixel: wl_output::Subpixel::Unknown,
+                make: "Smithay".into(),
+                model: "Generic DRM".into(),
+            };
 
-                    let wl_mode = wl_modes[mode_id];
-                    let drm_mode = drm_modes[mode_id];
+            let mode_id = drm_modes
+                .iter()
+                .position(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
+                .unwrap_or(0);
 
-                    let mut surface =
-                        match drm.create_surface(crtc, drm_mode, &[connector_info.handle()]) {
-                            Ok(surface) => surface,
-                            Err(err) => {
-                                warn!("Failed to create drm surface: {}", err);
-                                continue;
-                            }
-                        };
-                    surface.link(signaler.clone());
+            let wl_mode = wl_modes[mode_id];
+            let drm_mode = drm_modes[mode_id];
 
-                    let renderer_formats = Bind::<Dmabuf>::supported_formats(renderer)
-                        .expect("Dmabuf renderer without formats");
-
-                    let gbm_surface =
-                        match GbmBufferedSurface::new(surface, gbm.clone(), renderer_formats, None)
-                        {
-                            Ok(renderer) => renderer,
-                            Err(err) => {
-                                warn!("Failed to create rendering surface: {}", err);
-                                continue;
-                            }
-                        };
-
-                    let timer = Timer::new().unwrap();
-
-                    entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
-                        output_name,
-                        physical_properties,
-
-                        wl_mode,
-                        wl_modes,
-
-                        _drm_modes: drm_modes.to_owned(),
-
-                        surface: gbm_surface,
-                        _render_timer: timer.handle(),
-                        _connector_info: connector_info,
-                        crtc,
-                    })));
-
-                    let inner = inner.clone();
-                    handle
-                        .insert_source(timer, move |(dev_id, crtc), _, handler| {
-                            udev_render(handler, inner.clone(), dev_id, Some(crtc))
-                        })
-                        .unwrap();
-
-                    break 'outer;
+            let mut surface = match drm.create_surface(crtc, drm_mode, &[conn]) {
+                Ok(surface) => surface,
+                Err(err) => {
+                    warn!("Failed to create drm surface: {}", err);
+                    continue;
                 }
-            }
+            };
+            surface.link(signaler.clone());
+
+            let renderer_formats = Bind::<Dmabuf>::supported_formats(&*device.renderer.borrow())
+                .expect("Dmabuf renderer without formats");
+
+            let gbm_surface = match GbmBufferedSurface::new(
+                surface,
+                device.gbm.clone(),
+                renderer_formats,
+                None,
+            ) {
+                Ok(renderer) => renderer,
+                Err(err) => {
+                    warn!("Failed to create rendering surface: {}", err);
+                    continue;
+                }
+            };
+
+            let timer = Timer::new().unwrap();
+
+            entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
+                output_name,
+                physical_properties,
+
+                wl_mode,
+                wl_modes,
+
+                _drm_modes: drm_modes.to_owned(),
+
+                surface: gbm_surface,
+                _render_timer: timer.handle(),
+                _connector_info: connector_info,
+                crtc,
+            })));
+
+            let inner = inner.clone();
+            handle
+                .insert_source(timer, move |(dev_id, crtc), _, handler| {
+                    udev_render(handler, inner.clone(), dev_id, Some(crtc))
+                })
+                .unwrap();
         }
     }
 
-    ConnectorScanResult { backends }
+    backends
 }
 
 fn device_added<D>(
@@ -493,7 +461,7 @@ fn device_added<D>(
                 device.bind_wl_display(&*inner.borrow().display.borrow());
             }
 
-            let ConnectorScanResult { backends: outputs } =
+            let outputs =
                 scan_connectors(inner.clone(), handle.clone(), &mut device, session_signal);
 
             {
