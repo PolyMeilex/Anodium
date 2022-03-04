@@ -17,32 +17,20 @@ indexmap = "1.8"
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
 default-features = false
-features = [
-    "use_system_lib",
-    "renderer_gl",
-    "backend_egl",
-    "wayland_frontend",
-    "slog-stdlog",
-    "desktop",
-]
+features = ["use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend"]
 
 [dependencies.calloop]
 version = "0.9"
-features = ["executor", "futures-io"]
 
 [dependencies.x11rb]
 optional = true
 version = "0.9"
 default-features = false
-features = ["composite"]
-
 
 [features]
 default = ["udev", "winit", "x11"]
-# default = ["udev","winit", "xwayland"]
-#default = ["udev","winit"]
-x11 = ["smithay/backend_x11", "x11rb"]
 
+x11 = ["smithay/backend_x11", "x11rb"]
 winit = ["smithay/backend_winit"]
 udev = [
     "smithay/backend_libinput",

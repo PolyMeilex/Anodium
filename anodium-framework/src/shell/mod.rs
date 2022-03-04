@@ -309,7 +309,7 @@ impl<D> ShellManager<D> {
             windows: Default::default(),
             layers: Default::default(),
 
-            popup_manager: PopupManager::new(slog_scope::logger()),
+            popup_manager: PopupManager::new(None),
             _pd: PhantomData::<D>,
         }));
 
@@ -320,7 +320,7 @@ impl<D> ShellManager<D> {
                 let inner = inner.clone();
                 move |surface, ddata| inner.borrow_mut().surface_commit(surface, ddata)
             },
-            slog_scope::logger(),
+            None,
         );
 
         // init the xdg_shell
@@ -334,7 +334,7 @@ impl<D> ShellManager<D> {
                         .xdg_shell_request(request, ddata.get().unwrap());
                 }
             },
-            slog_scope::logger(),
+            None,
         );
 
         // init the wlr_layer_shell
@@ -348,7 +348,7 @@ impl<D> ShellManager<D> {
                         .wlr_layer_shell_request(request, ddata.get().unwrap())
                 }
             },
-            slog_scope::logger(),
+            None,
         );
 
         Self { inner }

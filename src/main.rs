@@ -7,7 +7,7 @@ extern crate slog_scope;
 mod event_handler;
 mod input_handler;
 
-mod framework;
+use anodium_framework as framework;
 
 mod grabs;
 
@@ -25,8 +25,6 @@ mod backend_handler;
 mod shell_handler;
 
 mod cli;
-
-mod workspace;
 
 use config::outputs::shell::logger::ShellDrain;
 use state::Anodium;

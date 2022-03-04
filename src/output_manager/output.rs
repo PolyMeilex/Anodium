@@ -1,6 +1,4 @@
 use std::cell::{RefCell, RefMut};
-use std::collections::HashMap;
-use std::rc::Rc;
 use std::time::Instant;
 
 use anodium_protocol::server::{AnodiumProtocol, AnodiumProtocolOutput};
@@ -17,7 +15,6 @@ use smithay_egui::{EguiFrame, EguiMode, EguiState};
 
 use crate::config::eventloop::ConfigEvent;
 use crate::config::outputs::shell::Shell;
-use crate::workspace::Workspace;
 
 /// Inmutable description of phisical output
 /// Used before wayland output is created
@@ -97,9 +94,6 @@ impl Output {
 
         egui.context().set_visuals(visuals);
 
-        let mut default_workspace = Workspace::new();
-        let insert_workspaces = Rc::new(RefCell::new(HashMap::new()));
-
         let added = output.user_data().insert_if_missing(move || Data {
             _anodium_protocol_output: anodium_protocol_output,
 
@@ -112,11 +106,6 @@ impl Output {
             config_tx,
         });
         assert!(added);
-
-        default_workspace.map_output(&output, 1.0, (0, 0));
-        insert_workspaces
-            .borrow_mut()
-            .insert("0".to_owned(), default_workspace);
 
         Self { output }
     }
