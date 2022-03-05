@@ -37,7 +37,7 @@ impl ShellHandler for State {
                     .cloned();
 
                 if let Some(window) = window {
-                    let initial_window_location = self.space.window_geometry(&window).unwrap().loc;
+                    let initial_window_location = self.space.window_location(&window).unwrap();
 
                     let grab = MoveSurfaceGrab {
                         start_data,

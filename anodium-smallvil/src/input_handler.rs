@@ -37,7 +37,7 @@ impl InputHandler for State {
                 position += event.delta();
 
                 let under = self.space.window_under(position).and_then(|win| {
-                    let window_loc = self.space.window_geometry(win).unwrap().loc;
+                    let window_loc = self.space.window_location(win).unwrap();
                     win.surface_under(position - window_loc.to_f64(), WindowSurfaceType::all())
                         .map(|(s, loc)| (s, loc + window_loc))
                 });
@@ -59,7 +59,7 @@ impl InputHandler for State {
                 let position = event.position_transformed(output_geo.size);
 
                 let under = self.space.window_under(position).and_then(|win| {
-                    let window_loc = self.space.window_geometry(win).unwrap().loc;
+                    let window_loc = self.space.window_location(win).unwrap();
                     win.surface_under(position - window_loc.to_f64(), WindowSurfaceType::all())
                         .map(|(s, loc)| (s, loc + window_loc))
                 });
@@ -90,7 +90,7 @@ impl InputHandler for State {
                     .space
                     .window_under(position)
                     .and_then(|win| {
-                        let pos = self.space.window_geometry(win).unwrap().loc.to_f64();
+                        let pos = self.space.window_location(win).unwrap().to_f64();
                         win.surface_under(position - pos, WindowSurfaceType::all())
                     })
                     .map(|w| w.0);

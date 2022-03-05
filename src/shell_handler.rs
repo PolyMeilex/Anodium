@@ -44,7 +44,7 @@ impl ShellHandler for Anodium {
                 if let Some(window) = window {
                     let workspace = self.region_manager.find_window_workspace(&window).unwrap();
                     let initial_window_location =
-                        workspace.space().window_geometry(&window).unwrap().loc;
+                        workspace.space().window_location(&window).unwrap();
 
                     let grab = MoveSurfaceGrab {
                         start_data,
@@ -70,10 +70,11 @@ impl ShellHandler for Anodium {
                 if let Some(window) = window {
                     let region = self.region_manager.find_window_region(&window).unwrap();
                     let workspace = region.find_window_workspace(&window).unwrap();
-                    let geometry = workspace.space().window_geometry(&window).unwrap();
+                    let loc = workspace.space().window_location(&window).unwrap();
+                    let geometry = window.geometry();
 
                     let (initial_window_location, initial_window_size) =
-                        (geometry.loc + region.position(), geometry.size);
+                        (loc + region.position(), geometry.size);
 
                     SurfaceData::with_mut(wl_surface, |data| {
                         data.resize_state = ResizeState::Resizing(ResizeData {
@@ -177,9 +178,8 @@ impl ShellHandler for Anodium {
             .find_window_workspace(window)
             .unwrap()
             .space()
-            .window_geometry(window)
+            .window_location(window)
             .unwrap()
-            .loc
             + region.position()
     }
 }

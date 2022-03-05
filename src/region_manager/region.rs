@@ -81,7 +81,7 @@ impl Region {
         point -= inner.position.to_f64();
         let window = space.window_under(point)?;
 
-        let window_loc = space.window_geometry(window).unwrap().loc;
+        let window_loc = space.window_location(window).unwrap();
         window
             .surface_under(point - window_loc.to_f64(), WindowSurfaceType::ALL)
             .map(|(s, loc)| (s, loc + window_loc))
