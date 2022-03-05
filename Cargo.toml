@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2018"
 
 [workspace]
-members = ["anodium-backend", "anodium-framework"]
+members = ["anodium-backend", "anodium-framework", "anodium-smallvil"]
 
 [dependencies]
 anodium-protocol = { path = "./anodium-protocol", features = ["server"] }
@@ -46,9 +46,7 @@ strum = { version = "0.23", features = ["derive"] }
 indexmap = "1.8.0"
 
 [dependencies.smithay]
-# git = "https://github.com/Smithay/smithay.git"
-git = "https://github.com/PolyMeilex/smithay.git"
-branch = "seat-ddata"
+git = "https://github.com/Smithay/smithay.git"
 default-features = false
 features = [
   "use_system_lib",

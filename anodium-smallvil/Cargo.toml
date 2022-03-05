@@ -1,0 +1,13 @@
+[package]
+name = "anodium-smallvil"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anodium-backend = { path = "../anodium-backend" }
+anodium-framework = { path = "../anodium-framework" }
+
+[dependencies.smithay]
+git = "https://github.com/Smithay/smithay.git"
+default-features = false
+features = ["wayland_frontend"]
