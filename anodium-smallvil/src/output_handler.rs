@@ -8,7 +8,12 @@ impl OutputHandler for State {
         output: smithay::wayland::output::Output,
         _possible_modes: Vec<smithay::wayland::output::Mode>,
     ) {
-        self.space.map_output(&output, 1.0, (0, 0));
+        let x = self
+            .space
+            .outputs()
+            .fold(0, |x, o| x + o.current_mode().unwrap().size.w);
+
+        self.space.map_output(&output, 1.0, (x, 0));
     }
 
     fn output_render(

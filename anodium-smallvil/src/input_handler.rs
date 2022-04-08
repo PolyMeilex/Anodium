@@ -8,7 +8,10 @@ use {
         },
         desktop::WindowSurfaceType,
         reexports::wayland_server::protocol::wl_pointer,
-        wayland::{seat::FilterResult, SERIAL_COUNTER},
+        wayland::{
+            seat::{keysyms as xkb, FilterResult},
+            SERIAL_COUNTER,
+        },
     },
 };
 
@@ -16,7 +19,7 @@ impl InputHandler for State {
     fn process_input_event<I: smithay::backend::input::InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        _absolute_output: Option<&smithay::wayland::output::Output>,
+        absolute_output: Option<&smithay::wayland::output::Output>,
     ) {
         match event {
             InputEvent::Keyboard { event } => {
@@ -27,7 +30,11 @@ impl InputHandler for State {
                     event.state(),
                     SERIAL_COUNTER.next_serial(),
                     event.time(),
-                    |_modifiers, _handle| FilterResult::Forward,
+                    |_modifiers, handle| {
+                        assert!(handle.modified_sym() != xkb::KEY_Escape);
+
+                        FilterResult::Forward
+                    },
                 );
             }
             InputEvent::PointerMotion { event } => {
@@ -53,10 +60,12 @@ impl InputHandler for State {
             InputEvent::PointerMotionAbsolute { event } => {
                 let pointer = self.seat.get_pointer().unwrap();
 
-                let output = self.space.outputs().next().unwrap();
+                let output =
+                    absolute_output.unwrap_or_else(|| self.space.outputs().next().unwrap());
                 let output_geo = self.space.output_geometry(output).unwrap();
+                let output_loc = output_geo.loc.to_f64();
 
-                let position = event.position_transformed(output_geo.size);
+                let position = output_loc + event.position_transformed(output_geo.size);
 
                 let under = self.space.window_under(position).and_then(|win| {
                     let window_loc = self.space.window_location(win).unwrap();
