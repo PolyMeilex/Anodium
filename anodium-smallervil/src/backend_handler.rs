@@ -1,4 +1,5 @@
-use {crate::State, anodium_backend::BackendHandler};
+use crate::State;
+use anodium_backend::BackendHandler;
 
 impl BackendHandler for State {
     fn send_frames(&mut self) {

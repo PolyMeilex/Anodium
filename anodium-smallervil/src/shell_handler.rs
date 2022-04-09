@@ -1,4 +1,8 @@
+use crate::State;
+use anodium_framework::shell::{ShellEvent, ShellHandler};
+
 use smithay::{
+    desktop,
     reexports::wayland_server::{
         protocol::{wl_pointer::ButtonState, wl_surface::WlSurface},
         DispatchData,
@@ -8,12 +12,6 @@ use smithay::{
         seat::{AxisFrame, PointerGrab, PointerGrabStartData, PointerInnerHandle},
         Serial,
     },
-};
-
-use {
-    crate::State,
-    anodium_framework::shell::{ShellEvent, ShellHandler},
-    smithay::desktop,
 };
 
 impl ShellHandler for State {

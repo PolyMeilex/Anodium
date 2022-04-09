@@ -1,10 +1,10 @@
+use crate::State;
 use anodium_backend::OutputHandler;
+
 use smithay::{
     backend::renderer::gles2::Gles2Renderer, desktop::space::SurfaceTree,
     wayland::seat::CursorImageStatus,
 };
-
-use crate::State;
 
 smithay::custom_elements! {
     pub CustomElem<=Gles2Renderer>;

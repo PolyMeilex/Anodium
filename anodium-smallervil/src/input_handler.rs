@@ -1,22 +1,17 @@
-use smithay::{
-    utils::{Logical, Point},
-    wayland::seat::PointerHandle,
-};
+use crate::State;
+use anodium_backend::InputHandler;
 
-use {
-    crate::State,
-    anodium_backend::InputHandler,
-    smithay::{
-        backend::input::{
-            ButtonState, Event, InputEvent, KeyboardKeyEvent, PointerButtonEvent,
-            PointerMotionAbsoluteEvent, PointerMotionEvent,
-        },
-        desktop::WindowSurfaceType,
-        reexports::wayland_server::protocol::wl_pointer,
-        wayland::{
-            seat::{keysyms as xkb, FilterResult},
-            SERIAL_COUNTER,
-        },
+use smithay::{
+    backend::input::{
+        ButtonState, Event, InputEvent, KeyboardKeyEvent, PointerButtonEvent,
+        PointerMotionAbsoluteEvent, PointerMotionEvent,
+    },
+    desktop::WindowSurfaceType,
+    reexports::wayland_server::protocol::wl_pointer,
+    utils::{Logical, Point},
+    wayland::{
+        seat::{keysyms as xkb, FilterResult, PointerHandle},
+        SERIAL_COUNTER,
     },
 };
 

@@ -1,20 +1,27 @@
 #![allow(irrefutable_let_patterns)]
 
-use std::sync::{Arc, Mutex};
+use anodium_framework::shell::ShellManager;
 
 use smithay::{
-    reexports::wayland_server::protocol::wl_surface::WlSurface,
-    wayland::{data_device::DataDeviceEvent, seat::CursorImageStatus},
+    desktop,
+    reexports::{
+        calloop::{self, channel, generic::Generic, EventLoop, Interest, LoopSignal, PostAction},
+        wayland_server::protocol::wl_surface::WlSurface,
+        wayland_server::Display,
+    },
+    wayland::{
+        data_device::{self, DataDeviceEvent},
+        output::xdg::init_xdg_output_manager,
+        seat::{CursorImageStatus, Seat},
+        shm::init_shm_global,
+    },
 };
 
-use {
-    anodium_framework::shell::ShellManager,
-    smithay::reexports::calloop::{
-        self, channel, generic::Generic, EventLoop, Interest, LoopSignal, PostAction,
-    },
-    smithay::wayland::{data_device, output::xdg::init_xdg_output_manager, shm::init_shm_global},
-    smithay::{desktop, reexports::wayland_server::Display, wayland::seat::Seat},
-    std::{cell::RefCell, rc::Rc, time::Instant},
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, Mutex},
+    time::Instant,
 };
 
 mod backend_handler;
