@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use anodium_backend::{BackendRequest, InputHandler};
 
 use crate::{output_manager::Output, region_manager::Region, Anodium};
@@ -425,7 +423,7 @@ impl Anodium {
             KeyAction::None | KeyAction::Filtred => {}
             KeyAction::Quit => {
                 info!("Quitting.");
-                self.running.store(false, Ordering::SeqCst);
+                self.loop_signal.stop();
             }
             KeyAction::VtSwitch(vt) => {
                 info!("Trying to switch to vt {}", vt);

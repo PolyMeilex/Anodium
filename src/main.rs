@@ -33,7 +33,6 @@ use slog::Drain;
 
 use smithay::reexports::{calloop::EventLoop, wayland_server::Display};
 
-use std::sync::atomic::Ordering;
 use std::{cell::RefCell, rc::Rc};
 
 fn main() {
@@ -66,6 +65,7 @@ fn main() {
 
     let (mut anodium, rx) = Anodium::new(
         event_loop.handle(),
+        event_loop.get_signal(),
         display.clone(),
         "seat0".into(),
         options,
@@ -83,13 +83,8 @@ fn main() {
 }
 
 fn run_loop(mut state: Anodium, mut event_loop: EventLoop<'static, Anodium>) {
-    let signal = event_loop.get_signal();
     event_loop
         .run(None, &mut state, |state| {
-            if !state.running.load(Ordering::SeqCst) {
-                signal.stop();
-            }
-
             state.display.borrow_mut().flush_clients(&mut ());
             state.update();
         })

@@ -31,7 +31,9 @@ impl InputHandler for State {
                     SERIAL_COUNTER.next_serial(),
                     event.time(),
                     |_modifiers, handle| {
-                        assert!(handle.modified_sym() != xkb::KEY_Escape);
+                        if handle.modified_sym() == xkb::KEY_Escape {
+                            self.loop_signal.stop();
+                        }
 
                         if handle.modified_sym() == xkb::KEY_C {
                             std::process::Command::new("nautilus")

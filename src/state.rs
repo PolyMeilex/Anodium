@@ -1,17 +1,11 @@
-use std::{
-    cell::RefCell,
-    collections::HashSet,
-    rc::Rc,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Instant,
-};
+use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Instant};
 
 use anodium_framework::pointer_icon::PointerIcon;
 use anodium_protocol::server::AnodiumProtocol;
-use calloop::channel::{self, Channel};
+use calloop::{
+    channel::{self, Channel},
+    LoopSignal,
+};
 use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     desktop::{self, space::SurfaceTree},
@@ -62,9 +56,8 @@ pub struct InputState {
 }
 
 pub struct Anodium {
-    pub handle: LoopHandle<'static, Self>,
+    pub loop_signal: LoopSignal,
 
-    pub running: Arc<AtomicBool>,
     pub display: Rc<RefCell<Display>>,
 
     pub shell_manager: ShellManager<Self>,
@@ -113,7 +106,7 @@ impl Anodium {
                         Ok(_) => Ok(PostAction::Continue),
                         Err(e) => {
                             error!("I/O error on the Wayland display: {}", e);
-                            state.running.store(false, Ordering::SeqCst);
+                            state.loop_signal.stop();
                             Err(e)
                         }
                     }
@@ -197,6 +190,7 @@ impl Anodium {
 
     pub fn new(
         handle: LoopHandle<'static, Self>,
+        loop_signal: LoopSignal,
         display: Rc<RefCell<Display>>,
         seat_name: String,
         options: AnodiumOptions,
@@ -250,9 +244,7 @@ impl Anodium {
 
         (
             Self {
-                handle,
-
-                running: Arc::new(AtomicBool::new(true)),
+                loop_signal,
 
                 shell_manager,
                 display,

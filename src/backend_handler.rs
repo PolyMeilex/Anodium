@@ -4,7 +4,6 @@ use smithay::{
     wayland::output,
     wayland::output::Output as SmithayOutput,
 };
-use std::sync::atomic::Ordering;
 
 use anodium_backend::{BackendHandler, OutputHandler};
 
@@ -75,7 +74,7 @@ impl BackendHandler for Anodium {
     }
 
     fn close_compositor(&mut self) {
-        self.running.store(false, Ordering::SeqCst);
+        self.loop_signal.stop();
     }
 }
 
