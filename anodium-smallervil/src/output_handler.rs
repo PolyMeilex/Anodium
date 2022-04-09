@@ -1,11 +1,16 @@
 use crate::State;
-use anodium_backend::OutputHandler;
 
-use smithay::{backend::renderer::gles2::Gles2Renderer, desktop::space::SurfaceTree};
+use anodium_backend::{utils::cursor::PointerElement, OutputHandler};
+
+use smithay::{
+    backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
+    desktop::space::SurfaceTree,
+};
 
 smithay::custom_elements! {
     pub CustomElem<=Gles2Renderer>;
     SurfaceTree=SurfaceTree,
+    PointerElement=PointerElement,
 }
 
 impl OutputHandler for State {
@@ -27,7 +32,7 @@ impl OutputHandler for State {
         renderer: &mut Gles2Renderer,
         output: &smithay::wayland::output::Output,
         age: usize,
-        _pointer_image: Option<&smithay::backend::renderer::gles2::Gles2Texture>,
+        pointer_image: Option<&Gles2Texture>,
     ) -> Result<
         Option<Vec<smithay::utils::Rectangle<i32, smithay::utils::Logical>>>,
         smithay::backend::SwapBuffersError,
@@ -47,6 +52,8 @@ impl OutputHandler for State {
 
         if let Some(tree) = self.pointer_icon.prepare_cursor_icon(location) {
             elems.push(tree.into());
+        } else if let Some(texture) = pointer_image {
+            elems.push(PointerElement::new(texture.clone(), location, true).into());
         }
 
         Ok(self

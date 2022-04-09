@@ -49,7 +49,21 @@ impl InputHandler for State {
             InputEvent::PointerMotion { event } => {
                 let pointer = self.seat.get_pointer().unwrap();
 
-                let position = pointer.current_location() + event.delta();
+                let mut position = pointer.current_location() + event.delta();
+
+                let max_x = self.space.outputs().fold(0, |acc, o| {
+                    acc + self.space.output_geometry(o).unwrap().size.w
+                });
+
+                let max_y = self
+                    .space
+                    .outputs()
+                    .next()
+                    .map(|o| self.space.output_geometry(o).unwrap().size.h)
+                    .unwrap_or_default();
+
+                position.x = position.x.max(0.0).min(max_x as f64 - 1.0);
+                position.y = position.y.max(0.0).min(max_y as f64 - 1.0);
 
                 self.pointer_motion(pointer, position, event.time());
             }
