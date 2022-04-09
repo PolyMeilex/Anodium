@@ -33,6 +33,13 @@ impl InputHandler for State {
                     |_modifiers, handle| {
                         assert!(handle.modified_sym() != xkb::KEY_Escape);
 
+                        if handle.modified_sym() == xkb::KEY_C {
+                            std::process::Command::new("nautilus")
+                                .env("WAYLAND_DISPLAY", "wayland-1")
+                                .spawn()
+                                .unwrap();
+                        }
+
                         FilterResult::Forward
                     },
                 );
