@@ -48,7 +48,7 @@ impl BackendHandler for Anodium {
     fn send_frames(&mut self) {
         let time = self.start_time.elapsed().as_millis() as u32;
 
-        self.region_manager.send_frames(false, time);
+        self.region_manager.send_frames(time);
     }
 
     fn start_compositor(&mut self) {

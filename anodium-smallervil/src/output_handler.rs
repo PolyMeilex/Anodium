@@ -1,7 +1,15 @@
 use anodium_backend::OutputHandler;
-use smithay::{desktop::space::DynamicRenderElements, wayland::seat::CursorImageStatus};
+use smithay::{
+    backend::renderer::gles2::Gles2Renderer, desktop::space::SurfaceTree,
+    wayland::seat::CursorImageStatus,
+};
 
 use crate::State;
+
+smithay::custom_elements! {
+    pub CustomElem<=Gles2Renderer>;
+    SurfaceTree=SurfaceTree,
+}
 
 impl OutputHandler for State {
     fn output_created(
@@ -19,7 +27,7 @@ impl OutputHandler for State {
 
     fn output_render(
         &mut self,
-        renderer: &mut smithay::backend::renderer::gles2::Gles2Renderer,
+        renderer: &mut Gles2Renderer,
         output: &smithay::wayland::output::Output,
         age: usize,
         _pointer_image: Option<&smithay::backend::renderer::gles2::Gles2Texture>,
@@ -27,7 +35,7 @@ impl OutputHandler for State {
         Option<Vec<smithay::utils::Rectangle<i32, smithay::utils::Logical>>>,
         smithay::backend::SwapBuffersError,
     > {
-        let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
+        let mut elems: Vec<CustomElem> = Vec::new();
 
         let location = self
             .seat
@@ -39,14 +47,14 @@ impl OutputHandler for State {
         if let Some(surface) = &*self.dnd_icon.lock().unwrap() {
             if surface.as_ref().is_alive() {
                 let e = anodium_framework::draw::draw_dnd_icon(surface.clone(), location);
-                elems.push(Box::new(e));
+                elems.push(e.into());
             }
         }
 
         if let CursorImageStatus::Image(surface) = &*self.pointer_icon.lock().unwrap() {
             if surface.as_ref().is_alive() {
                 let e = anodium_framework::draw::draw_cursor(surface.clone(), location);
-                elems.push(Box::new(e));
+                elems.push(e.into());
             }
         }
 

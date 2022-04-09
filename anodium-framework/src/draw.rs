@@ -33,12 +33,20 @@ pub fn draw_cursor(
             (0, 0).into()
         }
     };
-    SurfaceTree { surface, position }
+    SurfaceTree {
+        surface,
+        position,
+        z_index: 100,
+    }
 }
 
 pub fn draw_dnd_icon(surface: wl_surface::WlSurface, position: Point<i32, Logical>) -> SurfaceTree {
     if compositor::get_role(&surface) != Some("dnd_icon") {
         warn!("Trying to display as a dnd icon a surface that does not have the DndIcon role.");
     }
-    SurfaceTree { surface, position }
+    SurfaceTree {
+        surface,
+        position,
+        z_index: 100,
+    }
 }

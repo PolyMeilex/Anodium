@@ -3,7 +3,7 @@ use {crate::State, anodium_backend::BackendHandler};
 impl BackendHandler for State {
     fn send_frames(&mut self) {
         self.space
-            .send_frames(false, self.start_time.elapsed().as_millis() as u32);
+            .send_frames(self.start_time.elapsed().as_millis() as u32);
     }
 
     fn start_compositor(&mut self) {

@@ -13,10 +13,7 @@ use anodium_protocol::server::AnodiumProtocol;
 use calloop::channel::{self, Channel};
 use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
-    desktop::{
-        self,
-        space::{DynamicRenderElements, SurfaceTree},
-    },
+    desktop::{self, space::SurfaceTree},
     reexports::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
         wayland_server::{protocol::wl_surface::WlSurface, Display},
@@ -34,6 +31,7 @@ use smithay::{
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
 use anodium_backend::{utils::cursor::PointerElement, BackendRequest};
+use smithay_egui::EguiFrame;
 
 use crate::{
     cli::AnodiumOptions,
@@ -43,6 +41,13 @@ use crate::{
     region_manager::RegionManager,
     render,
 };
+
+smithay::custom_elements! {
+    pub CustomElem<=Gles2Renderer>;
+    SurfaceTree=SurfaceTree,
+    PointerElement=PointerElement,
+    EguiFrame=EguiFrame,
+}
 
 pub struct InputState {
     pub pointer_location: Point<f64, Logical>,
@@ -372,7 +377,7 @@ impl Anodium {
         let workspace = region.active_workspace();
         let output_geometry = workspace.space().output_geometry(output).unwrap();
 
-        let mut elems: Vec<DynamicRenderElements<_>> = Vec::new();
+        let mut elems: Vec<CustomElem> = Vec::new();
         {
             let input_state = self.input_state.borrow();
             let frame = output.render_egui_shell(
@@ -380,7 +385,7 @@ impl Anodium {
                 &input_state.modifiers_state,
                 &self.config_tx,
             );
-            elems.push(Box::new(frame));
+            elems.push(frame.into());
         }
         let mut input_state = self.input_state.borrow_mut();
         // Pointer Related:
@@ -391,19 +396,22 @@ impl Anodium {
                 - region.position();
 
             if let Some(wl_cursor) = self.prepare_cursor_element(relative_location) {
-                elems.push(Box::new(wl_cursor));
+                elems.push(wl_cursor.into());
             } else if let Some(texture) = pointer_image {
-                elems.push(Box::new(PointerElement::new(
-                    texture.clone(),
-                    relative_location,
-                    input_state.pointer_location != input_state.previous_pointer_location,
-                )));
+                elems.push(
+                    PointerElement::new(
+                        texture.clone(),
+                        relative_location,
+                        input_state.pointer_location != input_state.previous_pointer_location,
+                    )
+                    .into(),
+                );
             }
 
             input_state.previous_pointer_location = input_state.pointer_location;
 
             if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
-                elems.push(Box::new(wl_dnd));
+                elems.push(wl_dnd.into());
             }
         }
 

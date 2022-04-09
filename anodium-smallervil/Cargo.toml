@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anodium-backend = { path = "../anodium-backend" }
 anodium-framework = { path = "../anodium-framework" }
+slog = "2.7.0"
 
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"

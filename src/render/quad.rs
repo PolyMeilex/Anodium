@@ -6,7 +6,7 @@ use cgmath::Matrix3;
 use smithay::{
     backend::renderer::gles2::{
         ffi::{self, Gles2},
-        Gles2Error, Gles2Frame, Gles2Renderer, Gles2Texture,
+        Gles2Error, Gles2Frame, Gles2Renderer,
     },
     desktop::space::{RenderElement, SpaceOutputTuple},
     utils::{Logical, Physical, Point, Rectangle, Size, Transform},
@@ -137,7 +137,7 @@ impl QuadElement {
     }
 }
 
-impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for QuadElement {
+impl RenderElement<Gles2Renderer> for QuadElement {
     fn id(&self) -> usize {
         0
     }

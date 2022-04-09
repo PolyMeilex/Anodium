@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    os::unix::io::RawFd,
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -7,7 +8,6 @@ use std::{
 use calloop::ping;
 use smithay::{
     backend::{
-        drm::DrmNode,
         egl::{EGLContext, EGLDisplay},
         renderer::{gles2::Gles2Renderer, Bind, ImportEgl, Unbind},
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
@@ -46,7 +46,7 @@ struct OutputSurfaceBuilder {
 impl OutputSurfaceBuilder {
     fn new(
         handle: &X11Handle,
-        device: Arc<Mutex<gbm::Device<DrmNode>>>,
+        device: Arc<Mutex<gbm::Device<RawFd>>>,
         context: &EGLContext,
     ) -> Self {
         let window = WindowBuilder::new()
@@ -129,12 +129,12 @@ where
     let handle = backend.handle();
 
     // Obtain the DRM node the X server uses for direct rendering.
-    let drm_node = handle
+    let (_, fd) = handle
         .drm_node()
         .expect("Could not get DRM node used by X server");
 
     // Create the gbm device for buffer allocation.
-    let device = gbm::Device::new(drm_node).expect("Failed to create gbm device");
+    let device = gbm::Device::new(fd).expect("Failed to create gbm device");
     // Initialize EGL using the GBM device.
     let egl = EGLDisplay::new(&device, None).expect("Failed to create EGLDisplay");
     // Create the OpenGL context
@@ -182,7 +182,7 @@ where
         init_dmabuf_global(
             &mut *display.borrow_mut(),
             dmabuf_formats,
-            move |buffer, _| renderer.borrow_mut().import_dmabuf(buffer).is_ok(),
+            move |buffer, _| renderer.borrow_mut().import_dmabuf(buffer, None).is_ok(),
             None,
         );
     }

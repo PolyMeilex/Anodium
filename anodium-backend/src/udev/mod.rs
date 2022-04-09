@@ -182,7 +182,7 @@ where
                         if backend_data
                             .renderer
                             .borrow_mut()
-                            .import_dmabuf(buffer)
+                            .import_dmabuf(buffer, None)
                             .is_ok()
                         {
                             return true;
@@ -714,7 +714,7 @@ fn initial_render(
             frame
                 .clear(
                     [0.8, 0.8, 0.9, 1.0],
-                    &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+                    &[Rectangle::from_loc_and_size((0.0, 0.0), (1.0, 1.0))],
                 )
                 .map_err(Into::<SwapBuffersError>::into)
         })

@@ -130,7 +130,7 @@ impl PointerElement {
     }
 }
 
-impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for PointerElement {
+impl RenderElement<Gles2Renderer> for PointerElement {
     fn id(&self) -> usize {
         0
     }
@@ -167,7 +167,7 @@ impl RenderElement<Gles2Renderer, Gles2Frame, Gles2Error, Gles2Texture> for Poin
             Transform::Normal,
             &*damage
                 .iter()
-                .map(|rect| rect.to_buffer(1, Transform::Normal, &self.size))
+                .map(|rect| rect.to_f64().to_physical(scale).to_i32_round())
                 .collect::<Vec<_>>(),
             1.0,
         )?;
