@@ -1,3 +1,8 @@
+use smithay::{
+    utils::{Logical, Point},
+    wayland::seat::PointerHandle,
+};
+
 use {
     crate::State,
     anodium_backend::InputHandler,
@@ -47,22 +52,9 @@ impl InputHandler for State {
             InputEvent::PointerMotion { event } => {
                 let pointer = self.seat.get_pointer().unwrap();
 
-                let mut position = pointer.current_location();
-                position += event.delta();
+                let position = pointer.current_location() + event.delta();
 
-                let under = self.space.window_under(position).and_then(|win| {
-                    let window_loc = self.space.window_location(win).unwrap();
-                    win.surface_under(position - window_loc.to_f64(), WindowSurfaceType::all())
-                        .map(|(s, loc)| (s, loc + window_loc))
-                });
-
-                pointer.motion(
-                    position,
-                    under,
-                    SERIAL_COUNTER.next_serial(),
-                    event.time(),
-                    self,
-                );
+                self.pointer_motion(pointer, position, event.time());
             }
             InputEvent::PointerMotionAbsolute { event } => {
                 let pointer = self.seat.get_pointer().unwrap();
@@ -74,19 +66,7 @@ impl InputHandler for State {
 
                 let position = output_loc + event.position_transformed(output_geo.size);
 
-                let under = self.space.window_under(position).and_then(|win| {
-                    let window_loc = self.space.window_location(win).unwrap();
-                    win.surface_under(position - window_loc.to_f64(), WindowSurfaceType::all())
-                        .map(|(s, loc)| (s, loc + window_loc))
-                });
-
-                pointer.motion(
-                    position,
-                    under,
-                    SERIAL_COUNTER.next_serial(),
-                    event.time(),
-                    self,
-                );
+                self.pointer_motion(pointer, position, event.time());
             }
             InputEvent::PointerButton { event } => {
                 let pointer = self.seat.get_pointer().unwrap();
@@ -115,5 +95,17 @@ impl InputHandler for State {
             }
             _ => {}
         }
+    }
+}
+
+impl State {
+    fn pointer_motion(&mut self, pointer: PointerHandle, position: Point<f64, Logical>, time: u32) {
+        let under = self.space.window_under(position).and_then(|win| {
+            let window_loc = self.space.window_location(win).unwrap();
+            win.surface_under(position - window_loc.to_f64(), WindowSurfaceType::all())
+                .map(|(s, loc)| (s, loc + window_loc))
+        });
+
+        pointer.motion(position, under, SERIAL_COUNTER.next_serial(), time, self);
     }
 }
