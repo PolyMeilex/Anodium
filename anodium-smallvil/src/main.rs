@@ -1,3 +1,5 @@
+#![allow(irrefutable_let_patterns)]
+
 use std::sync::{Arc, Mutex};
 
 use smithay::{
