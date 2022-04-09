@@ -19,12 +19,19 @@ impl OutputHandler for State {
         output: smithay::wayland::output::Output,
         _possible_modes: Vec<smithay::wayland::output::Mode>,
     ) {
-        let x = self
+        let outputs: Vec<_> = self
             .space
             .outputs()
-            .fold(0, |x, o| x + o.current_mode().unwrap().size.w);
+            .cloned()
+            .chain(std::iter::once(output))
+            .collect();
 
-        self.space.map_output(&output, 1.0, (x, 0));
+        let mut x = 0;
+        for output in outputs.into_iter().rev() {
+            self.space.map_output(&output, 1.0, (x, 0));
+
+            x += output.current_mode().unwrap().size.w;
+        }
     }
 
     fn output_render(
