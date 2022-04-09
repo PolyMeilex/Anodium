@@ -113,6 +113,21 @@ impl Default for ResizeState {
     }
 }
 
+impl ResizeState {
+    pub fn start_resize(
+        &mut self,
+        edges: ResizeEdge,
+        initial_window_location: Point<i32, Logical>,
+        initial_window_size: Size<i32, Logical>,
+    ) {
+        *self = ResizeState::Resizing(ResizeData {
+            edges,
+            initial_window_location,
+            initial_window_size,
+        });
+    }
+}
+
 bitflags::bitflags! {
     pub struct ResizeEdge: u32 {
         const NONE = 0;

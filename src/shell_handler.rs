@@ -30,44 +30,35 @@ impl ShellHandler for Anodium {
             }
 
             ShellEvent::WindowMove {
-                toplevel,
+                window,
                 start_data,
                 seat,
                 serial,
             } => {
                 let pointer = seat.get_pointer().unwrap();
 
-                let window = self
-                    .region_manager
-                    .window_for_surface(toplevel.get_surface().unwrap());
+                let workspace = self.region_manager.find_window_workspace(&window).unwrap();
+                let initial_window_location = workspace.space().window_location(&window).unwrap();
 
-                if let Some(window) = window {
-                    let workspace = self.region_manager.find_window_workspace(&window).unwrap();
-                    let initial_window_location =
-                        workspace.space().window_location(&window).unwrap();
-
-                    let grab = MoveSurfaceGrab {
-                        start_data,
-                        window,
-                        initial_window_location,
-                    };
-                    pointer.set_grab(grab, serial, 0);
-                }
+                let grab = MoveSurfaceGrab {
+                    start_data,
+                    window,
+                    initial_window_location,
+                };
+                pointer.set_grab(grab, serial, 0);
             }
 
             ShellEvent::WindowResize {
-                toplevel,
+                window,
                 start_data,
                 seat,
                 edges,
                 serial,
             } => {
                 let pointer = seat.get_pointer().unwrap();
-                let wl_surface = toplevel.get_surface().unwrap();
+                let wl_surface = window.toplevel().get_surface();
 
-                let window = self.region_manager.window_for_surface(wl_surface);
-
-                if let Some(window) = window {
+                if let Some(wl_surface) = wl_surface {
                     let region = self.region_manager.find_window_region(&window).unwrap();
                     let workspace = region.find_window_workspace(&window).unwrap();
                     let loc = workspace.space().window_location(&window).unwrap();

@@ -41,12 +41,16 @@ where
                 let seat = Seat::from_resource(&seat).unwrap();
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
-                    handler.on_shell_event(ShellEvent::WindowMove {
-                        toplevel: Kind::Xdg(surface),
-                        start_data,
-                        seat,
-                        serial,
-                    });
+                    let window = self.windows.find(&surface);
+
+                    if let Some(window) = window.cloned() {
+                        handler.on_shell_event(ShellEvent::WindowMove {
+                            window,
+                            start_data,
+                            seat,
+                            serial,
+                        });
+                    }
                 }
             }
             XdgRequest::Resize {
@@ -58,43 +62,51 @@ where
                 let seat = Seat::from_resource(&seat).unwrap();
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
-                    handler.on_shell_event(ShellEvent::WindowResize {
-                        toplevel: Kind::Xdg(surface),
-                        start_data,
-                        seat,
-                        edges: edges.into(),
-                        serial,
-                    });
+                    let window = self.windows.find(&surface);
+
+                    if let Some(window) = window.cloned() {
+                        handler.on_shell_event(ShellEvent::WindowResize {
+                            window,
+                            start_data,
+                            seat,
+                            edges: edges.into(),
+                            serial,
+                        });
+                    }
                 }
             }
 
             XdgRequest::Maximize { surface } => {
-                handler.on_shell_event(ShellEvent::WindowMaximize {
-                    toplevel: Kind::Xdg(surface),
-                });
+                let window = self.windows.find(&surface);
+                if let Some(window) = window.cloned() {
+                    handler.on_shell_event(ShellEvent::WindowMaximize { window });
+                }
             }
             XdgRequest::UnMaximize { surface } => {
-                handler.on_shell_event(ShellEvent::WindowUnMaximize {
-                    toplevel: Kind::Xdg(surface),
-                });
+                let window = self.windows.find(&surface);
+                if let Some(window) = window.cloned() {
+                    handler.on_shell_event(ShellEvent::WindowUnMaximize { window });
+                }
             }
 
             XdgRequest::Fullscreen { surface, output } => {
-                handler.on_shell_event(ShellEvent::WindowFullscreen {
-                    toplevel: Kind::Xdg(surface),
-                    output,
-                });
+                let window = self.windows.find(&surface);
+                if let Some(window) = window.cloned() {
+                    handler.on_shell_event(ShellEvent::WindowFullscreen { window, output });
+                }
             }
             XdgRequest::UnFullscreen { surface } => {
-                handler.on_shell_event(ShellEvent::WindowUnFullscreen {
-                    toplevel: Kind::Xdg(surface),
-                });
+                let window = self.windows.find(&surface);
+                if let Some(window) = window.cloned() {
+                    handler.on_shell_event(ShellEvent::WindowUnFullscreen { window });
+                }
             }
 
             XdgRequest::Minimize { surface } => {
-                handler.on_shell_event(ShellEvent::WindowMinimize {
-                    toplevel: Kind::Xdg(surface),
-                });
+                let window = self.windows.find(&surface);
+                if let Some(window) = window.cloned() {
+                    handler.on_shell_event(ShellEvent::WindowMinimize { window });
+                }
             }
 
             //
@@ -134,12 +146,15 @@ where
                 serial,
                 location,
             } => {
-                handler.on_shell_event(ShellEvent::ShowWindowMenu {
-                    toplevel: Kind::Xdg(surface),
-                    seat: Seat::from_resource(&seat).unwrap(),
-                    serial,
-                    location,
-                });
+                let window = self.windows.find(&surface);
+                if let Some(window) = window.cloned() {
+                    handler.on_shell_event(ShellEvent::ShowWindowMenu {
+                        window,
+                        seat: Seat::from_resource(&seat).unwrap(),
+                        serial,
+                        location,
+                    });
+                }
             }
 
             XdgRequest::AckConfigure {

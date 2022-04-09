@@ -1,4 +1,4 @@
-use smithay::desktop::{self, Kind, LayerSurface, PopupKind, PopupManager};
+use smithay::desktop::{self, LayerSurface, PopupKind, PopupManager};
 use smithay::reexports::wayland_server::protocol::wl_output::WlOutput;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{DispatchData, Display};
@@ -44,14 +44,14 @@ pub enum ShellEvent {
     },
 
     WindowMove {
-        toplevel: Kind,
+        window: desktop::Window,
         start_data: PointerGrabStartData,
         seat: Seat,
         serial: Serial,
     },
 
     WindowResize {
-        toplevel: Kind,
+        window: desktop::Window,
         start_data: PointerGrabStartData,
         seat: Seat,
         edges: ResizeEdge,
@@ -64,22 +64,22 @@ pub enum ShellEvent {
     },
 
     WindowMaximize {
-        toplevel: Kind,
+        window: desktop::Window,
     },
     WindowUnMaximize {
-        toplevel: Kind,
+        window: desktop::Window,
     },
 
     WindowFullscreen {
-        toplevel: Kind,
+        window: desktop::Window,
         output: Option<WlOutput>,
     },
     WindowUnFullscreen {
-        toplevel: Kind,
+        window: desktop::Window,
     },
 
     WindowMinimize {
-        toplevel: Kind,
+        window: desktop::Window,
     },
 
     //
@@ -100,7 +100,7 @@ pub enum ShellEvent {
     // Misc
     //
     ShowWindowMenu {
-        toplevel: Kind,
+        window: desktop::Window,
         seat: Seat,
         serial: Serial,
         location: Point<i32, Logical>,

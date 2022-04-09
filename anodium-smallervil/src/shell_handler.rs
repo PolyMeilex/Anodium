@@ -23,66 +23,50 @@ impl ShellHandler for State {
                 self.space.map_window(&window, (0, 0), true);
                 window.configure();
             }
+
             ShellEvent::WindowMove {
-                toplevel,
+                window,
                 start_data,
                 seat,
                 serial,
             } => {
                 let pointer = seat.get_pointer().unwrap();
 
-                let window = self
-                    .space
-                    .window_for_surface(toplevel.get_surface().unwrap())
-                    .cloned();
+                let initial_window_location = self.space.window_location(&window).unwrap();
 
-                if let Some(window) = window {
-                    let initial_window_location = self.space.window_location(&window).unwrap();
-
-                    let grab = MoveSurfaceGrab {
-                        start_data,
-                        window,
-                        initial_window_location,
-                    };
-                    pointer.set_grab(grab, serial, 0);
-                }
+                let grab = MoveSurfaceGrab {
+                    start_data,
+                    window,
+                    initial_window_location,
+                };
+                pointer.set_grab(grab, serial, 0);
             }
+
             ShellEvent::SurfaceCommit { surface } => {
                 self.space.commit(&surface);
             }
+
             ShellEvent::WindowResize {
-                toplevel,
+                window,
                 start_data,
                 seat,
                 edges,
                 serial,
             } => {
                 let pointer = seat.get_pointer().unwrap();
-                let wl_surface = toplevel.get_surface().unwrap();
 
-                let window = self.space.window_for_surface(wl_surface);
+                let wl_surface = window.toplevel().get_surface();
 
-                if let Some(window) = window {
-                    let loc = self.space.window_location(window).unwrap();
-                    let geometry = window.geometry();
-
-                    let (initial_window_location, initial_window_size) = (loc, geometry.size);
+                if let Some(wl_surface) = wl_surface {
+                    let window_location = self.space.window_location(&window).unwrap();
+                    let window_size = window.geometry().size;
 
                     SurfaceData::with_mut(wl_surface, |data| {
-                        data.resize_state = ResizeState::Resizing(ResizeData {
-                            edges,
-                            initial_window_location,
-                            initial_window_size,
-                        });
+                        data.resize_state
+                            .start_resize(edges, window_location, window_size);
                     });
 
-                    let grab = ResizeSurfaceGrab {
-                        start_data,
-                        window: window.clone(),
-                        edges,
-                        initial_window_size,
-                        last_window_size: initial_window_size,
-                    };
+                    let grab = ResizeSurfaceGrab::new(start_data, window, edges, window_size);
 
                     pointer.set_grab(grab, serial, 0);
                 }
@@ -174,7 +158,7 @@ use smithay::{
     wayland::{compositor::with_states, shell::xdg::SurfaceCachedState},
 };
 
-use anodium_framework::surface_data::{ResizeData, ResizeEdge, ResizeState, SurfaceData};
+use anodium_framework::surface_data::{ResizeEdge, ResizeState, SurfaceData};
 
 pub struct ResizeSurfaceGrab {
     pub start_data: PointerGrabStartData,
@@ -182,6 +166,23 @@ pub struct ResizeSurfaceGrab {
     pub edges: ResizeEdge,
     pub initial_window_size: Size<i32, Logical>,
     pub last_window_size: Size<i32, Logical>,
+}
+
+impl ResizeSurfaceGrab {
+    fn new(
+        start_data: PointerGrabStartData,
+        window: desktop::Window,
+        edges: ResizeEdge,
+        window_size: Size<i32, Logical>,
+    ) -> Self {
+        Self {
+            start_data,
+            window,
+            edges,
+            initial_window_size: window_size,
+            last_window_size: window_size,
+        }
+    }
 }
 
 impl PointerGrab for ResizeSurfaceGrab {
