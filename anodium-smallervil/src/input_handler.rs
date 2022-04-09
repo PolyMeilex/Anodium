@@ -88,6 +88,12 @@ impl InputHandler for State {
 
                 keyboard.set_focus(under.as_ref(), serial)
             }
+            InputEvent::PointerAxis { event } => {
+                let frame = anodium_framework::input::basic_axis_frame::<I>(&event);
+
+                let pointer = self.seat.get_pointer().unwrap();
+                pointer.axis(frame, self);
+            }
             _ => {}
         }
     }

@@ -4,5 +4,6 @@
 extern crate log;
 
 pub mod draw;
+pub mod input;
 pub mod shell;
 pub mod surface_data;
