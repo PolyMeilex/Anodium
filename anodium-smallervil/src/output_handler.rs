@@ -1,10 +1,7 @@
 use crate::State;
 use anodium_backend::OutputHandler;
 
-use smithay::{
-    backend::renderer::gles2::Gles2Renderer, desktop::space::SurfaceTree,
-    wayland::seat::CursorImageStatus,
-};
+use smithay::{backend::renderer::gles2::Gles2Renderer, desktop::space::SurfaceTree};
 
 smithay::custom_elements! {
     pub CustomElem<=Gles2Renderer>;
@@ -44,18 +41,12 @@ impl OutputHandler for State {
             .current_location()
             .to_i32_round();
 
-        if let Some(surface) = &*self.dnd_icon.lock().unwrap() {
-            if surface.as_ref().is_alive() {
-                let e = anodium_framework::draw::draw_dnd_icon(surface.clone(), location);
-                elems.push(e.into());
-            }
+        if let Some(tree) = self.pointer_icon.prepare_dnd_icon(location) {
+            elems.push(tree.into());
         }
 
-        if let CursorImageStatus::Image(surface) = &*self.pointer_icon.lock().unwrap() {
-            if surface.as_ref().is_alive() {
-                let e = anodium_framework::draw::draw_cursor(surface.clone(), location);
-                elems.push(e.into());
-            }
+        if let Some(tree) = self.pointer_icon.prepare_cursor_icon(location) {
+            elems.push(tree.into());
         }
 
         Ok(self

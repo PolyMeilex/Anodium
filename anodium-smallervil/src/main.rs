@@ -1,28 +1,22 @@
 #![allow(irrefutable_let_patterns)]
 
-use anodium_framework::shell::ShellManager;
+use anodium_framework::{pointer_icon::PointerIcon, shell::ShellManager};
 
 use smithay::{
     desktop,
     reexports::{
         calloop::{self, channel, generic::Generic, EventLoop, Interest, LoopSignal, PostAction},
-        wayland_server::protocol::wl_surface::WlSurface,
         wayland_server::Display,
     },
     wayland::{
-        data_device::{self, DataDeviceEvent},
+        data_device::{self},
         output::xdg::init_xdg_output_manager,
-        seat::{CursorImageStatus, Seat},
+        seat::Seat,
         shm::init_shm_global,
     },
 };
 
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    sync::{Arc, Mutex},
-    time::Instant,
-};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
 mod backend_handler;
 mod input_handler;
@@ -38,8 +32,7 @@ struct State {
     start_time: Instant,
     loop_signal: LoopSignal,
 
-    dnd_icon: Arc<Mutex<Option<WlSurface>>>,
-    pointer_icon: Arc<Mutex<CursorImageStatus>>,
+    pointer_icon: PointerIcon,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,20 +42,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_shm_global(&mut display.borrow_mut(), vec![], None);
     init_xdg_output_manager(&mut display.borrow_mut(), None);
 
-    let dnd_icon: Arc<Mutex<Option<WlSurface>>> = Arc::new(Mutex::new(None));
+    let pointer_icon = PointerIcon::new();
+
     data_device::init_data_device(
         &mut display.borrow_mut(),
         {
-            let dnd_icon = dnd_icon.clone();
-            move |event| match event {
-                DataDeviceEvent::DnDStarted { icon, .. } => {
-                    *dnd_icon.lock().unwrap() = icon;
-                }
-                DataDeviceEvent::DnDDropped { .. } => {
-                    *dnd_icon.lock().unwrap() = None;
-                }
-                _ => {}
-            }
+            let pointer_icon = pointer_icon.clone();
+            move |event| pointer_icon.on_data_device_event(event)
         },
         data_device::default_action_chooser,
         None,
@@ -72,12 +58,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (mut seat, _) = Seat::new(&mut display.borrow_mut(), "seat0".into(), None);
 
-    let pointer_icon = Arc::new(Mutex::new(CursorImageStatus::Default));
     seat.add_pointer({
         let pointer_icon = pointer_icon.clone();
-        move |status| {
-            *pointer_icon.lock().unwrap() = status;
-        }
+        move |cursor| pointer_icon.on_new_cursor(cursor)
     });
     seat.add_keyboard(Default::default(), 200, 25, |seat, focus| {
         data_device::set_data_device_focus(seat, focus.and_then(|s| s.as_ref().client()))
@@ -92,7 +75,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         start_time: Instant::now(),
         loop_signal: event_loop.get_signal(),
 
-        dnd_icon,
         pointer_icon,
     };
 

@@ -4,11 +4,12 @@ use std::{
     rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc,
     },
     time::Instant,
 };
 
+use anodium_framework::pointer_icon::PointerIcon;
 use anodium_protocol::server::AnodiumProtocol;
 use calloop::channel::{self, Channel};
 use smithay::{
@@ -16,13 +17,13 @@ use smithay::{
     desktop::{self, space::SurfaceTree},
     reexports::{
         calloop::{self, channel::Sender, generic::Generic, Interest, LoopHandle, PostAction},
-        wayland_server::{protocol::wl_surface::WlSurface, Display},
+        wayland_server::Display,
     },
     utils::{Logical, Point, Rectangle},
     wayland::{
-        data_device::{self, DataDeviceEvent},
+        data_device,
         output::xdg::init_xdg_output_manager,
-        seat::{CursorImageStatus, KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
+        seat::{KeyboardHandle, ModifiersState, PointerHandle, Seat, XkbConfig},
         shm::init_shm_global,
     },
 };
@@ -39,7 +40,6 @@ use crate::{
     framework::shell::ShellManager,
     output_manager::{Output, OutputManager},
     region_manager::RegionManager,
-    render,
 };
 
 smithay::custom_elements! {
@@ -69,8 +69,7 @@ pub struct Anodium {
 
     pub shell_manager: ShellManager<Self>,
 
-    pub dnd_icon: Arc<Mutex<Option<WlSurface>>>,
-    pub cursor_status: Arc<Mutex<CursorImageStatus>>,
+    pub pointer_icon: PointerIcon,
 
     pub input_state: Rc<RefCell<InputState>>,
 
@@ -153,48 +152,24 @@ impl Anodium {
     }
 
     /// init data device
-    fn init_data_device(display: &Rc<RefCell<Display>>) -> Arc<Mutex<Option<WlSurface>>> {
-        let dnd_icon = Arc::new(Mutex::new(None));
-
+    fn init_data_device(display: &Rc<RefCell<Display>>, pointer_icon: PointerIcon) {
         data_device::init_data_device(
             &mut display.borrow_mut(),
-            {
-                let dnd_icon = dnd_icon.clone();
-                move |event| match event {
-                    DataDeviceEvent::DnDStarted { icon, .. } => {
-                        *dnd_icon.lock().unwrap() = icon;
-                    }
-                    DataDeviceEvent::DnDDropped { .. } => {
-                        *dnd_icon.lock().unwrap() = None;
-                    }
-                    _ => {}
-                }
-            },
+            move |event| pointer_icon.on_data_device_event(event),
             data_device::default_action_chooser,
             slog_scope::logger(),
         );
-
-        dnd_icon
     }
 
     /// init wayland seat, keyboard and pointer
     fn init_seat(
         display: &Rc<RefCell<Display>>,
         seat_name: String,
-    ) -> (
-        Seat,
-        PointerHandle,
-        KeyboardHandle,
-        Arc<Mutex<CursorImageStatus>>,
-    ) {
+        pointer_icon: PointerIcon,
+    ) -> (Seat, PointerHandle, KeyboardHandle) {
         let (mut seat, _) = Seat::new(&mut display.borrow_mut(), seat_name, slog_scope::logger());
 
-        let cursor_status = Arc::new(Mutex::new(CursorImageStatus::Default));
-
-        let pointer = seat.add_pointer({
-            let cursor_status = cursor_status.clone();
-            move |new_status| *cursor_status.lock().unwrap() = new_status
-        });
+        let pointer = seat.add_pointer(move |status| pointer_icon.on_new_cursor(status));
 
         let keyboard = seat
             .add_keyboard(XkbConfig::default(), 200, 25, |seat, focus| {
@@ -202,7 +177,7 @@ impl Anodium {
             })
             .expect("Failed to initialize the keyboard");
 
-        (seat, pointer, keyboard, cursor_status)
+        (seat, pointer, keyboard)
     }
 
     fn init_config_channel(handle: &LoopHandle<'static, Self>) -> Sender<ConfigEvent> {
@@ -238,11 +213,12 @@ impl Anodium {
         init_shm_global(&mut display.borrow_mut(), vec![], log.clone());
         init_xdg_output_manager(&mut display.borrow_mut(), log.clone());
 
-        let dnd_icon = Self::init_data_device(&display);
+        let pointer_icon = PointerIcon::new();
+        Self::init_data_device(&display, pointer_icon.clone());
 
         let shell_manager = ShellManager::init_shell(&mut display.borrow_mut());
 
-        let (seat, pointer, keyboard, cursor_status) = Self::init_seat(&display, seat_name);
+        let (seat, pointer, keyboard) = Self::init_seat(&display, seat_name, pointer_icon.clone());
 
         let (anodium_protocol, _global) = AnodiumProtocol::init(&mut display.borrow_mut());
 
@@ -281,8 +257,7 @@ impl Anodium {
                 shell_manager,
                 display,
 
-                dnd_icon,
-                cursor_status,
+                pointer_icon,
 
                 input_state,
 
@@ -325,42 +300,6 @@ impl Anodium {
         self.last_update = Instant::now();
     }
 
-    // draw the custom cursor if applicable
-    fn prepare_cursor_element(
-        &self,
-        relative_location: Point<i32, Logical>,
-    ) -> Option<SurfaceTree> {
-        // draw the cursor as relevant
-        let mut cursor_status = self.cursor_status.lock().unwrap();
-        // reset the cursor if the surface is no longer alive
-        let mut reset = false;
-        if let CursorImageStatus::Image(ref surface) = *cursor_status {
-            reset = !surface.as_ref().is_alive();
-        }
-        if reset {
-            *cursor_status = CursorImageStatus::Default;
-        }
-
-        if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
-            let elm = render::draw_cursor(wl_surface.clone(), relative_location);
-            Some(elm)
-        } else {
-            None
-        }
-    }
-
-    // draw the dnd icon if applicable
-    fn prepare_dnd_element(&self, relative_location: Point<i32, Logical>) -> Option<SurfaceTree> {
-        let guard = self.dnd_icon.lock().unwrap();
-        guard.as_ref().and_then(|wl_surface| {
-            if wl_surface.as_ref().is_alive() {
-                Some(render::draw_dnd_icon(wl_surface.clone(), relative_location))
-            } else {
-                None
-            }
-        })
-    }
-
     pub fn render(
         &mut self,
         renderer: &mut Gles2Renderer,
@@ -395,8 +334,12 @@ impl Anodium {
                 - output_geometry.loc
                 - region.position();
 
-            if let Some(wl_cursor) = self.prepare_cursor_element(relative_location) {
-                elems.push(wl_cursor.into());
+            if let Some(tree) = self.pointer_icon.prepare_dnd_icon(relative_location) {
+                elems.push(tree.into());
+            }
+
+            if let Some(tree) = self.pointer_icon.prepare_cursor_icon(relative_location) {
+                elems.push(tree.into());
             } else if let Some(texture) = pointer_image {
                 elems.push(
                     PointerElement::new(
@@ -409,10 +352,6 @@ impl Anodium {
             }
 
             input_state.previous_pointer_location = input_state.pointer_location;
-
-            if let Some(wl_dnd) = self.prepare_dnd_element(output_geometry.loc) {
-                elems.push(wl_dnd.into());
-            }
         }
 
         let render_result = workspace
