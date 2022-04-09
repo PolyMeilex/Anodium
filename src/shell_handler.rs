@@ -1,5 +1,5 @@
 use smithay::{
-    desktop::{self, Window},
+    desktop::{self},
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
 };
@@ -89,9 +89,23 @@ impl ShellHandler for Anodium {
 
             ShellEvent::WindowGotResized {
                 window,
-                new_location,
+                new_location_x,
+                new_location_y,
             } => {
                 if let Some(region) = self.region_manager.find_window_region(&window) {
+                    let space = region.find_window_workspace(&window).unwrap();
+
+                    let mut new_location =
+                        space.space().window_location(&window).unwrap_or_default();
+
+                    if let Some(x) = new_location_x {
+                        new_location.x = x;
+                    }
+
+                    if let Some(y) = new_location_y {
+                        new_location.y = y;
+                    }
+
                     let new_location = new_location - region.position();
 
                     region
@@ -160,18 +174,6 @@ impl ShellHandler for Anodium {
             }
             _ => {}
         }
-    }
-
-    fn window_location(&self, window: &Window) -> Point<i32, Logical> {
-        let region = self.region_manager.find_window_region(window).unwrap();
-
-        region
-            .find_window_workspace(window)
-            .unwrap()
-            .space()
-            .window_location(window)
-            .unwrap()
-            + region.position()
     }
 }
 

@@ -34,8 +34,6 @@ pub use xwayland::X11Surface;
 
 pub trait ShellHandler {
     fn on_shell_event(&mut self, event: ShellEvent);
-
-    fn window_location(&self, window: &Window) -> Point<i32, Logical>;
 }
 
 pub enum ShellEvent {
@@ -60,7 +58,8 @@ pub enum ShellEvent {
 
     WindowGotResized {
         window: desktop::Window,
-        new_location: Point<i32, Logical>,
+        new_location_x: Option<i32>,
+        new_location_y: Option<i32>,
     },
 
     WindowMaximize {
@@ -142,10 +141,10 @@ where
     fn try_update_mapped(&mut self, surface: &WlSurface, handler: &mut D) {
         if let Some(window) = self.windows.find_mut(surface) {
             let geometry = window.geometry();
-            let location = handler.window_location(window);
 
             let new_location = SurfaceData::with_mut(surface, |data| {
-                let mut new_location = None;
+                let mut new_location_x = None;
+                let mut new_location_y = None;
 
                 // If the window is being resized by top or left, its location must be adjusted
                 // accordingly.
@@ -159,18 +158,19 @@ where
                             initial_window_size,
                         } = resize_data;
 
-                        let mut location = location;
                         if edges.intersects(ResizeEdge::TOP_LEFT) {
                             if edges.intersects(ResizeEdge::LEFT) {
-                                location.x = initial_window_location.x
-                                    + (initial_window_size.w - geometry.size.w);
+                                new_location_x = Some(
+                                    initial_window_location.x
+                                        + (initial_window_size.w - geometry.size.w),
+                                );
                             }
                             if edges.intersects(ResizeEdge::TOP) {
-                                location.y = initial_window_location.y
-                                    + (initial_window_size.h - geometry.size.h);
+                                new_location_y = Some(
+                                    initial_window_location.y
+                                        + (initial_window_size.h - geometry.size.h),
+                                );
                             }
-
-                            new_location = Some(location);
                         }
                     }
                     ResizeState::NotResizing => (),
@@ -184,17 +184,20 @@ where
                 // If the compositor requested MoveAfterReszie
                 if let MoveAfterResizeState::WaitingForCommit(mdata) = data.move_after_resize_state
                 {
-                    new_location = Some(mdata.target_window_location);
+                    new_location_x = Some(mdata.target_window_location.x);
+                    new_location_y = Some(mdata.target_window_location.y);
+
                     data.move_after_resize_state = MoveAfterResizeState::Current(mdata);
                 }
 
-                new_location
+                (new_location_x, new_location_y)
             });
 
-            if let Some(new_location) = new_location {
+            if new_location.0.is_some() | new_location.1.is_some() {
                 handler.on_shell_event(ShellEvent::WindowGotResized {
                     window: window.clone(),
-                    new_location,
+                    new_location_x: new_location.0,
+                    new_location_y: new_location.1,
                 })
             }
         }

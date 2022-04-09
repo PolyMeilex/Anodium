@@ -74,19 +74,23 @@ impl ShellHandler for State {
 
             ShellEvent::WindowGotResized {
                 window,
-                new_location,
+                new_location_x,
+                new_location_y,
             } => {
+                let mut new_location = self.space.window_location(&window).unwrap_or_default();
+
+                if let Some(x) = new_location_x {
+                    new_location.x = x;
+                }
+
+                if let Some(y) = new_location_y {
+                    new_location.y = y;
+                }
+
                 self.space.map_window(&window, new_location, false);
             }
             _ => {}
         }
-    }
-
-    fn window_location(
-        &self,
-        window: &desktop::Window,
-    ) -> smithay::utils::Point<i32, smithay::utils::Logical> {
-        self.space.window_location(window).unwrap_or_default()
     }
 }
 
