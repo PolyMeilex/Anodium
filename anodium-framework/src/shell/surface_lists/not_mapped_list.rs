@@ -5,7 +5,7 @@ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
-use super::super::utils::AsWlSurface;
+use crate::shell::{utils::AsWlSurface, X11WindowUserData};
 
 use smithay::desktop::Window;
 
@@ -16,8 +16,13 @@ pub struct NotMappedList {
 
 /// Toplevel Windows
 impl NotMappedList {
-    pub fn insert_window(&mut self, toplevel: Kind) {
+    pub fn insert_window(&mut self, toplevel: Kind, x11: Option<X11WindowUserData>) {
         let window = Window::new(toplevel);
+
+        if let Some(x11) = x11 {
+            window.user_data().insert_if_missing(|| x11);
+        }
+
         window.refresh();
         self.windows.push(window);
     }
@@ -87,7 +92,7 @@ impl NotMappedList {
                         }
                     }
                     #[cfg(feature = "xwayland")]
-                    WindowSurface::X11(_) => Some(toplevel),
+                    Kind::X11(_) => Some(toplevel),
                 }
             } else {
                 None

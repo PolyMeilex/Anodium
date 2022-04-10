@@ -71,14 +71,19 @@ features = ["executor", "futures-io"]
 git = "https://github.com/Smithay/smithay-egui.git"
 
 [features]
-default = ["udev", "winit", "x11", "debug"]
+default = ["udev", "winit", "x11", "debug", "xwayland"]
 
 x11 = ["anodium-backend/x11", "x11rb"]
 winit = ["anodium-backend/winit"]
 udev = ["anodium-backend/udev"]
 
 debug = []
-#xwayland = ["smithay/xwayland", "smithay/x11rb_event_source", "x11rb"]
+xwayland = [
+  "smithay/xwayland",
+  "smithay/x11rb_event_source",
+  "x11rb",
+  "anodium-framework/xwayland",
+]
 
 [patch."https://github.com/Smithay/smithay.git"]
 smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }

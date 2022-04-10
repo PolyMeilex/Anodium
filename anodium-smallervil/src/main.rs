@@ -19,6 +19,9 @@ use smithay::{
 
 use std::{cell::RefCell, rc::Rc, time::Instant};
 
+#[cfg(feature = "xwayland")]
+use smithay::{reexports::calloop::LoopHandle, xwayland::XWayland};
+
 mod backend_handler;
 mod input_handler;
 mod output_handler;
@@ -36,6 +39,34 @@ struct State {
     pointer_icon: PointerIcon,
 
     backend: BackendState,
+
+    #[cfg(feature = "xwayland")]
+    xwayland: XWayland<Self>,
+}
+
+/// init the xwayland connection
+#[cfg(feature = "xwayland")]
+fn init_xwayland_connection(
+    handle: &LoopHandle<'static, State>,
+    display: &Rc<RefCell<Display>>,
+) -> XWayland<State> {
+    use smithay::xwayland::XWaylandEvent;
+
+    let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), None);
+
+    handle
+        .insert_source(channel, {
+            let handle = handle.clone();
+            move |event, _, state| match event {
+                XWaylandEvent::Ready { connection, client } => state
+                    .shell_manager
+                    .xwayland_ready(&handle, connection, client),
+                XWaylandEvent::Exited => {}
+            }
+        })
+        .unwrap();
+
+    xwayland
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,6 +100,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         data_device::set_data_device_focus(seat, focus.and_then(|s| s.as_ref().client()))
     })?;
 
+    let xwayland = init_xwayland_connection(&event_loop.handle(), &display);
+
     let mut state = State {
         space: desktop::Space::new(None),
         display: display.clone(),
@@ -80,6 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         pointer_icon,
         backend: BackendState::default(),
+        xwayland,
     };
 
     event_loop

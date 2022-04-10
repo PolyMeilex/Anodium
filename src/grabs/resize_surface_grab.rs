@@ -96,7 +96,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                 }
             }
             #[cfg(feature = "xwayland")]
-            WindowSurface::X11(_) => {
+            Kind::X11(_) => {
                 // TODO: What to do here? Send the update via X11?
             }
         }

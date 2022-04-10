@@ -28,12 +28,34 @@ mod xdg;
 mod utils;
 
 #[cfg(feature = "xwayland")]
-pub mod xwayland;
+use {
+    smithay::reexports::{calloop::LoopHandle, wayland_server::Client},
+    std::os::unix::net::UnixStream,
+    std::sync::Arc,
+    x11rb::protocol::xproto::{ConfigureRequestEvent, ConfigureWindowAux, ConnectionExt},
+};
+
+pub struct X11WindowUserData {
+    pub window: x11rb::protocol::xproto::Window,
+    pub location: Point<i32, Logical>,
+}
+
 #[cfg(feature = "xwayland")]
-pub use xwayland::X11Surface;
+pub mod xwayland;
 
 pub trait ShellHandler {
     fn on_shell_event(&mut self, event: ShellEvent);
+
+    #[cfg(feature = "xwayland")]
+    fn xwayland_configure_request(
+        &mut self,
+        conn: Arc<x11rb::rust_connection::RustConnection>,
+        event: ConfigureRequestEvent,
+    ) {
+        // Just grant the wish
+        let aux = ConfigureWindowAux::from_configure_request(&event);
+        conn.configure_window(event.window, &aux).ok();
+    }
 }
 
 pub enum ShellEvent {
@@ -302,7 +324,10 @@ pub struct ShellManager<D> {
     inner: Rc<RefCell<Inner<D>>>,
 }
 
-impl<D> ShellManager<D> {
+impl<D> ShellManager<D>
+where
+    D: ShellHandler + 'static,
+{
     pub fn init_shell(display: &mut Display) -> Self
     where
         D: ShellHandler + 'static,
@@ -360,18 +385,19 @@ impl<D> ShellManager<D> {
     #[cfg(feature = "xwayland")]
     pub fn xwayland_ready(
         &mut self,
-        handle: &LoopHandle<Anodium>,
+        handle: &LoopHandle<D>,
         connection: UnixStream,
         client: Client,
     ) {
         xwayland::xwayland_shell_init(handle, connection, client, {
             let inner = self.inner.clone();
 
-            move |event, x11, client, ddata| {
+            move |event, x11, client, mut ddata| {
+                let handler = ddata.get::<D>().unwrap();
+
                 inner
                     .borrow_mut()
-                    .xwayland_shell_event(event, x11, client, ddata)
-                    .log_err("Error while handling X11 event:")
+                    .xwayland_shell_event(event, x11, client, handler)
                     .ok();
             }
         });

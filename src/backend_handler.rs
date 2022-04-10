@@ -68,12 +68,7 @@ impl BackendHandler for Anodium {
 
         #[cfg(feature = "xwayland")]
         {
-            use crate::utils::LogResult;
-
-            self.xwayland
-                .start()
-                .log_err("Failed to start XWayland:")
-                .ok();
+            self.xwayland.start().ok();
         }
     }
 

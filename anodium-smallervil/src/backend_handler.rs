@@ -22,6 +22,11 @@ impl BackendHandler for State {
 
         ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
         dbg!(&socket_name);
+
+        #[cfg(feature = "xwayland")]
+        {
+            self.xwayland.start().ok();
+        }
     }
 
     fn close_compositor(&mut self) {

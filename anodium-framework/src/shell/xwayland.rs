@@ -1,6 +1,7 @@
-use std::{cell::RefCell, convert::TryFrom, os::unix::net::UnixStream, rc::Rc};
+use std::{cell::RefCell, os::unix::net::UnixStream, rc::Rc};
 
 use smithay::{
+    desktop::{Kind, X11Surface},
     reexports::{
         calloop::LoopHandle,
         wayland_server::{protocol::wl_surface::WlSurface, Client, DispatchData},
@@ -13,54 +14,37 @@ use x11rb::{
     connection::Connection as _,
     errors::ReplyOrIdError,
     protocol::{
-        xproto::{ConfigWindow, ConfigureWindowAux, ConnectionExt as _, Window},
+        xproto::{ConnectionExt as _, Window},
         Event,
     },
 };
 
-use crate::window::WindowSurface;
-
 mod x11_state;
 use x11_state::X11State;
 
-mod x11_surface;
-pub use x11_surface::X11Surface;
+// mod x11_surface;
+// pub use x11_surface::X11Surface;
 
-impl super::Inner {
+use crate::shell::X11WindowUserData;
+
+use super::ShellHandler;
+
+impl<D> super::Inner<D>
+where
+    D: ShellHandler + 'static,
+{
     pub fn xwayland_shell_event(
         &mut self,
         event: Event,
         x11: &mut X11State,
         client: &Client,
-        ddata: DispatchData,
+        handler: &mut D,
     ) -> Result<(), ReplyOrIdError> {
         debug!("X11: Got event {:?}", event);
+        dbg!("X11: Got event {:?}", &event);
         match event {
             Event::ConfigureRequest(r) => {
-                // Just grant the wish
-                let mut aux = ConfigureWindowAux::default();
-                if r.value_mask & u16::from(ConfigWindow::STACK_MODE) != 0 {
-                    aux = aux.stack_mode(r.stack_mode);
-                }
-                if r.value_mask & u16::from(ConfigWindow::SIBLING) != 0 {
-                    aux = aux.sibling(r.sibling);
-                }
-                if r.value_mask & u16::from(ConfigWindow::X) != 0 {
-                    aux = aux.x(i32::try_from(r.x).unwrap());
-                }
-                if r.value_mask & u16::from(ConfigWindow::Y) != 0 {
-                    aux = aux.y(i32::try_from(r.y).unwrap());
-                }
-                if r.value_mask & u16::from(ConfigWindow::WIDTH) != 0 {
-                    aux = aux.width(u32::try_from(r.width).unwrap());
-                }
-                if r.value_mask & u16::from(ConfigWindow::HEIGHT) != 0 {
-                    aux = aux.height(u32::try_from(r.height).unwrap());
-                }
-                if r.value_mask & u16::from(ConfigWindow::BORDER_WIDTH) != 0 {
-                    aux = aux.border_width(u32::try_from(r.border_width).unwrap());
-                }
-                x11.conn.configure_window(r.window, &aux)?;
+                handler.xwayland_configure_request(x11.conn.clone(), r);
             }
             Event::MapRequest(r) => {
                 // Just grant the wish
@@ -79,9 +63,9 @@ impl super::Inner {
                             Ok(geo) => (geo.x as i32, geo.y as i32).into(),
                             Err(err) => {
                                 error!(
-                                    "Failed to get geometry for {:x}, perhaps the window was already destroyed?",
-                                    msg.window;
-                                    "err" => format!("{:?}", err),
+                                    "Failed to get geometry for {:x}, perhaps the window was already destroyed? {}",
+                                    msg.window,
+                                    format!("{:?}", err),
                                 );
                                 (0, 0).into()
                             }
@@ -100,7 +84,7 @@ impl super::Inner {
                         }
                         Some(surface) => {
                             self.new_window(x11, msg.window, surface.clone(), location);
-                            self.try_map_unmaped(&surface, ddata);
+                            self.try_map_unmaped(&surface, handler);
                         }
                     }
                 }
@@ -129,7 +113,7 @@ impl super::Inner {
 
     fn new_window(
         &mut self,
-        x11: &X11State,
+        _x11: &X11State,
         window: Window,
         surface: WlSurface,
         location: Point<i32, Logical>,
@@ -142,10 +126,13 @@ impl super::Inner {
             return;
         }
 
-        let x11surface = X11Surface::new(x11.conn.clone(), window, surface);
+        // let x11surface = X11Surface::new(x11.conn.clone(), window, surface);
+        let x11surface = X11Surface { surface };
 
-        self.not_mapped_list
-            .insert_window(WindowSurface::X11(x11surface), location);
+        self.not_mapped_list.insert_window(
+            Kind::X11(x11surface),
+            Some(X11WindowUserData { window, location }),
+        );
     }
 }
 

@@ -21,12 +21,18 @@ impl ShellHandler for Anodium {
             // Toplevel
             //
             ShellEvent::WindowCreated { window } => {
+                let pos = window
+                    .user_data()
+                    .get::<anodium_framework::shell::X11WindowUserData>()
+                    .map(|i| i.location)
+                    .unwrap_or_default();
+
                 self.region_manager
                     .region_under(self.input_state.borrow().pointer_location)
                     .unwrap_or_else(|| self.region_manager.first().unwrap())
                     .active_workspace()
                     .space_mut()
-                    .map_window(&window, (0, 0), false);
+                    .map_window(&window, pos, false);
             }
 
             ShellEvent::WindowMove {

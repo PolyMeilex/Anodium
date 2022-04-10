@@ -1,5 +1,5 @@
 use crate::State;
-use anodium_framework::shell::{ShellEvent, ShellHandler};
+use anodium_framework::shell::{ShellEvent, ShellHandler, X11WindowUserData};
 
 use smithay::{
     desktop,
@@ -87,7 +87,30 @@ impl ShellHandler for State {
 
                 self.space.map_window(&window, new_location, false);
             }
+
             _ => {}
+        }
+    }
+
+    fn xwayland_configure_request(
+        &mut self,
+        _conn: std::sync::Arc<smithay::reexports::x11rb::rust_connection::RustConnection>,
+        event: smithay::reexports::x11rb::protocol::xproto::ConfigureRequestEvent,
+    ) {
+        let window = self
+            .space
+            .windows()
+            .find(|win| {
+                win.user_data()
+                    .get::<X11WindowUserData>()
+                    .map(|win| win.window == event.window)
+                    .unwrap_or(false)
+            })
+            .cloned();
+
+        if let Some(window) = window {
+            self.space
+                .map_window(&window, (event.x as i32, event.y as i32), false);
         }
     }
 }
@@ -259,7 +282,7 @@ impl PointerGrab for ResizeSurfaceGrab {
                 }
             }
             #[cfg(feature = "xwayland")]
-            WindowSurface::X11(_) => {
+            Kind::X11(_) => {
                 // TODO: What to do here? Send the update via X11?
             }
         }
