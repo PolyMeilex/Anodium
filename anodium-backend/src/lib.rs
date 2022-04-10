@@ -10,7 +10,6 @@ pub mod x11;
 
 pub mod utils;
 
-use calloop::channel::Channel;
 use smithay::{
     backend::input::{InputBackend, InputEvent},
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
@@ -21,6 +20,47 @@ use smithay::{
 };
 
 use std::{cell::RefCell, rc::Rc};
+
+pub enum BackendState {
+    Udev(udev::UdevState),
+    None,
+}
+
+impl Default for BackendState {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl BackendState {
+    fn init_udev(&mut self, inner: udev::UdevState) {
+        *self = Self::Udev(inner);
+    }
+
+    fn udev(&mut self) -> &mut udev::UdevState {
+        if let Self::Udev(i) = self {
+            i
+        } else {
+            unreachable!("Only one backend at the time");
+        }
+    }
+}
+
+impl BackendState {
+    pub fn change_vt(&mut self, vt: i32) {
+        match self {
+            BackendState::Udev(inner) => inner.change_vt(vt),
+            BackendState::None => {}
+        }
+    }
+
+    pub fn update_mode(&mut self, output: SmithayOutput, mode: wayland::output::Mode) {
+        match self {
+            BackendState::Udev(inner) => inner.update_mode(output, mode),
+            BackendState::None => {}
+        }
+    }
+}
 
 pub trait OutputHandler {
     /// Output was created
@@ -51,16 +91,12 @@ pub trait InputHandler {
 }
 
 pub trait BackendHandler: OutputHandler + InputHandler {
+    fn backend_state(&mut self) -> &mut BackendState;
+
     fn send_frames(&mut self);
 
     fn start_compositor(&mut self);
     fn close_compositor(&mut self);
-}
-
-#[derive(Debug)]
-pub enum BackendRequest {
-    ChangeVT(i32),
-    UpdateMode(SmithayOutput, wayland::output::Mode),
 }
 
 #[derive(Debug, Clone)]
@@ -75,7 +111,6 @@ pub fn init<D>(
     event_loop: &mut EventLoop<'static, D>,
     display: Rc<RefCell<Display>>,
     handler: &mut D,
-    rx: Channel<BackendRequest>,
     backend: PreferedBackend,
 ) where
     D: BackendHandler + 'static,
@@ -84,20 +119,21 @@ pub fn init<D>(
         PreferedBackend::Auto => {
             if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
                 info!("Starting with winit backend");
-                winit::run_winit(event_loop, display, handler, rx)
+                winit::run_winit(event_loop, display, handler)
                     .expect("Failed to initialize winit backend.");
             } else {
                 info!("Starting with udev backend");
-                udev::run_udev(event_loop, display, handler, rx)
+                udev::run_udev(event_loop, display, handler)
                     .expect("Failed to initialize tty backend.");
             }
         }
-        PreferedBackend::X11 => x11::run_x11(event_loop, display, handler, rx)
-            .expect("Failed to initialize x11 backend."),
-        PreferedBackend::Winit => winit::run_winit(event_loop, display, handler, rx)
+        PreferedBackend::X11 => {
+            x11::run_x11(event_loop, display, handler).expect("Failed to initialize x11 backend.")
+        }
+        PreferedBackend::Winit => winit::run_winit(event_loop, display, handler)
             .expect("Failed to initialize winit backend."),
         PreferedBackend::Udev => {
-            udev::run_udev(event_loop, display, handler, rx)
+            udev::run_udev(event_loop, display, handler)
                 .expect("Failed to initialize tty backend.");
         }
     }

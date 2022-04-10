@@ -1,11 +1,12 @@
 #![allow(irrefutable_let_patterns)]
 
+use anodium_backend::BackendState;
 use anodium_framework::{pointer_icon::PointerIcon, shell::ShellManager};
 
 use smithay::{
     desktop,
     reexports::{
-        calloop::{self, channel, generic::Generic, EventLoop, Interest, LoopSignal, PostAction},
+        calloop::{self, generic::Generic, EventLoop, Interest, LoopSignal, PostAction},
         wayland_server::Display,
     },
     wayland::{
@@ -33,6 +34,8 @@ struct State {
     loop_signal: LoopSignal,
 
     pointer_icon: PointerIcon,
+
+    backend: BackendState,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -76,6 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop_signal: event_loop.get_signal(),
 
         pointer_icon,
+        backend: BackendState::default(),
     };
 
     event_loop
@@ -100,13 +104,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .expect("Failed to init the wayland event source.");
 
-    let (_backend_tx, backend_rx) = channel::channel();
-
     anodium_backend::init(
         &mut event_loop,
         display,
         &mut state,
-        backend_rx,
         anodium_backend::PreferedBackend::Auto,
     );
 

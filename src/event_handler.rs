@@ -1,6 +1,5 @@
 use crate::config::eventloop::ConfigEvent;
 use crate::Anodium;
-use anodium_backend::BackendRequest;
 
 impl Anodium {
     pub fn process_config_event(&mut self, event: ConfigEvent) {
@@ -22,9 +21,7 @@ impl Anodium {
             }
             ConfigEvent::OutputUpdateMode(output, mode) => {
                 let output: &smithay::wayland::output::Output = &output;
-                self.backend_tx
-                    .send(BackendRequest::UpdateMode(output.clone(), mode))
-                    .unwrap();
+                self.backend.update_mode(output.clone(), mode);
             }
             ConfigEvent::Shell(fnptr) => {
                 self.config.execute_fnptr(fnptr, ());

@@ -6,7 +6,7 @@ use smithay::{
         winit::{self, WinitEvent},
     },
     reexports::{
-        calloop::{channel, timer::Timer, EventLoop},
+        calloop::{timer::Timer, EventLoop},
         wayland_server::{protocol::wl_output, Display},
     },
     wayland::{
@@ -15,7 +15,7 @@ use smithay::{
     },
 };
 
-use super::{BackendHandler, BackendRequest};
+use super::BackendHandler;
 
 pub const OUTPUT_NAME: &str = "winit";
 
@@ -23,23 +23,10 @@ pub fn run_winit<D>(
     event_loop: &mut EventLoop<'static, D>,
     display: Rc<RefCell<Display>>,
     handler: &mut D,
-
-    rx: channel::Channel<BackendRequest>,
 ) -> Result<(), ()>
 where
     D: BackendHandler + 'static,
 {
-    event_loop
-        .handle()
-        .insert_source(rx, move |event, _, _| match event {
-            channel::Event::Msg(event) => match event {
-                BackendRequest::ChangeVT(_) => {}
-                BackendRequest::UpdateMode(_, _) => {}
-            },
-            channel::Event::Closed => {}
-        })
-        .unwrap();
-
     let (backend, mut input) = winit::init(None).map_err(|err| {
         error!("Failed to initialize Winit backend: {}", err);
     })?;

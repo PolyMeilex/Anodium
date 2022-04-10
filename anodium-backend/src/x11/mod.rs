@@ -13,7 +13,7 @@ use smithay::{
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },
     reexports::{
-        calloop::{channel, EventLoop},
+        calloop::EventLoop,
         gbm,
         wayland_server::{protocol::wl_output, Display},
     },
@@ -24,7 +24,7 @@ use smithay::{
     wayland::dmabuf::init_dmabuf_global,
 };
 
-use super::{BackendHandler, BackendRequest};
+use super::BackendHandler;
 
 pub const OUTPUT_NAME: &str = "x11";
 
@@ -108,23 +108,10 @@ pub fn run_x11<D>(
     event_loop: &mut EventLoop<'static, D>,
     display: Rc<RefCell<Display>>,
     handler: &mut D,
-
-    rx: channel::Channel<BackendRequest>,
 ) -> Result<(), ()>
 where
     D: BackendHandler + 'static,
 {
-    event_loop
-        .handle()
-        .insert_source(rx, move |event, _, _| match event {
-            channel::Event::Msg(event) => match event {
-                BackendRequest::ChangeVT(_) => {}
-                BackendRequest::UpdateMode(_, _) => {}
-            },
-            channel::Event::Closed => {}
-        })
-        .unwrap();
-
     let backend = X11Backend::new(None).expect("Failed to initilize X11 backend");
     let handle = backend.handle();
 

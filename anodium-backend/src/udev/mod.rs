@@ -26,7 +26,6 @@ use smithay::{
     },
     reexports::{
         calloop::{
-            channel,
             timer::{Timer, TimerHandle},
             EventLoop, LoopHandle,
         },
@@ -44,29 +43,57 @@ use smithay::{
         Rectangle, Transform,
     },
     wayland::{
+        self,
         dmabuf::init_dmabuf_global,
         output::{Mode, PhysicalProperties},
     },
 };
 
 use super::utils::{cursor, import_bitmap};
-use super::{BackendHandler, BackendRequest};
+use super::BackendHandler;
 use smithay::wayland::output::Output as SmithayOutput;
 
 mod device_map;
 use device_map::Device;
 
-struct Inner {
+pub struct UdevState {
     display: Rc<RefCell<Display>>,
-    primary_gpu: Option<PathBuf>,
     session: AutoSession,
+    primary_gpu: Option<PathBuf>,
     pointer_image: cursor::Cursor,
-    udev_devices: HashMap<dev_t, UdevDeviceData>,
 
+    udev_devices: Rc<RefCell<HashMap<dev_t, UdevDeviceData>>>,
+    // renderers: HashMap<usize, Gles2Renderer>,
     outputs: Vec<SmithayOutput>,
 }
 
-type InnerRc = Rc<RefCell<Inner>>;
+impl UdevState {
+    pub fn change_vt(&mut self, vt: i32) {
+        self.session.change_vt(vt).ok();
+    }
+
+    pub fn update_mode(&mut self, output: SmithayOutput, mode: wayland::output::Mode) {
+        let id = output.user_data().get::<UdevOutputId>().unwrap();
+
+        let udev_devices = self.udev_devices.borrow();
+        let device = udev_devices.get(&id.device_id).unwrap();
+
+        let data = device.surfaces.get(&id.crtc).unwrap();
+
+        let mut data = data.borrow_mut();
+        let pos = data.wl_modes.iter().position(|m| m == &mode);
+
+        let mode = pos.and_then(|id| data._drm_modes.get(id)).copied();
+
+        if let Some(mode) = mode {
+            if let Err(err) = data.surface.use_mode(mode) {
+                error!("Mode: {:?} failed: {:?}", mode, err);
+            }
+        } else {
+            error!("Mode: {:?} not found in drm", mode);
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct SessionFd(RawFd);
@@ -88,12 +115,11 @@ pub fn run_udev<D>(
     event_loop: &mut EventLoop<'static, D>,
     display: Rc<RefCell<Display>>,
     handler: &mut D,
-    rx: channel::Channel<BackendRequest>,
 ) -> Result<(), ()>
 where
     D: BackendHandler + 'static,
 {
-    let (mut session, notifier) = AutoSession::new(None).expect("Could not init session!");
+    let (session, notifier) = AutoSession::new(None).expect("Could not init session!");
 
     let session_signal = notifier.signaler();
 
@@ -104,14 +130,14 @@ where
     let primary_gpu = primary_gpu(&session.seat()).unwrap_or_default();
     info!("Primary GPU: {:?}", primary_gpu);
 
-    let inner = Rc::new(RefCell::new(Inner {
-        display: display.clone(),
-        primary_gpu,
+    handler.backend_state().init_udev(UdevState {
+        outputs: Default::default(),
         session: session.clone(),
+        display: display.clone(),
         pointer_image: cursor::Cursor::load(),
         udev_devices: Default::default(),
-        outputs: Default::default(),
-    }));
+        primary_gpu,
+    });
 
     /*
      * Initialize the udev backend
@@ -153,7 +179,6 @@ where
         device_added(
             handler,
             event_loop.handle(),
-            inner.clone(),
             dev,
             path.into(),
             &session_signal,
@@ -164,86 +189,42 @@ where
     // TODO: We need to update this list, when the set of gpus changes
     // TODO2: This does not necessarily depend on egl, but mesa makes no use of it without wl_drm right now
     {
+        let udev_devices = handler.backend_state().udev().udev_devices.borrow();
         let mut formats = Vec::new();
-        for backend_data in inner.borrow().udev_devices.values() {
+        for backend_data in udev_devices.values() {
             formats.extend(backend_data.renderer.borrow().dmabuf_formats().cloned());
         }
 
         init_dmabuf_global(
             &mut *display.borrow_mut(),
             formats,
-            {
-                let inner = inner.clone();
+            move |buffer, mut ddata| {
+                let handler = ddata.get::<D>().unwrap();
+                let udev_devices = handler.backend_state().udev().udev_devices.borrow();
 
-                move |buffer, _| {
-                    let inner = inner.borrow();
-
-                    for backend_data in inner.udev_devices.values() {
-                        if backend_data
-                            .renderer
-                            .borrow_mut()
-                            .import_dmabuf(buffer, None)
-                            .is_ok()
-                        {
-                            return true;
-                        }
+                for backend_data in udev_devices.values() {
+                    if backend_data
+                        .renderer
+                        .borrow_mut()
+                        .import_dmabuf(buffer, None)
+                        .is_ok()
+                    {
+                        return true;
                     }
-                    false
                 }
+                false
             },
             None,
         );
     }
 
-    event_loop
-        .handle()
-        .insert_source(rx, {
-            let inner = inner.clone();
-            move |event, _, _| match event {
-                channel::Event::Msg(event) => match event {
-                    BackendRequest::ChangeVT(id) => {
-                        session.change_vt(id).ok();
-                    }
-                    BackendRequest::UpdateMode(output, mode) => {
-                        let mut inner = inner.borrow_mut();
-
-                        let id = output.user_data().get::<UdevOutputId>().unwrap();
-
-                        let device = inner.udev_devices.get_mut(&id.device_id).unwrap();
-
-                        let data = device.surfaces.get_mut(&id.crtc).unwrap();
-
-                        let mut data = data.borrow_mut();
-                        let pos = data.wl_modes.iter().position(|m| m == &mode);
-
-                        let mode = pos.and_then(|id| data._drm_modes.get(id)).copied();
-
-                        if let Some(mode) = mode {
-                            if let Err(err) = data.surface.use_mode(mode) {
-                                error!("Mode: {:?} failed: {:?}", mode, err);
-                            }
-                        } else {
-                            error!("Mode: {:?} not found in drm", mode);
-                        }
-                    }
-                },
-                channel::Event::Closed => {}
-            }
-        })
-        .unwrap();
-
     let handle = event_loop.handle();
     let _udev_event_source = event_loop
         .handle()
         .insert_source(udev_backend, move |event, _, handler| match event {
-            UdevEvent::Added { device_id, path } => device_added(
-                handler,
-                handle.clone(),
-                inner.clone(),
-                device_id,
-                path,
-                &session_signal,
-            ),
+            UdevEvent::Added { device_id, path } => {
+                device_added(handler, handle.clone(), device_id, path, &session_signal)
+            }
             UdevEvent::Changed { device_id } => {
                 error!("Udev device ({:?}) changed: unimplemented", device_id);
             }
@@ -317,7 +298,6 @@ pub fn format_connector_name(interface: connector::Interface, interface_id: u32)
 }
 
 fn scan_connectors<D>(
-    inner: InnerRc,
     handle: LoopHandle<'static, D>,
     device: &mut Device<D>,
     signaler: &Signaler<SessionSignal>,
@@ -417,10 +397,9 @@ where
                 crtc,
             })));
 
-            let inner = inner.clone();
             handle
                 .insert_source(timer, move |(dev_id, crtc), _, handler| {
-                    udev_render(handler, inner.clone(), dev_id, Some(crtc))
+                    udev_render(handler, dev_id, Some(crtc))
                 })
                 .unwrap();
         }
@@ -432,7 +411,6 @@ where
 fn device_added<D>(
     handler: &mut D,
     handle: LoopHandle<'static, D>,
-    inner: InnerRc,
     device_id: dev_t,
     path: PathBuf,
     session_signal: &Signaler<SessionSignal>,
@@ -441,81 +419,76 @@ fn device_added<D>(
 {
     info!("Device Added {:?} : {:?}", device_id, path);
 
-    let ret = Device::<D>::open(&mut inner.borrow_mut().session, session_signal, &path, {
-        let inner = inner.clone();
+    let ret = Device::<D>::open(
+        &mut handler.backend_state().udev().session,
+        session_signal,
+        &path,
         move |event, _, handler| match event {
             DrmEvent::VBlank(crtc) => {
-                udev_render(handler, inner.clone(), device_id, Some(crtc));
+                udev_render(handler, device_id, Some(crtc));
             }
             DrmEvent::Error(error) => {
                 error!("{:?}", error);
             }
-        }
-    });
+        },
+    );
 
     match ret {
         Ok(mut device) => {
-            if path.canonicalize().ok() == inner.borrow().primary_gpu {
+            let display = handler.backend_state().udev().display.clone();
+
+            if path.canonicalize().ok() == handler.backend_state().udev().primary_gpu {
                 info!("Initializing EGL Hardware Acceleration via {:?}", path);
 
-                device.bind_wl_display(&*inner.borrow().display.borrow());
+                device.bind_wl_display(&display.borrow());
             }
 
-            let outputs =
-                scan_connectors(inner.clone(), handle.clone(), &mut device, session_signal);
+            let outputs = scan_connectors(handle.clone(), &mut device, session_signal);
 
-            {
-                let mut inner = inner.borrow_mut();
+            for (_, output_surface) in outputs.iter() {
+                let (output, modes) = {
+                    let output_surface = output_surface.borrow();
 
-                for (_, output_surface) in outputs.iter() {
-                    let (output, modes) = {
-                        let output_surface = output_surface.borrow();
+                    let (output, _output_global) = SmithayOutput::new(
+                        &mut display.borrow_mut(),
+                        output_surface.output_name.clone(),
+                        // TODO: Add PhysicalProperties::Clone to smithay
+                        PhysicalProperties {
+                            size: output_surface.physical_properties.size,
+                            subpixel: output_surface.physical_properties.subpixel,
+                            make: output_surface.physical_properties.make.clone(),
+                            model: output_surface.physical_properties.model.clone(),
+                        },
+                        None,
+                    );
 
-                        let (output, _output_global) = SmithayOutput::new(
-                            &mut inner.display.borrow_mut(),
-                            output_surface.output_name.clone(),
-                            // TODO: Add PhysicalProperties::Clone to smithay
-                            PhysicalProperties {
-                                size: output_surface.physical_properties.size,
-                                subpixel: output_surface.physical_properties.subpixel,
-                                make: output_surface.physical_properties.make.clone(),
-                                model: output_surface.physical_properties.model.clone(),
-                            },
-                            None,
-                        );
+                    output.set_preferred(output_surface.wl_mode);
+                    output.change_current_state(
+                        Some(output_surface.wl_mode),
+                        Some(wl_output::Transform::Normal),
+                        None,
+                        None,
+                    );
 
-                        output.set_preferred(output_surface.wl_mode);
-                        output.change_current_state(
-                            Some(output_surface.wl_mode),
-                            Some(wl_output::Transform::Normal),
-                            None,
-                            None,
-                        );
+                    output.user_data().insert_if_missing(|| UdevOutputId {
+                        crtc: output_surface.crtc,
+                        device_id,
+                    });
 
-                        output.user_data().insert_if_missing(|| UdevOutputId {
-                            crtc: output_surface.crtc,
-                            device_id,
-                        });
+                    (output, output_surface.wl_modes.clone())
+                };
 
-                        (output, output_surface.wl_modes.clone())
-                    };
+                handler.backend_state().udev().outputs.push(output.clone());
 
-                    inner.outputs.push(output.clone());
-
-                    handler.output_created(output, modes);
-                }
+                handler.output_created(output, modes);
             }
 
             let restart_token = session_signal.register({
                 let handle = handle.clone();
-                let inner = inner.clone();
 
                 move |signal| match signal {
                     SessionSignal::ActivateSession | SessionSignal::ActivateDevice { .. } => {
-                        let inner = inner.clone();
-                        handle.insert_idle(move |handler| {
-                            udev_render(handler, inner.clone(), device_id, None)
-                        });
+                        handle.insert_idle(move |handler| udev_render(handler, device_id, None));
                     }
                     _ => {}
                 }
@@ -530,7 +503,8 @@ fn device_added<D>(
                 schedule_initial_render(output.clone(), device.renderer.clone(), &handle);
             }
 
-            inner.borrow_mut().udev_devices.insert(
+            let udev_devices = &handler.backend_state().udev().udev_devices;
+            udev_devices.borrow_mut().insert(
                 device_id,
                 UdevDeviceData {
                     _restart_token: restart_token,
@@ -550,13 +524,14 @@ fn device_added<D>(
     }
 }
 
-fn udev_render<D>(handler: &mut D, inner: InnerRc, dev_id: u64, crtc: Option<crtc::Handle>)
+fn udev_render<D>(handler: &mut D, dev_id: u64, crtc: Option<crtc::Handle>)
 where
     D: BackendHandler + 'static,
 {
-    let inner = &mut *inner.borrow_mut();
+    let udev_devices = handler.backend_state().udev().udev_devices.clone();
+    let mut udev_devices = udev_devices.borrow_mut();
 
-    let device_backend = match inner.udev_devices.get_mut(&dev_id) {
+    let device_backend = match udev_devices.get_mut(&dev_id) {
         Some(backend) => backend,
         None => {
             error!("Trying to render on non-existent backend {}", dev_id);
@@ -581,7 +556,7 @@ where
 
     for (&crtc, surface) in to_render_iter {
         // TODO get scale from the rendersurface when supporting HiDPI
-        let frame = inner.pointer_image.get_image(1);
+        let frame = handler.backend_state().udev().pointer_image.get_image(1);
         let renderer = &mut *device_backend.renderer.borrow_mut();
         let pointer_images = &mut device_backend.pointer_images;
         let pointer_image = pointer_images
@@ -599,7 +574,6 @@ where
 
         let result = render_output_surface(
             handler,
-            &inner.outputs,
             &mut *surface.borrow_mut(),
             renderer,
             device_backend.device_id,
@@ -637,11 +611,14 @@ where
     }
 }
 
-fn schedule_initial_render<Data: 'static>(
+fn schedule_initial_render<D>(
     surface: Rc<RefCell<OutputSurfaceData>>,
     renderer: Rc<RefCell<Gles2Renderer>>,
-    evt_handle: &LoopHandle<'static, Data>,
-) {
+    evt_handle: &LoopHandle<'static, D>,
+) where
+    D: 'static,
+    D: BackendHandler,
+{
     let result = {
         let mut surface = surface.borrow_mut();
         let mut renderer = renderer.borrow_mut();
@@ -665,7 +642,6 @@ fn schedule_initial_render<Data: 'static>(
 #[allow(clippy::too_many_arguments)]
 fn render_output_surface<D>(
     handler: &mut D,
-    outputs: &[SmithayOutput],
     surface: &mut OutputSurfaceData,
     renderer: &mut Gles2Renderer,
     device_id: dev_t,
@@ -677,9 +653,17 @@ where
 {
     surface.surface.frame_submitted()?;
 
-    let output = outputs
-        .iter()
-        .find(|o| o.user_data().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc }));
+    let output = {
+        handler
+            .backend_state()
+            .udev()
+            .outputs
+            .iter()
+            .find(|o| {
+                o.user_data().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc })
+            })
+            .cloned()
+    };
 
     let output = if let Some(output) = output {
         output
@@ -693,7 +677,7 @@ where
 
     // and draw to our buffer
     handler
-        .output_render(renderer, output, age as usize, Some(pointer_image))
+        .output_render(renderer, &output, age as usize, Some(pointer_image))
         .ok();
 
     surface

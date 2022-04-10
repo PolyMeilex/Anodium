@@ -1,4 +1,4 @@
-use anodium_backend::{BackendRequest, InputHandler};
+use anodium_backend::InputHandler;
 
 use crate::{output_manager::Output, region_manager::Region, Anodium};
 
@@ -427,9 +427,7 @@ impl Anodium {
             }
             KeyAction::VtSwitch(vt) => {
                 info!("Trying to switch to vt {}", vt);
-                // self.session.change_vt(vt).ok();
-                // TODO(poly)
-                self.backend_tx.send(BackendRequest::ChangeVT(vt)).ok();
+                self.backend.change_vt(vt);
             }
             // KeyAction::MoveToWorkspace(num) => {
             // let mut window_map = self.window_map.borrow_mut();

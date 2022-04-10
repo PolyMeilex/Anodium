@@ -2,10 +2,7 @@ use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Instant};
 
 use anodium_framework::pointer_icon::PointerIcon;
 use anodium_protocol::server::AnodiumProtocol;
-use calloop::{
-    channel::{self, Channel},
-    LoopSignal,
-};
+use calloop::LoopSignal;
 use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     desktop::{self, space::SurfaceTree},
@@ -25,7 +22,7 @@ use smithay::{
 #[cfg(feature = "xwayland")]
 use smithay::xwayland::{XWayland, XWaylandEvent};
 
-use anodium_backend::{utils::cursor::PointerElement, BackendRequest};
+use anodium_backend::{utils::cursor::PointerElement, BackendState};
 use smithay_egui::EguiFrame;
 
 use crate::{
@@ -85,7 +82,7 @@ pub struct Anodium {
     #[cfg(feature = "xwayland")]
     pub xwayland: XWayland<Self>,
 
-    pub backend_tx: Sender<BackendRequest>,
+    pub backend: BackendState,
     pub config_tx: Sender<ConfigEvent>,
 }
 
@@ -194,10 +191,8 @@ impl Anodium {
         display: Rc<RefCell<Display>>,
         seat_name: String,
         options: AnodiumOptions,
-    ) -> (Self, Channel<BackendRequest>) {
+    ) -> Self {
         let log = slog_scope::logger();
-
-        let (backend_tx, backend_rx) = channel::channel();
 
         // init the wayland connection
         Self::init_wayland_connection(&handle, &display);
@@ -242,39 +237,37 @@ impl Anodium {
         )
         .unwrap();
 
-        (
-            Self {
-                loop_signal,
+        Self {
+            loop_signal,
 
-                shell_manager,
-                display,
+            shell_manager,
+            display,
 
-                pointer_icon,
+            pointer_icon,
 
-                input_state,
+            input_state,
 
-                seat,
+            seat,
 
-                options,
+            options,
 
-                start_time: Instant::now(),
-                last_update: Instant::now(),
+            start_time: Instant::now(),
+            last_update: Instant::now(),
 
-                config,
+            config,
 
-                anodium_protocol,
-                output_manager: output_map,
-                region_manager: region_map,
-                //workspace: Workspace::new(),
-                focused_window: Default::default(),
+            anodium_protocol,
+            output_manager: output_map,
+            region_manager: region_map,
+            //workspace: Workspace::new(),
+            focused_window: Default::default(),
 
-                #[cfg(feature = "xwayland")]
-                xwayland,
-                backend_tx,
-                config_tx,
-            },
-            backend_rx,
-        )
+            #[cfg(feature = "xwayland")]
+            xwayland,
+
+            backend: Default::default(),
+            config_tx,
+        }
     }
 }
 

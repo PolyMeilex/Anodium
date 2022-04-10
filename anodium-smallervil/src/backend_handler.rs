@@ -1,7 +1,11 @@
 use crate::State;
-use anodium_backend::BackendHandler;
+use anodium_backend::{BackendHandler, BackendState};
 
 impl BackendHandler for State {
+    fn backend_state(&mut self) -> &mut BackendState {
+        &mut self.backend
+    }
+
     fn send_frames(&mut self) {
         self.space
             .send_frames(self.start_time.elapsed().as_millis() as u32);

@@ -5,7 +5,7 @@ use smithay::{
     wayland::output::Output as SmithayOutput,
 };
 
-use anodium_backend::{BackendHandler, OutputHandler};
+use anodium_backend::{BackendHandler, BackendState, OutputHandler};
 
 use crate::{output_manager::Output, state::Anodium};
 
@@ -44,6 +44,10 @@ impl OutputHandler for Anodium {
 }
 
 impl BackendHandler for Anodium {
+    fn backend_state(&mut self) -> &mut BackendState {
+        &mut self.backend
+    }
+
     fn send_frames(&mut self) {
         let time = self.start_time.elapsed().as_millis() as u32;
 

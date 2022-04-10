@@ -63,7 +63,7 @@ fn main() {
     let mut event_loop = EventLoop::try_new().unwrap();
     let display = Rc::new(RefCell::new(Display::new()));
 
-    let (mut anodium, rx) = Anodium::new(
+    let mut anodium = Anodium::new(
         event_loop.handle(),
         event_loop.get_signal(),
         display.clone(),
@@ -75,7 +75,6 @@ fn main() {
         &mut event_loop,
         display,
         &mut anodium,
-        rx,
         prefered_backend.into(),
     );
 
