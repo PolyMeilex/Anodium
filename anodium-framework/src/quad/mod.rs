@@ -12,7 +12,8 @@ use smithay::{
     utils::{Logical, Physical, Point, Rectangle, Size, Transform},
 };
 
-use crate::utils::glow::{self, Program, Shader};
+mod glow;
+use glow::{Program, Shader};
 
 pub struct QuadPipeline {
     program: glow::Program,

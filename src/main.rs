@@ -11,7 +11,6 @@ use anodium_framework as framework;
 
 mod grabs;
 
-mod render;
 mod utils;
 
 mod config;
