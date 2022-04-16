@@ -1,5 +1,5 @@
 use crate::State;
-use anodium_backend::InputHandler;
+use anodium_backend::{InputHandler, OutputId};
 
 use smithay::{
     backend::input::{
@@ -19,8 +19,14 @@ impl InputHandler for State {
     fn process_input_event<I: smithay::backend::input::InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        absolute_output: Option<&smithay::wayland::output::Output>,
+        output_id: Option<&OutputId>,
     ) {
+        let absolute_output = self
+            .space
+            .outputs()
+            .find(|o| o.user_data().get::<OutputId>() == output_id)
+            .cloned();
+
         match event {
             InputEvent::Keyboard { event } => {
                 let keyboard = self.seat.get_keyboard().unwrap();
@@ -71,8 +77,8 @@ impl InputHandler for State {
                 let pointer = self.seat.get_pointer().unwrap();
 
                 let output =
-                    absolute_output.unwrap_or_else(|| self.space.outputs().next().unwrap());
-                let output_geo = self.space.output_geometry(output).unwrap();
+                    absolute_output.unwrap_or_else(|| self.space.outputs().next().unwrap().clone());
+                let output_geo = self.space.output_geometry(&output).unwrap();
                 let output_loc = output_geo.loc.to_f64();
 
                 let position = output_loc + event.position_transformed(output_geo.size);

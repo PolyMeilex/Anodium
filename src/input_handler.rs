@@ -1,4 +1,4 @@
-use anodium_backend::InputHandler;
+use anodium_backend::{InputHandler, OutputId};
 
 use crate::{output_manager::Output, region_manager::Region, Anodium};
 
@@ -11,7 +11,6 @@ use smithay::{
     reexports::wayland_server::protocol::wl_pointer,
     utils::{Logical, Point},
     wayland::{
-        output::Output as SmithayOutput,
         seat::{keysyms as xkb, FilterResult, Keysym, ModifiersState},
         SERIAL_COUNTER as SCOUNTER,
     },
@@ -21,9 +20,15 @@ impl InputHandler for Anodium {
     fn process_input_event<I: InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        absolute_output: Option<&SmithayOutput>,
+        output_id: Option<&OutputId>,
     ) {
-        let absolute_output = absolute_output.map(|o| Output::wrap(o.clone()));
+        let absolute_output = {
+            let outputs = self.output_manager.outputs();
+            outputs
+                .iter()
+                .find(|o| o.user_data().get::<OutputId>() == output_id)
+                .cloned()
+        };
 
         let captured = match &event {
             InputEvent::Keyboard { event, .. } => {

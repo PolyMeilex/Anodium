@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
-    collections::hash_map::HashMap,
+    collections::hash_map::{DefaultHasher, HashMap},
+    hash::{Hash, Hasher},
     io::Error as IoError,
     os::unix::io::{AsRawFd, RawFd},
     path::PathBuf,
@@ -49,9 +50,10 @@ use smithay::{
     },
 };
 
+use crate::{NewOutputDescriptor, OutputId};
+
 use super::utils::{cursor, import_bitmap};
 use super::BackendHandler;
-use smithay::wayland::output::Output as SmithayOutput;
 
 mod device_map;
 use device_map::Device;
@@ -64,7 +66,7 @@ pub struct UdevState {
 
     udev_devices: Rc<RefCell<HashMap<dev_t, UdevDeviceData>>>,
     // renderers: HashMap<usize, Gles2Renderer>,
-    outputs: Vec<SmithayOutput>,
+    outputs: HashMap<OutputId, UdevOutputId>,
 }
 
 impl UdevState {
@@ -72,8 +74,8 @@ impl UdevState {
         self.session.change_vt(vt).ok();
     }
 
-    pub fn update_mode(&mut self, output: SmithayOutput, mode: wayland::output::Mode) {
-        let id = output.user_data().get::<UdevOutputId>().unwrap();
+    pub fn update_mode(&mut self, output: &OutputId, mode: &wayland::output::Mode) {
+        let id = self.outputs.get(output).unwrap();
 
         let udev_devices = self.udev_devices.borrow();
         let device = udev_devices.get(&id.device_id).unwrap();
@@ -81,7 +83,7 @@ impl UdevState {
         let data = device.surfaces.get(&id.crtc).unwrap();
 
         let mut data = data.borrow_mut();
-        let pos = data.wl_modes.iter().position(|m| m == &mode);
+        let pos = data.wl_modes.iter().position(|m| m == mode);
 
         let mode = pos.and_then(|id| data._drm_modes.get(id)).copied();
 
@@ -103,10 +105,20 @@ impl AsRawFd for SessionFd {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 struct UdevOutputId {
     device_id: dev_t,
     crtc: crtc::Handle,
+}
+
+impl UdevOutputId {
+    fn output_id(&self) -> OutputId {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        OutputId {
+            id: hasher.finish(),
+        }
+    }
 }
 
 type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
@@ -446,41 +458,59 @@ fn device_added<D>(
             let outputs = scan_connectors(handle.clone(), &mut device, session_signal);
 
             for (_, output_surface) in outputs.iter() {
-                let (output, modes) = {
+                let (id, output) = {
                     let output_surface = output_surface.borrow();
 
-                    let (output, _output_global) = SmithayOutput::new(
-                        &mut display.borrow_mut(),
-                        output_surface.output_name.clone(),
-                        // TODO: Add PhysicalProperties::Clone to smithay
-                        PhysicalProperties {
-                            size: output_surface.physical_properties.size,
-                            subpixel: output_surface.physical_properties.subpixel,
-                            make: output_surface.physical_properties.make.clone(),
-                            model: output_surface.physical_properties.model.clone(),
-                        },
-                        None,
-                    );
+                    let name = output_surface.output_name.clone();
+                    let physical_properties = output_surface.physical_properties.clone();
+                    let prefered_mode = output_surface.wl_mode;
+                    let transform = wl_output::Transform::Normal;
 
-                    output.set_preferred(output_surface.wl_mode);
-                    output.change_current_state(
-                        Some(output_surface.wl_mode),
-                        Some(wl_output::Transform::Normal),
-                        None,
-                        None,
-                    );
+                    let possible_modes = output_surface.wl_modes.clone();
 
-                    output.user_data().insert_if_missing(|| UdevOutputId {
+                    // let (output, _output_global) = SmithayOutput::new(
+                    //     &mut display.borrow_mut(),
+                    //     output_name.clone(),
+                    //     physical_properties.clone(),
+                    //     None,
+                    // );
+
+                    // output.set_preferred(output_surface.wl_mode);
+                    // output.change_current_state(
+                    //     Some(output_surface.wl_mode),
+                    //     Some(wl_output::Transform::Normal),
+                    //     None,
+                    //     None,
+                    // );
+
+                    let id = UdevOutputId {
                         crtc: output_surface.crtc,
                         device_id,
-                    });
+                    };
 
-                    (output, output_surface.wl_modes.clone())
+                    // output.user_data().insert_if_missing(|| id);
+
+                    let output = NewOutputDescriptor {
+                        id: id.output_id(),
+                        name,
+                        physical_properties,
+
+                        prefered_mode,
+                        possible_modes,
+
+                        transform,
+                    };
+
+                    (id, output)
                 };
 
-                handler.backend_state().udev().outputs.push(output.clone());
+                handler
+                    .backend_state()
+                    .udev()
+                    .outputs
+                    .insert(id.output_id(), id);
 
-                handler.output_created(output, modes);
+                handler.output_created(output);
             }
 
             let restart_token = session_signal.register({
@@ -653,31 +683,14 @@ where
 {
     surface.surface.frame_submitted()?;
 
-    let output = {
-        handler
-            .backend_state()
-            .udev()
-            .outputs
-            .iter()
-            .find(|o| {
-                o.user_data().get::<UdevOutputId>() == Some(&UdevOutputId { device_id, crtc })
-            })
-            .cloned()
-    };
-
-    let output = if let Some(output) = output {
-        output
-    } else {
-        // Somehow we got called with a non existing output
-        return Ok(());
-    };
+    let output_id = UdevOutputId { device_id, crtc }.output_id();
 
     let (dmabuf, age) = surface.surface.next_buffer()?;
     renderer.bind(dmabuf)?;
 
     // and draw to our buffer
     handler
-        .output_render(renderer, &output, age as usize, Some(pointer_image))
+        .output_render(renderer, &output_id, age as usize, Some(pointer_image))
         .ok();
 
     surface

@@ -1,3 +1,5 @@
+use anodium_backend::OutputId;
+
 use crate::config::eventloop::ConfigEvent;
 use crate::Anodium;
 
@@ -21,7 +23,9 @@ impl Anodium {
             }
             ConfigEvent::OutputUpdateMode(output, mode) => {
                 let output: &smithay::wayland::output::Output = &output;
-                self.backend.update_mode(output.clone(), mode);
+
+                let id = output.user_data().get::<OutputId>().unwrap();
+                self.backend.update_mode(id, &mode);
             }
             ConfigEvent::Shell(fnptr) => {
                 self.config.execute_fnptr(fnptr, ());

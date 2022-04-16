@@ -17,7 +17,13 @@ indexmap = "1.8"
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
 default-features = false
-features = ["use_system_lib", "renderer_gl", "backend_egl", "wayland_frontend"]
+features = [
+    "use_system_lib",
+    "renderer_gl",
+    "backend_egl",
+    "wayland_frontend",
+    "desktop",
+]
 
 [dependencies.calloop]
 version = "0.9"

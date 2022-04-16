@@ -5,16 +5,27 @@ use smithay::{
     wayland::output::Output as SmithayOutput,
 };
 
-use anodium_backend::{BackendHandler, BackendState, OutputHandler};
+use anodium_backend::{BackendHandler, BackendState, NewOutputDescriptor, OutputHandler, OutputId};
 
 use crate::{output_manager::Output, state::Anodium};
 
 impl OutputHandler for Anodium {
-    fn output_created(&mut self, output: SmithayOutput, possible_modes: Vec<output::Mode>) {
+    fn output_created(&mut self, desc: NewOutputDescriptor) {
+        let (output, _) = SmithayOutput::new(
+            &mut self.display.borrow_mut(),
+            desc.name,
+            desc.physical_properties,
+            None,
+        );
+
+        output.change_current_state(Some(desc.prefered_mode), Some(desc.transform), None, None);
+        let id = desc.id;
+        output.user_data().insert_if_missing(|| id);
+
         let output = Output::new(
             output,
             &mut self.anodium_protocol,
-            possible_modes,
+            desc.possible_modes,
             self.config_tx.clone(),
         );
 
@@ -25,20 +36,36 @@ impl OutputHandler for Anodium {
         self.config.output_rearrange();
     }
 
-    fn output_mode_updated(&mut self, output: &SmithayOutput, mode: output::Mode) {
-        output.change_current_state(Some(mode), None, None, None);
+    fn output_mode_updated(&mut self, output_id: &OutputId, mode: output::Mode) {
+        let outputs = self.output_manager.outputs();
 
-        desktop::layer_map_for_output(output).arrange();
+        let output = outputs
+            .iter()
+            .find(|o| o.user_data().get::<OutputId>() == Some(output_id));
+
+        if let Some(output) = output {
+            output.change_current_state(Some(mode), None, None, None);
+
+            desktop::layer_map_for_output(output).arrange();
+        }
     }
 
     fn output_render(
         &mut self,
         renderer: &mut smithay::backend::renderer::gles2::Gles2Renderer,
-        output: &SmithayOutput,
+        output_id: &OutputId,
         age: usize,
         pointer_image: Option<&smithay::backend::renderer::gles2::Gles2Texture>,
     ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError> {
-        let output = Output::wrap(output.clone());
+        let output = {
+            let outputs = self.output_manager.outputs();
+            outputs
+                .iter()
+                .find(|o| o.user_data().get::<OutputId>() == Some(output_id))
+                .cloned()
+                .unwrap()
+        };
+
         self.render(renderer, &output, age, pointer_image)
     }
 }

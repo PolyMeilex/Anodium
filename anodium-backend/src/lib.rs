@@ -13,13 +13,32 @@ pub mod utils;
 use smithay::{
     backend::input::{InputBackend, InputEvent},
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
-    reexports::{calloop::EventLoop, wayland_server::Display},
+    reexports::{
+        calloop::EventLoop,
+        wayland_server::{protocol::wl_output, Display},
+    },
     utils::{Logical, Rectangle},
     wayland,
-    wayland::output::Output as SmithayOutput,
+    wayland::output::{self, PhysicalProperties},
 };
 
 use std::{cell::RefCell, rc::Rc};
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct OutputId {
+    id: u64,
+}
+
+pub struct NewOutputDescriptor {
+    pub id: OutputId,
+    pub name: String,
+    pub physical_properties: PhysicalProperties,
+
+    pub prefered_mode: output::Mode,
+    pub possible_modes: Vec<output::Mode>,
+
+    pub transform: wl_output::Transform,
+}
 
 pub enum BackendState {
     Udev(udev::UdevState),
@@ -54,9 +73,9 @@ impl BackendState {
         }
     }
 
-    pub fn update_mode(&mut self, output: SmithayOutput, mode: wayland::output::Mode) {
+    pub fn update_mode(&mut self, output_id: &OutputId, mode: &wayland::output::Mode) {
         match self {
-            BackendState::Udev(inner) => inner.update_mode(output, mode),
+            BackendState::Udev(inner) => inner.update_mode(output_id, mode),
             BackendState::None => {}
         }
     }
@@ -64,18 +83,16 @@ impl BackendState {
 
 pub trait OutputHandler {
     /// Output was created
-    fn output_created(&mut self, output: SmithayOutput, possible_modes: Vec<wayland::output::Mode>);
+    fn output_created(&mut self, output: NewOutputDescriptor);
 
     /// Output got resized
-    fn output_mode_updated(&mut self, output: &SmithayOutput, mode: wayland::output::Mode) {
-        output.change_current_state(Some(mode), None, None, None);
-    }
+    fn output_mode_updated(&mut self, output_id: &OutputId, mode: wayland::output::Mode);
 
     /// Render the ouput
     fn output_render(
         &mut self,
         renderer: &mut Gles2Renderer,
-        output: &SmithayOutput,
+        output: &OutputId,
         age: usize,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError>;
@@ -86,7 +103,7 @@ pub trait InputHandler {
     fn process_input_event<I: InputBackend>(
         &mut self,
         event: InputEvent<I>,
-        absolute_output: Option<&SmithayOutput>,
+        absolute_output: Option<&OutputId>,
     );
 }
 
@@ -119,20 +136,29 @@ pub fn init<D>(
         PreferedBackend::Auto => {
             if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
                 info!("Starting with winit backend");
+                #[cfg(feature = "winit")]
                 winit::run_winit(event_loop, display, handler)
                     .expect("Failed to initialize winit backend.");
             } else {
                 info!("Starting with udev backend");
+                #[cfg(feature = "udev")]
                 udev::run_udev(event_loop, display, handler)
                     .expect("Failed to initialize tty backend.");
             }
         }
-        PreferedBackend::X11 => {
+        PreferedBackend::X11 =>
+        {
+            #[cfg(feature = "x11")]
             x11::run_x11(event_loop, display, handler).expect("Failed to initialize x11 backend.")
         }
-        PreferedBackend::Winit => winit::run_winit(event_loop, display, handler)
-            .expect("Failed to initialize winit backend."),
+        PreferedBackend::Winit =>
+        {
+            #[cfg(feature = "winit")]
+            winit::run_winit(event_loop, display, handler)
+                .expect("Failed to initialize winit backend.")
+        }
         PreferedBackend::Udev => {
+            #[cfg(feature = "udev")]
             udev::run_udev(event_loop, display, handler)
                 .expect("Failed to initialize tty backend.");
         }

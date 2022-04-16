@@ -5,7 +5,9 @@ use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceRoleAttributes;
 
-use crate::shell::{utils::AsWlSurface, X11WindowUserData};
+use crate::shell::utils::AsWlSurface;
+#[cfg(feature = "xwayland")]
+use crate::shell::X11WindowUserData;
 
 use smithay::desktop::Window;
 

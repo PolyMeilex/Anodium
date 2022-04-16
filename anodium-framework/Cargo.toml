@@ -22,4 +22,4 @@ features = ["composite"]
 
 [features]
 default = []
-xwayland = ["x11rb", "smithay/xwayland"]
+xwayland = ["x11rb", "smithay/xwayland", "smithay/x11rb_event_source"]

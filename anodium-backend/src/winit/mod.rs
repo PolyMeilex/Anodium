@@ -11,9 +11,11 @@ use smithay::{
     },
     wayland::{
         dmabuf::init_dmabuf_global,
-        output::{Mode, Output as SmithayOutput, PhysicalProperties},
+        output::{Mode, PhysicalProperties},
     },
 };
+
+use crate::{NewOutputDescriptor, OutputId};
 
 use super::BackendHandler;
 
@@ -78,22 +80,18 @@ where
         model: "Winit".into(),
     };
 
-    let (output, _) = SmithayOutput::new(
-        &mut *display.borrow_mut(),
-        OUTPUT_NAME.to_owned(),
+    let output_id = OutputId { id: 1 };
+
+    let output = NewOutputDescriptor {
+        id: output_id,
         physical_properties,
-        None,
-    );
+        transform: wl_output::Transform::Flipped180,
+        name: OUTPUT_NAME.to_owned(),
+        prefered_mode: mode,
+        possible_modes: vec![mode],
+    };
 
-    output.set_preferred(mode);
-    output.change_current_state(
-        Some(mode),
-        Some(wl_output::Transform::Flipped180),
-        None,
-        None,
-    );
-
-    handler.output_created(output.clone(), vec![mode]);
+    handler.output_created(output);
     handler.start_compositor();
 
     info!("Initialization completed, starting the main loop.");
@@ -111,11 +109,10 @@ where
                         refresh: 60_000,
                     };
 
-                    output.change_current_state(Some(mode), None, Some(1), None);
-                    handler.output_mode_updated(&output, mode);
+                    handler.output_mode_updated(&output_id, mode);
                 }
                 WinitEvent::Input(event) => {
-                    handler.process_input_event(event, Some(&output));
+                    handler.process_input_event(event, Some(&output_id));
                 }
                 _ => {}
             });
@@ -127,7 +124,7 @@ where
                     if backend.bind().is_ok() {
                         let age = backend.buffer_age().unwrap_or(0);
                         let damage = handler
-                            .output_render(backend.renderer(), &output, age, None)
+                            .output_render(backend.renderer(), &output_id, age, None)
                             .unwrap();
                         backend.submit(damage.as_deref(), 1.0).unwrap();
                     }

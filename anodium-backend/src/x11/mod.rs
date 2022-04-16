@@ -17,12 +17,14 @@ use smithay::{
         gbm,
         wayland_server::{protocol::wl_output, Display},
     },
-    wayland::output::{Mode, Output as SmithayOutput, PhysicalProperties},
+    wayland::output::{Mode, PhysicalProperties},
 };
 use smithay::{
     backend::{input::InputEvent, renderer::ImportDma},
     wayland::dmabuf::init_dmabuf_global,
 };
+
+use crate::{NewOutputDescriptor, OutputId};
 
 use super::BackendHandler;
 
@@ -32,7 +34,7 @@ struct OutputSurface {
     surface: X11Surface,
     window: smithay::backend::x11::Window,
 
-    output: SmithayOutput,
+    output_id: OutputId,
     mode: Mode,
 
     rerender: bool,
@@ -69,7 +71,7 @@ impl OutputSurfaceBuilder {
         Self { surface, window }
     }
 
-    fn build(self, display: &mut Display) -> OutputSurface {
+    fn build(self) -> (OutputSurface, NewOutputDescriptor) {
         let size = {
             let s = self.window.size();
             (s.w as i32, s.h as i32).into()
@@ -87,20 +89,28 @@ impl OutputSurfaceBuilder {
             model: "Winit".into(),
         };
 
-        let (output, _) =
-            SmithayOutput::new(display, OUTPUT_NAME.to_owned(), physical_properties, None);
+        let output_id = crate::OutputId { id: 1 };
+        let output = NewOutputDescriptor {
+            id: output_id,
+            name: "X11".to_string(),
+            physical_properties,
+            prefered_mode: mode,
+            possible_modes: vec![mode],
+            transform: wl_output::Transform::Normal,
+        };
 
-        output.set_preferred(mode);
-        output.change_current_state(Some(mode), Some(wl_output::Transform::Normal), None, None);
+        (
+            OutputSurface {
+                surface: self.surface,
+                window: self.window,
+                mode,
 
-        OutputSurface {
-            surface: self.surface,
-            window: self.window,
-            mode,
+                output_id,
+
+                rerender: true,
+            },
             output,
-
-            rerender: true,
-        }
+        )
     }
 }
 
@@ -176,12 +186,12 @@ where
 
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
-        .map(|o| o.build(&mut display.borrow_mut()))
+        .map(|o| o.build())
+        .map(|(o, new)| {
+            handler.output_created(new);
+            o
+        })
         .collect();
-
-    for surface_data in surface_datas.iter() {
-        handler.output_created(surface_data.output.clone(), vec![surface_data.mode]);
-    }
 
     handler.start_compositor();
 
@@ -216,7 +226,12 @@ where
 
                     let res: Result<(), ()> = {
                         handler
-                            .output_render(&mut renderer, &surface_data.output, age as usize, None)
+                            .output_render(
+                                &mut renderer,
+                                &surface_data.output_id,
+                                age as usize,
+                                None,
+                            )
                             .ok();
                         Ok(())
                     };
@@ -277,11 +292,8 @@ where
                     };
 
                     surface_data.mode = mode;
-                    surface_data
-                        .output
-                        .change_current_state(Some(mode), None, Some(1), None);
 
-                    handler.output_mode_updated(&surface_data.output, mode);
+                    handler.output_mode_updated(&surface_data.output_id, mode);
 
                     surface_data.rerender = true;
                     render.ping();
@@ -319,7 +331,7 @@ where
                             .find(|sd| sd.window.id() == window_id)
                             .unwrap();
 
-                        handler.process_input_event(event, Some(&surface_data.output));
+                        handler.process_input_event(event, Some(&surface_data.output_id));
                     }
                 }
             }

@@ -35,6 +35,7 @@ use {
     x11rb::protocol::xproto::{ConfigureRequestEvent, ConfigureWindowAux, ConnectionExt},
 };
 
+#[cfg(feature = "xwayland")]
 pub struct X11WindowUserData {
     pub window: x11rb::protocol::xproto::Window,
     pub location: Point<i32, Logical>,
