@@ -22,13 +22,14 @@ use smithay::{
     wayland::output::{self, PhysicalProperties},
 };
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, str::FromStr};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct OutputId {
     id: u64,
 }
 
+#[derive(Debug)]
 pub struct NewOutputDescriptor {
     pub id: OutputId,
     pub name: String,
@@ -122,6 +123,36 @@ pub enum PreferedBackend {
     X11,
     Winit,
     Udev,
+}
+
+impl Default for PreferedBackend {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+#[derive(Debug)]
+pub struct PreferedBackendParseError(String);
+
+impl std::fmt::Display for PreferedBackendParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unknown backend: {}", self.0)
+    }
+}
+impl std::error::Error for PreferedBackendParseError {}
+
+impl FromStr for PreferedBackend {
+    type Err = PreferedBackendParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "x11" => Self::X11,
+            "winit" => Self::Winit,
+            "udev" => Self::Udev,
+            "auto" => Self::Auto,
+            other => return Err(PreferedBackendParseError(other.to_string())),
+        })
+    }
 }
 
 pub fn init<D>(

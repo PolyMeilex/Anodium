@@ -1,38 +1,25 @@
+use crate::State;
+use anodium_framework::shell::{ShellEvent, ShellHandler, X11WindowUserData};
+
 use smithay::{
-    desktop::{self},
-    reexports::wayland_server::protocol::wl_surface::WlSurface,
-    utils::{Logical, Point},
-};
-
-use crate::{
-    framework::{
-        shell::{ShellEvent, ShellHandler},
-        surface_data::{ResizeData, ResizeState, SurfaceData},
+    desktop,
+    reexports::wayland_server::{
+        protocol::{wl_pointer::ButtonState, wl_surface::WlSurface},
+        DispatchData,
     },
-    grabs::{MoveSurfaceGrab, ResizeSurfaceGrab},
-    output_manager::Output,
-    state::Anodium,
+    utils::{Logical, Point},
+    wayland::{
+        seat::{AxisFrame, PointerGrab, PointerGrabStartData, PointerInnerHandle},
+        Serial,
+    },
 };
 
-impl ShellHandler for Anodium {
-    fn on_shell_event(&mut self, event: ShellEvent) {
+impl ShellHandler for State {
+    fn on_shell_event(&mut self, event: anodium_framework::shell::ShellEvent) {
         match event {
-            //
-            // Toplevel
-            //
             ShellEvent::WindowCreated { window } => {
-                let pos = window
-                    .user_data()
-                    .get::<anodium_framework::shell::X11WindowUserData>()
-                    .map(|i| i.location)
-                    .unwrap_or_default();
-
-                self.region_manager
-                    .region_under(self.input_state.borrow().pointer_location)
-                    .unwrap_or_else(|| self.region_manager.first().unwrap())
-                    .active_workspace()
-                    .space_mut()
-                    .map_window(&window, pos, false);
+                self.space.map_window(&window, (0, 0), true);
+                window.configure();
             }
 
             ShellEvent::WindowMove {
@@ -43,8 +30,7 @@ impl ShellHandler for Anodium {
             } => {
                 let pointer = seat.get_pointer().unwrap();
 
-                let workspace = self.region_manager.find_window_workspace(&window).unwrap();
-                let initial_window_location = workspace.space().window_location(&window).unwrap();
+                let initial_window_location = self.space.window_location(&window).unwrap();
 
                 let grab = MoveSurfaceGrab {
                     start_data,
@@ -52,6 +38,10 @@ impl ShellHandler for Anodium {
                     initial_window_location,
                 };
                 pointer.set_grab(grab, serial, 0);
+            }
+
+            ShellEvent::SurfaceCommit { surface } => {
+                self.space.commit(&surface);
             }
 
             ShellEvent::WindowResize {
@@ -62,32 +52,19 @@ impl ShellHandler for Anodium {
                 serial,
             } => {
                 let pointer = seat.get_pointer().unwrap();
+
                 let wl_surface = window.toplevel().get_surface();
 
                 if let Some(wl_surface) = wl_surface {
-                    let region = self.region_manager.find_window_region(&window).unwrap();
-                    let workspace = region.find_window_workspace(&window).unwrap();
-                    let loc = workspace.space().window_location(&window).unwrap();
-                    let geometry = window.geometry();
-
-                    let (initial_window_location, initial_window_size) =
-                        (loc + region.position(), geometry.size);
+                    let window_location = self.space.window_location(&window).unwrap();
+                    let window_size = window.geometry().size;
 
                     SurfaceData::with_mut(wl_surface, |data| {
-                        data.resize_state = ResizeState::Resizing(ResizeData {
-                            edges,
-                            initial_window_location,
-                            initial_window_size,
-                        });
+                        data.resize_state
+                            .start_resize(edges, window_location, window_size);
                     });
 
-                    let grab = ResizeSurfaceGrab {
-                        start_data,
-                        window,
-                        edges,
-                        initial_window_size,
-                        last_window_size: initial_window_size,
-                    };
+                    let grab = ResizeSurfaceGrab::new(start_data, window, edges, window_size);
 
                     pointer.set_grab(grab, serial, 0);
                 }
@@ -98,96 +75,271 @@ impl ShellHandler for Anodium {
                 new_location_x,
                 new_location_y,
             } => {
-                if let Some(region) = self.region_manager.find_window_region(&window) {
-                    let space = region.find_window_workspace(&window).unwrap();
+                let mut new_location = self.space.window_location(&window).unwrap_or_default();
 
-                    let mut new_location =
-                        space.space().window_location(&window).unwrap_or_default();
-
-                    if let Some(x) = new_location_x {
-                        new_location.x = x;
-                    }
-
-                    if let Some(y) = new_location_y {
-                        new_location.y = y;
-                    }
-
-                    let new_location = new_location - region.position();
-
-                    region
-                        .find_window_workspace(&window)
-                        .unwrap()
-                        .space_mut()
-                        .map_window(&window, new_location, false);
+                if let Some(x) = new_location_x {
+                    new_location.x = x;
                 }
-            }
 
-            ShellEvent::WindowMaximize { .. } => {}
-            ShellEvent::WindowUnMaximize { .. } => {}
-
-            //
-            // Popup
-            //
-            ShellEvent::PopupCreated { .. } => {}
-            ShellEvent::PopupGrab { .. } => {}
-
-            //
-            // Wlr Layer Shell
-            //
-            ShellEvent::LayerCreated {
-                surface, output, ..
-            } => {
-                let output = output
-                    .and_then(|o| Output::from_resource(&o))
-                    .unwrap_or_else(|| {
-                        Output::wrap(
-                            self.region_manager
-                                .first()
-                                .unwrap()
-                                .active_workspace()
-                                .space()
-                                .outputs()
-                                .next()
-                                .unwrap()
-                                .clone(),
-                        )
-                    });
-
-                let mut map = output.layer_map();
-                map.map_layer(&surface).unwrap();
-            }
-            ShellEvent::LayerAckConfigure { surface, .. } => {
-                if let Some(output) = self
-                    .region_manager
-                    .find_surface_workspace(&surface)
-                    .unwrap()
-                    .space()
-                    .outputs()
-                    .find(|o| {
-                        let map = desktop::layer_map_for_output(o);
-                        map.layer_for_surface(&surface).is_some()
-                    })
-                {
-                    let mut map = desktop::layer_map_for_output(output);
-                    map.arrange();
+                if let Some(y) = new_location_y {
+                    new_location.y = y;
                 }
+
+                self.space.map_window(&window, new_location, false);
             }
 
-            ShellEvent::SurfaceCommit { surface } => {
-                if let Some(workspace) = self.region_manager.find_surface_workspace(&surface) {
-                    workspace.space().commit(&surface);
-                }
-            }
             _ => {}
+        }
+    }
+
+    fn xwayland_configure_request(
+        &mut self,
+        _conn: std::sync::Arc<smithay::reexports::x11rb::rust_connection::RustConnection>,
+        event: smithay::reexports::x11rb::protocol::xproto::ConfigureRequestEvent,
+    ) {
+        let window = self
+            .space
+            .windows()
+            .find(|win| {
+                win.user_data()
+                    .get::<X11WindowUserData>()
+                    .map(|win| win.window == event.window)
+                    .unwrap_or(false)
+            })
+            .cloned();
+
+        if let Some(window) = window {
+            self.space
+                .map_window(&window, (event.x as i32, event.y as i32), false);
         }
     }
 }
 
-impl Anodium {
-    pub fn surface_under(
-        &self,
-        point: Point<f64, Logical>,
-    ) -> Option<(WlSurface, Point<i32, Logical>)> {
-        self.region_manager.surface_under(point)
+pub struct MoveSurfaceGrab {
+    pub start_data: PointerGrabStartData,
+
+    pub window: desktop::Window,
+    pub initial_window_location: Point<i32, Logical>,
+}
+
+impl PointerGrab for MoveSurfaceGrab {
+    fn motion(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        location: Point<f64, Logical>,
+        _focus: Option<(WlSurface, Point<i32, Logical>)>,
+        serial: Serial,
+        time: u32,
+        mut ddata: DispatchData,
+    ) {
+        handle.motion(location, None, serial, time);
+
+        let state = ddata.get::<State>().unwrap();
+
+        let delta = location - self.start_data.location;
+        let new_location = self.initial_window_location.to_f64() + delta;
+
+        state
+            .space
+            .map_window(&self.window, new_location.to_i32_round(), false);
+    }
+
+    fn button(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        button: u32,
+        state: ButtonState,
+        serial: Serial,
+        time: u32,
+        _ddata: DispatchData,
+    ) {
+        handle.button(button, state, serial, time);
+        if handle.current_pressed().is_empty() {
+            // No more buttons are pressed, release the grab.
+            handle.unset_grab(serial, time);
+        }
+    }
+
+    fn axis(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        details: AxisFrame,
+        _ddata: DispatchData,
+    ) {
+        handle.axis(details)
+    }
+
+    fn start_data(&self) -> &PointerGrabStartData {
+        &self.start_data
+    }
+}
+
+use smithay::{
+    desktop::Kind,
+    reexports::{
+        wayland_protocols::xdg_shell::server::xdg_toplevel, wayland_server::protocol::wl_surface,
+    },
+    utils::Size,
+    wayland::{compositor::with_states, shell::xdg::SurfaceCachedState},
+};
+
+use anodium_framework::surface_data::{ResizeEdge, ResizeState, SurfaceData};
+
+pub struct ResizeSurfaceGrab {
+    pub start_data: PointerGrabStartData,
+    pub window: desktop::Window,
+    pub edges: ResizeEdge,
+    pub initial_window_size: Size<i32, Logical>,
+    pub last_window_size: Size<i32, Logical>,
+}
+
+impl ResizeSurfaceGrab {
+    fn new(
+        start_data: PointerGrabStartData,
+        window: desktop::Window,
+        edges: ResizeEdge,
+        window_size: Size<i32, Logical>,
+    ) -> Self {
+        Self {
+            start_data,
+            window,
+            edges,
+            initial_window_size: window_size,
+            last_window_size: window_size,
+        }
+    }
+}
+
+impl PointerGrab for ResizeSurfaceGrab {
+    fn motion(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        location: Point<f64, Logical>,
+        _focus: Option<(wl_surface::WlSurface, Point<i32, Logical>)>,
+        serial: Serial,
+        time: u32,
+        _ddata: DispatchData,
+    ) {
+        handle.motion(location, None, serial, time);
+
+        let (mut dx, mut dy) = (location - self.start_data.location).into();
+
+        let mut new_window_width = self.initial_window_size.w;
+        let mut new_window_height = self.initial_window_size.h;
+
+        let left_right = ResizeEdge::LEFT | ResizeEdge::RIGHT;
+        let top_bottom = ResizeEdge::TOP | ResizeEdge::BOTTOM;
+
+        if self.edges.intersects(left_right) {
+            if self.edges.intersects(ResizeEdge::LEFT) {
+                dx = -dx;
+            }
+
+            new_window_width = (self.initial_window_size.w as f64 + dx) as i32;
+        }
+
+        if self.edges.intersects(top_bottom) {
+            if self.edges.intersects(ResizeEdge::TOP) {
+                dy = -dy;
+            }
+
+            new_window_height = (self.initial_window_size.h as f64 + dy) as i32;
+        }
+
+        let (min_size, max_size) =
+            with_states(self.window.toplevel().get_surface().unwrap(), |states| {
+                let data = states.cached_state.current::<SurfaceCachedState>();
+                (data.min_size, data.max_size)
+            })
+            .expect("Can't resize surface");
+
+        let min_width = min_size.w.max(1);
+        let min_height = min_size.h.max(1);
+        let max_width = if max_size.w == 0 {
+            i32::max_value()
+        } else {
+            max_size.w
+        };
+        let max_height = if max_size.h == 0 {
+            i32::max_value()
+        } else {
+            max_size.h
+        };
+
+        new_window_width = new_window_width.max(min_width).min(max_width);
+        new_window_height = new_window_height.max(min_height).min(max_height);
+
+        self.last_window_size = (new_window_width, new_window_height).into();
+
+        match self.window.toplevel() {
+            Kind::Xdg(xdg) => {
+                let ret = xdg.with_pending_state(|state| {
+                    state.states.set(xdg_toplevel::State::Resizing);
+                    state.size = Some(self.last_window_size);
+                });
+                if ret.is_ok() {
+                    xdg.send_configure();
+                }
+            }
+            #[cfg(feature = "xwayland")]
+            Kind::X11(_) => {
+                // TODO: What to do here? Send the update via X11?
+            }
+        }
+    }
+
+    fn button(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        button: u32,
+        state: ButtonState,
+        serial: Serial,
+        time: u32,
+        _ddata: DispatchData,
+    ) {
+        handle.button(button, state, serial, time);
+        if handle.current_pressed().is_empty() {
+            // No more buttons are pressed, release the grab.
+            handle.unset_grab(serial, time);
+
+            if let Kind::Xdg(xdg) = self.window.toplevel() {
+                let ret = xdg.with_pending_state(|state| {
+                    state.states.unset(xdg_toplevel::State::Resizing);
+                    state.size = Some(self.last_window_size);
+                });
+                if ret.is_ok() {
+                    xdg.send_configure();
+                }
+
+                SurfaceData::with_mut(self.window.toplevel().get_surface().unwrap(), |data| {
+                    if let ResizeState::Resizing(resize_data) = data.resize_state {
+                        data.resize_state = ResizeState::WaitingForFinalAck(resize_data, serial);
+                    } else {
+                        panic!("invalid resize state: {:?}", data.resize_state);
+                    }
+                });
+            } else {
+                SurfaceData::with_mut(self.window.toplevel().get_surface().unwrap(), |data| {
+                    if let ResizeState::Resizing(resize_data) = data.resize_state {
+                        data.resize_state = ResizeState::WaitingForCommit(resize_data);
+                    } else {
+                        panic!("invalid resize state: {:?}", data.resize_state);
+                    }
+                });
+            }
+        }
+    }
+
+    fn axis(
+        &mut self,
+        handle: &mut PointerInnerHandle<'_>,
+        details: AxisFrame,
+        _ddata: DispatchData,
+    ) {
+        handle.axis(details)
+    }
+
+    fn start_data(&self) -> &PointerGrabStartData {
+        &self.start_data
     }
 }

@@ -1,16 +1,11 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::hash::Hash;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, hash::Hash, rc::Rc};
 
 use rhai::plugin::*;
+use rhai::{FnPtr, Scope};
 
-use rhai::FnPtr;
 use smithay::backend::input::KeyState;
+use smithay::wayland::seat::{KeysymHandle, ModifiersState};
 use xkbcommon::xkb;
-
-use super::ConfigVM;
 
 #[derive(Debug, Default, Clone)]
 pub struct Keyboard {
@@ -25,9 +20,40 @@ impl Keyboard {
     }
 }
 
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct ConfigModifiersState {
+    /// The "control" key
+    pub ctrl: bool,
+    /// The "alt" key
+    pub alt: bool,
+    /// The "shift" key
+    pub shift: bool,
+    /// The "logo" key
+    ///
+    /// Also known as the "windows" key on most keyboards
+    pub logo: bool,
+}
+
+impl From<ModifiersState> for ConfigModifiersState {
+    fn from(m: ModifiersState) -> Self {
+        Self {
+            ctrl: m.ctrl,
+            alt: m.alt,
+            shift: m.shift,
+            logo: m.logo,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Keybind {
+    modifiers: ConfigModifiersState,
+    keysym: u32,
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct Callbacks {
-    callbacks: Rc<RefCell<HashMap<u32, Vec<Callback>>>>,
+    callbacks: Rc<RefCell<HashMap<Keybind, Vec<FnPtr>>>>,
 }
 
 impl Callbacks {
@@ -37,108 +63,35 @@ impl Callbacks {
         }
     }
 
-    pub fn clear(&self) {
-        self.callbacks.borrow_mut().clear();
-    }
-
-    pub fn insert(&self, key: &str, callback: Callback) {
-        let key = xkb::keysym_from_name(key, xkb::KEYSYM_CASE_INSENSITIVE);
-
+    pub fn insert(&self, keybind: Keybind, callback: FnPtr) {
         let mut callbacks = self.callbacks.borrow_mut();
 
-        if let Some(callbacks) = callbacks.get_mut(&key) {
+        if let Some(callbacks) = callbacks.get_mut(&keybind) {
             callbacks.push(callback);
         } else {
-            let callbacks_vec = vec![callback];
-            callbacks.insert(key.to_owned(), callbacks_vec);
+            callbacks.insert(keybind, vec![callback]);
         }
     }
 
     pub fn key_action(
         &self,
-        config: &ConfigVM,
-        current_key: u32,
-        _state: KeyState,
-        keys_pressed: &HashSet<u32>,
-    ) -> bool {
-        let mut executed = false;
+        engine: &mut rhai::Engine,
+        ast: &mut rhai::AST,
+        modifiers: ConfigModifiersState,
+        keysym: &KeysymHandle,
+        state: KeyState,
+    ) {
+        let keysyms = keysym.raw_syms();
+        let keysym = keysyms[0];
 
-        if !keys_pressed.is_empty() {
-            let callbacks = self.callbacks.borrow();
-            for (key, callbacks) in callbacks.iter() {
-                if keys_pressed.contains(key) {
-                    for callback in callbacks {
-                        if let Some(capture) = &callback.capture {
-                            if capture.is_captured(current_key)
-                                && current_key != *key
-                                && !callback.keys.contains(&current_key)
-                                && callback.execute(config, keys_pressed, Some(current_key))
-                            {
-                                executed = true;
-                                break;
-                            }
-                        } else if callback.execute(config, keys_pressed, None) {
-                            executed = true;
-                            break;
-                        }
-                    }
+        let keybind = Keybind { modifiers, keysym };
+
+        if state == KeyState::Pressed {
+            if let Some(cbs) = self.callbacks.borrow_mut().get_mut(&keybind) {
+                for fnptr in cbs {
+                    let _: Option<Dynamic> = fnptr.call(engine, ast, ()).ok();
                 }
             }
-        }
-
-        executed
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Callback {
-    keys: Vec<u32>,
-    fnptr: FnPtr,
-    capture: Option<Capture>,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Capture {
-    Numbers,
-    Letters,
-    Functions,
-}
-
-impl Capture {
-    pub fn is_captured(&self, key: u32) -> bool {
-        match self {
-            Self::Letters => (xkb::KEY_a..=xkb::KEY_z).contains(&key),
-            Self::Numbers => (xkb::KEY_0..=xkb::KEY_9).contains(&key),
-            Self::Functions => (xkb::KEY_F1..=xkb::KEY_F12).contains(&key),
-        }
-    }
-}
-
-impl Callback {
-    pub fn new(fnptr: FnPtr, keys: Vec<u32>, capture: Option<Capture>) -> Self {
-        Self {
-            fnptr,
-            keys,
-            capture,
-        }
-    }
-
-    pub fn execute(
-        &self,
-        config: &ConfigVM,
-        keys_pressed: &HashSet<u32>,
-        captured: Option<u32>,
-    ) -> bool {
-        if self.keys.iter().all(|item| keys_pressed.contains(item)) {
-            if let Some(captured) = captured {
-                let captured = ::xkbcommon::xkb::keysym_get_name(captured);
-                config.execute_fnptr(self.fnptr.clone(), (captured,));
-            } else {
-                config.execute_fnptr(self.fnptr.clone(), ());
-            }
-            true
-        } else {
-            false
         }
     }
 }
@@ -150,55 +103,54 @@ pub mod keyboard {
         keyboard.callbacks.clone()
     }
 
-    pub fn numbers() -> Capture {
-        Capture::Numbers
+    pub fn number_keys() -> rhai::Array {
+        (1..=9).map(|n| n.to_string()).map(|s| s.into()).collect()
     }
 
-    pub fn letters() -> Capture {
-        Capture::Letters
-    }
-
-    pub fn functions() -> Capture {
-        Capture::Functions
-    }
-}
-
-#[export_module]
-pub mod callbacks {
-    #[rhai_fn(global)]
-    pub fn register(callbacks: &mut Callbacks, fnptr: FnPtr, key: &str, keys: rhai::Array) {
-        let keys_parsed: Vec<u32> = keys
-            .iter()
-            .map(|k| xkb::keysym_from_name(&format!("{}", k), xkb::KEYSYM_CASE_INSENSITIVE))
-            .collect();
-        let callback = Callback::new(fnptr, keys_parsed, None);
-        callbacks.insert(key, callback);
+    pub fn function_keys() -> rhai::Array {
+        (1..=12)
+            .map(|n| format!("F{}", n))
+            .map(|s| s.into())
+            .collect()
     }
 
     #[rhai_fn(global)]
-    pub fn register_capture(
-        callbacks: &mut Callbacks,
+    pub fn register(
+        keyboard: &mut Keyboard,
+        modifiers_arr: rhai::Array,
+        key: rhai::ImmutableString,
         fnptr: FnPtr,
-        key: &str,
-        keys: rhai::Array,
-        capture: Capture,
     ) {
-        let keys_parsed: Vec<u32> = keys
+        let mut modifiers = ConfigModifiersState::default();
+        for m in modifiers_arr
             .iter()
-            .map(|k| xkb::keysym_from_name(&format!("{}", k), xkb::KEYSYM_CASE_INSENSITIVE))
-            .collect();
-        let callback = Callback::new(fnptr, keys_parsed, Some(capture));
-        callbacks.insert(key, callback);
+            .filter_map(|k| k.clone().into_string().ok())
+        {
+            match m.as_str() {
+                "ctrl" => modifiers.ctrl = true,
+                "alt" => modifiers.alt = true,
+                "shift" => modifiers.shift = true,
+                "logo" => modifiers.logo = true,
+                _ => {}
+            }
+        }
+
+        let keysym = xkb::keysym_from_name(&key, xkb::KEYSYM_CASE_INSENSITIVE);
+        let keybind = Keybind { modifiers, keysym };
+
+        keyboard.callbacks.insert(keybind, fnptr);
     }
 }
 
-pub fn register(engine: &mut Engine) {
+pub fn register(engine: &mut Engine, scope: &mut Scope) -> Keyboard {
     let keyboard_module = exported_module!(keyboard);
-    let callbacks_module = exported_module!(callbacks);
+
     engine
         .register_static_module("keyboard", keyboard_module.into())
-        .register_static_module("callbacks", callbacks_module.into())
-        .register_type::<Capture>()
-        .register_type::<Keyboard>()
-        .register_type::<Callbacks>();
+        .register_type::<Keyboard>();
+
+    let keyboard = Keyboard::new();
+    scope.set_value("Keyboard", keyboard.clone());
+
+    keyboard
 }

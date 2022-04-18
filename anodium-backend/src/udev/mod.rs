@@ -457,6 +457,7 @@ fn device_added<D>(
 
             let outputs = scan_connectors(handle.clone(), &mut device, session_signal);
 
+            let mut new_outputs = Vec::new();
             for (_, output_surface) in outputs.iter() {
                 let (id, output) = {
                     let output_surface = output_surface.borrow();
@@ -468,27 +469,10 @@ fn device_added<D>(
 
                     let possible_modes = output_surface.wl_modes.clone();
 
-                    // let (output, _output_global) = SmithayOutput::new(
-                    //     &mut display.borrow_mut(),
-                    //     output_name.clone(),
-                    //     physical_properties.clone(),
-                    //     None,
-                    // );
-
-                    // output.set_preferred(output_surface.wl_mode);
-                    // output.change_current_state(
-                    //     Some(output_surface.wl_mode),
-                    //     Some(wl_output::Transform::Normal),
-                    //     None,
-                    //     None,
-                    // );
-
                     let id = UdevOutputId {
                         crtc: output_surface.crtc,
                         device_id,
                     };
-
-                    // output.user_data().insert_if_missing(|| id);
 
                     let output = NewOutputDescriptor {
                         id: id.output_id(),
@@ -510,7 +494,7 @@ fn device_added<D>(
                     .outputs
                     .insert(id.output_id(), id);
 
-                handler.output_created(output);
+                new_outputs.push(output);
             }
 
             let restart_token = session_signal.register({
@@ -547,6 +531,10 @@ fn device_added<D>(
                     device_id,
                 },
             );
+
+            for output in new_outputs {
+                handler.output_created(output);
+            }
         }
         Err(err) => {
             error!("Skiping device '{}' because of: {}", device_id, err);
