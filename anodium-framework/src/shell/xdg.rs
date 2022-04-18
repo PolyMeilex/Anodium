@@ -18,8 +18,6 @@ use super::{
 
 use super::utils::AsWlSurface;
 
-use super::ShellEvent;
-
 impl<D> super::Inner<D>
 where
     D: ShellHandler,
@@ -44,12 +42,7 @@ where
                     let window = self.windows.find(&surface);
 
                     if let Some(window) = window.cloned() {
-                        handler.on_shell_event(ShellEvent::WindowMove {
-                            window,
-                            start_data,
-                            seat,
-                            serial,
-                        });
+                        handler.window_move(window, start_data, seat, serial);
                     }
                 }
             }
@@ -65,13 +58,7 @@ where
                     let window = self.windows.find(&surface);
 
                     if let Some(window) = window.cloned() {
-                        handler.on_shell_event(ShellEvent::WindowResize {
-                            window,
-                            start_data,
-                            seat,
-                            edges: edges.into(),
-                            serial,
-                        });
+                        handler.window_resize(window, start_data, seat, edges.into(), serial);
                     }
                 }
             }
@@ -79,33 +66,33 @@ where
             XdgRequest::Maximize { surface } => {
                 let window = self.windows.find(&surface);
                 if let Some(window) = window.cloned() {
-                    handler.on_shell_event(ShellEvent::WindowMaximize { window });
+                    handler.window_maximize(window);
                 }
             }
             XdgRequest::UnMaximize { surface } => {
                 let window = self.windows.find(&surface);
                 if let Some(window) = window.cloned() {
-                    handler.on_shell_event(ShellEvent::WindowUnMaximize { window });
+                    handler.window_unmaximize(window);
                 }
             }
 
             XdgRequest::Fullscreen { surface, output } => {
                 let window = self.windows.find(&surface);
                 if let Some(window) = window.cloned() {
-                    handler.on_shell_event(ShellEvent::WindowFullscreen { window, output });
+                    handler.window_fullscreen(window, output);
                 }
             }
             XdgRequest::UnFullscreen { surface } => {
                 let window = self.windows.find(&surface);
                 if let Some(window) = window.cloned() {
-                    handler.on_shell_event(ShellEvent::WindowUnFullscreen { window });
+                    handler.window_unfullscreen(window);
                 }
             }
 
             XdgRequest::Minimize { surface } => {
                 let window = self.windows.find(&surface);
                 if let Some(window) = window.cloned() {
-                    handler.on_shell_event(ShellEvent::WindowMinimize { window });
+                    handler.window_minimize(window);
                 }
             }
 
@@ -125,12 +112,7 @@ where
                 let seat = Seat::from_resource(&seat).unwrap();
 
                 if let Some(start_data) = check_grab(&seat, serial, &surface) {
-                    handler.on_shell_event(ShellEvent::PopupGrab {
-                        popup: PopupKind::Xdg(surface),
-                        start_data,
-                        seat,
-                        serial,
-                    });
+                    handler.popup_grab(PopupKind::Xdg(surface), start_data, seat, serial);
                 }
             }
             XdgRequest::RePosition { .. } => {
@@ -148,12 +130,12 @@ where
             } => {
                 let window = self.windows.find(&surface);
                 if let Some(window) = window.cloned() {
-                    handler.on_shell_event(ShellEvent::ShowWindowMenu {
+                    handler.show_window_menu(
                         window,
-                        seat: Seat::from_resource(&seat).unwrap(),
+                        Seat::from_resource(&seat).unwrap(),
                         serial,
                         location,
-                    });
+                    );
                 }
             }
 

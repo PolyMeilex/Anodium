@@ -8,7 +8,9 @@ use smithay::wayland::seat::{PointerGrabStartData, Seat};
 use smithay::wayland::shell::wlr_layer::{
     wlr_layer_shell_init, Layer, LayerSurfaceAttributes, LayerSurfaceConfigure,
 };
-use smithay::wayland::shell::xdg::{xdg_shell_init, XdgPopupSurfaceRoleAttributes};
+use smithay::wayland::shell::xdg::{
+    xdg_shell_init, PositionerState, XdgPopupSurfaceRoleAttributes,
+};
 use smithay::wayland::Serial;
 use std::cell::RefCell;
 use std::marker::PhantomData;
@@ -44,8 +46,86 @@ pub struct X11WindowUserData {
 #[cfg(feature = "xwayland")]
 pub mod xwayland;
 
+#[allow(unused)]
 pub trait ShellHandler {
-    fn on_shell_event(&mut self, event: ShellEvent);
+    fn window_created(&mut self, window: Window) {}
+
+    fn window_move(
+        &mut self,
+        window: desktop::Window,
+        start_data: PointerGrabStartData,
+        seat: Seat,
+        serial: Serial,
+    ) {
+    }
+
+    fn window_resize(
+        &mut self,
+        window: desktop::Window,
+        start_data: PointerGrabStartData,
+        seat: Seat,
+        edges: ResizeEdge,
+        serial: Serial,
+    ) {
+    }
+
+    fn window_got_resized(
+        &mut self,
+        window: desktop::Window,
+        new_location_x: Option<i32>,
+        new_location_y: Option<i32>,
+    ) {
+    }
+
+    fn window_maximize(&mut self, window: desktop::Window) {}
+    fn window_unmaximize(&mut self, window: desktop::Window) {}
+
+    fn window_fullscreen(&mut self, window: desktop::Window, output: Option<WlOutput>) {}
+    fn window_unfullscreen(&mut self, window: desktop::Window) {}
+
+    fn window_minimize(&mut self, window: desktop::Window) {}
+
+    //
+    // Popup
+    //
+    fn popup_created(&mut self, popup: PopupKind, positioner: PositionerState) {}
+
+    fn popup_grab(
+        &mut self,
+        popup: PopupKind,
+        start_data: PointerGrabStartData,
+        seat: Seat,
+        serial: Serial,
+    ) {
+    }
+
+    //
+    // Misc
+    //
+    fn show_window_menu(
+        &mut self,
+        window: desktop::Window,
+        seat: Seat,
+        serial: Serial,
+        location: Point<i32, Logical>,
+    ) {
+    }
+
+    fn surface_commit(&mut self, surface: WlSurface);
+
+    //
+    // Wlr Layer Shell
+    //
+    fn layer_created(
+        &mut self,
+        surface: LayerSurface,
+        output: Option<WlOutput>,
+        layer: Layer,
+        namespace: String,
+    ) {
+    }
+
+    fn layer_ack_configure(&mut self, surface: WlSurface, configure: LayerSurfaceConfigure) {}
 
     #[cfg(feature = "xwayland")]
     fn xwayland_configure_request(
@@ -57,94 +137,6 @@ pub trait ShellHandler {
         let aux = ConfigureWindowAux::from_configure_request(&event);
         conn.configure_window(event.window, &aux).ok();
     }
-}
-
-pub enum ShellEvent {
-    WindowCreated {
-        window: Window,
-    },
-
-    WindowMove {
-        window: desktop::Window,
-        start_data: PointerGrabStartData,
-        seat: Seat,
-        serial: Serial,
-    },
-
-    WindowResize {
-        window: desktop::Window,
-        start_data: PointerGrabStartData,
-        seat: Seat,
-        edges: ResizeEdge,
-        serial: Serial,
-    },
-
-    WindowGotResized {
-        window: desktop::Window,
-        new_location_x: Option<i32>,
-        new_location_y: Option<i32>,
-    },
-
-    WindowMaximize {
-        window: desktop::Window,
-    },
-    WindowUnMaximize {
-        window: desktop::Window,
-    },
-
-    WindowFullscreen {
-        window: desktop::Window,
-        output: Option<WlOutput>,
-    },
-    WindowUnFullscreen {
-        window: desktop::Window,
-    },
-
-    WindowMinimize {
-        window: desktop::Window,
-    },
-
-    //
-    // Popup
-    //
-    PopupCreated {
-        popup: PopupKind,
-        // positioner: PositionerState,
-    },
-    PopupGrab {
-        popup: PopupKind,
-        start_data: PointerGrabStartData,
-        seat: Seat,
-        serial: Serial,
-    },
-
-    //
-    // Misc
-    //
-    ShowWindowMenu {
-        window: desktop::Window,
-        seat: Seat,
-        serial: Serial,
-        location: Point<i32, Logical>,
-    },
-
-    SurfaceCommit {
-        surface: WlSurface,
-    },
-
-    //
-    // Wlr Layer Shell
-    //
-    LayerCreated {
-        surface: LayerSurface,
-        output: Option<WlOutput>,
-        layer: Layer,
-        namespace: String,
-    },
-    LayerAckConfigure {
-        surface: WlSurface,
-        configure: LayerSurfaceConfigure,
-    },
 }
 
 struct Inner<D> {
@@ -217,11 +209,7 @@ where
             });
 
             if new_location.0.is_some() | new_location.1.is_some() {
-                handler.on_shell_event(ShellEvent::WindowGotResized {
-                    window: window.clone(),
-                    new_location_x: new_location.0,
-                    new_location_y: new_location.1,
-                })
+                handler.window_got_resized(window.clone(), new_location.0, new_location.1);
             }
         }
     }
@@ -230,7 +218,7 @@ where
     fn try_map_unmaped(&mut self, surface: &WlSurface, handler: &mut D) {
         if let Some(window) = self.not_mapped_list.try_window_map(surface) {
             self.windows.push(window.clone());
-            handler.on_shell_event(ShellEvent::WindowCreated { window });
+            handler.window_created(window);
         }
 
         if let Some(popup) = self.popup_manager.find_popup(surface) {
@@ -317,7 +305,7 @@ where
         }
 
         let handler = ddata.get::<D>().unwrap();
-        handler.on_shell_event(ShellEvent::SurfaceCommit { surface });
+        handler.surface_commit(surface);
     }
 }
 

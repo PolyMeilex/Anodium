@@ -1,6 +1,6 @@
 use smithay::{desktop::LayerSurface, wayland::shell::wlr_layer::LayerShellRequest};
 
-use super::{ShellEvent, ShellHandler};
+use super::ShellHandler;
 
 impl<D> super::Inner<D>
 where
@@ -19,15 +19,10 @@ where
                 // TODO: Wait for first commit
                 self.layers.push(surface.clone());
 
-                handler.on_shell_event(ShellEvent::LayerCreated {
-                    surface,
-                    output,
-                    layer,
-                    namespace,
-                });
+                handler.layer_created(surface, output, layer, namespace);
             }
             LayerShellRequest::AckConfigure { surface, configure } => {
-                handler.on_shell_event(ShellEvent::LayerAckConfigure { surface, configure });
+                handler.layer_ack_configure(surface, configure);
             }
         }
     }

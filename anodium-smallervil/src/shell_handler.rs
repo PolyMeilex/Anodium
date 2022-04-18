@@ -1,5 +1,5 @@
 use crate::State;
-use anodium_framework::shell::{ShellEvent, ShellHandler, X11WindowUserData};
+use anodium_framework::shell::{ShellHandler, X11WindowUserData};
 
 use smithay::{
     desktop,
@@ -15,81 +15,78 @@ use smithay::{
 };
 
 impl ShellHandler for State {
-    fn on_shell_event(&mut self, event: anodium_framework::shell::ShellEvent) {
-        match event {
-            ShellEvent::WindowCreated { window } => {
-                self.space.map_window(&window, (0, 0), true);
-                window.configure();
-            }
+    fn window_created(&mut self, window: desktop::Window) {
+        self.space.map_window(&window, (0, 0), true);
+        window.configure();
+    }
 
-            ShellEvent::WindowMove {
-                window,
-                start_data,
-                seat,
-                serial,
-            } => {
-                let pointer = seat.get_pointer().unwrap();
+    fn window_move(
+        &mut self,
+        window: desktop::Window,
+        start_data: PointerGrabStartData,
+        seat: smithay::wayland::seat::Seat,
+        serial: Serial,
+    ) {
+        let pointer = seat.get_pointer().unwrap();
 
-                let initial_window_location = self.space.window_location(&window).unwrap();
+        let initial_window_location = self.space.window_location(&window).unwrap();
 
-                let grab = MoveSurfaceGrab {
-                    start_data,
-                    window,
-                    initial_window_location,
-                };
-                pointer.set_grab(grab, serial, 0);
-            }
+        let grab = MoveSurfaceGrab {
+            start_data,
+            window,
+            initial_window_location,
+        };
+        pointer.set_grab(grab, serial, 0);
+    }
 
-            ShellEvent::SurfaceCommit { surface } => {
-                self.space.commit(&surface);
-            }
+    fn surface_commit(&mut self, surface: WlSurface) {
+        self.space.commit(&surface);
+    }
 
-            ShellEvent::WindowResize {
-                window,
-                start_data,
-                seat,
-                edges,
-                serial,
-            } => {
-                let pointer = seat.get_pointer().unwrap();
+    fn window_resize(
+        &mut self,
+        window: desktop::Window,
+        start_data: PointerGrabStartData,
+        seat: smithay::wayland::seat::Seat,
+        edges: ResizeEdge,
+        serial: Serial,
+    ) {
+        let pointer = seat.get_pointer().unwrap();
 
-                let wl_surface = window.toplevel().get_surface();
+        let wl_surface = window.toplevel().get_surface();
 
-                if let Some(wl_surface) = wl_surface {
-                    let window_location = self.space.window_location(&window).unwrap();
-                    let window_size = window.geometry().size;
+        if let Some(wl_surface) = wl_surface {
+            let window_location = self.space.window_location(&window).unwrap();
+            let window_size = window.geometry().size;
 
-                    SurfaceData::with_mut(wl_surface, |data| {
-                        data.resize_state
-                            .start_resize(edges, window_location, window_size);
-                    });
+            SurfaceData::with_mut(wl_surface, |data| {
+                data.resize_state
+                    .start_resize(edges, window_location, window_size);
+            });
 
-                    let grab = ResizeSurfaceGrab::new(start_data, window, edges, window_size);
+            let grab = ResizeSurfaceGrab::new(start_data, window, edges, window_size);
 
-                    pointer.set_grab(grab, serial, 0);
-                }
-            }
-
-            ShellEvent::WindowGotResized {
-                window,
-                new_location_x,
-                new_location_y,
-            } => {
-                let mut new_location = self.space.window_location(&window).unwrap_or_default();
-
-                if let Some(x) = new_location_x {
-                    new_location.x = x;
-                }
-
-                if let Some(y) = new_location_y {
-                    new_location.y = y;
-                }
-
-                self.space.map_window(&window, new_location, false);
-            }
-
-            _ => {}
+            pointer.set_grab(grab, serial, 0);
         }
+    }
+
+    fn window_got_resized(
+        &mut self,
+        window: desktop::Window,
+        new_location_x: Option<i32>,
+        new_location_y: Option<i32>,
+    ) {
+        let mut new_location = self.space.window_location(&window).unwrap_or_default();
+
+        if let Some(x) = new_location_x {
+            new_location.x = x;
+        }
+
+        if let Some(y) = new_location_y {
+            new_location.y = y;
+        }
+
+        self.space.map_window(&window, new_location, false);
     }
 
     fn xwayland_configure_request(
