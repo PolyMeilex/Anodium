@@ -25,12 +25,9 @@ use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Instant};
 #[cfg(feature = "xwayland")]
 use smithay::{reexports::calloop::LoopHandle, xwayland::XWayland};
 
-mod backend_handler;
 mod cli;
 mod config;
-mod input_handler;
-mod output_handler;
-mod shell_handler;
+mod handlers;
 
 struct State {
     space: desktop::Space,
