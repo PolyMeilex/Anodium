@@ -77,14 +77,16 @@ fn init_xwayland_connection(
 }
 
 fn init_log() -> slog::Logger {
-    std::env::set_var("RUST_LOG", "trace,smithay=error");
-
-    let terminal_drain = slog_async::Async::default(slog_envlogger::new(
+    let terminal_drain = slog_envlogger::LogBuilder::new(
         slog_term::CompactFormat::new(slog_term::TermDecorator::new().stderr().build())
             .build()
             .fuse(),
-    ))
+    )
+    .filter(Some("smithay"), slog::FilterLevel::Warning)
+    .build()
     .fuse();
+
+    let terminal_drain = slog_async::Async::default(terminal_drain).fuse();
 
     let log = slog::Logger::root(terminal_drain.fuse(), slog::o!());
 

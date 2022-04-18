@@ -26,6 +26,7 @@ impl OutputHandler for State {
             desc.physical_properties,
             None,
         );
+        output.set_preferred(desc.prefered_mode);
 
         output.user_data().insert_if_missing(|| desc.id);
 
