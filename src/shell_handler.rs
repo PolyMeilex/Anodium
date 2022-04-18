@@ -9,6 +9,7 @@ use smithay::{
     },
     utils::{Logical, Point},
     wayland::{
+        output::Output,
         seat::{AxisFrame, PointerGrab, PointerGrabStartData, PointerInnerHandle},
         Serial,
     },
@@ -86,6 +87,30 @@ impl ShellHandler for State {
                 }
 
                 self.space.map_window(&window, new_location, false);
+            }
+
+            ShellEvent::LayerCreated {
+                surface, output, ..
+            } => {
+                let output = output.and_then(|o| Output::from_resource(&o));
+
+                if let Some(output) = output {
+                    smithay::desktop::layer_map_for_output(&output)
+                        .map_layer(&surface)
+                        .unwrap();
+                }
+            }
+
+            ShellEvent::LayerAckConfigure { surface, .. } => {
+                let map = self
+                    .space
+                    .outputs()
+                    .map(|o| desktop::layer_map_for_output(o))
+                    .find(|map| map.layer_for_surface(&surface).is_some());
+
+                if let Some(mut map) = map {
+                    map.arrange();
+                }
             }
 
             _ => {}
