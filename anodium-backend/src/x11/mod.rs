@@ -43,6 +43,7 @@ struct OutputSurface {
 struct OutputSurfaceBuilder {
     surface: X11Surface,
     window: smithay::backend::x11::Window,
+    id: u64,
 }
 
 impl OutputSurfaceBuilder {
@@ -50,6 +51,7 @@ impl OutputSurfaceBuilder {
         handle: &X11Handle,
         device: Arc<Mutex<gbm::Device<RawFd>>>,
         context: &EGLContext,
+        id: u64,
     ) -> Self {
         let window = WindowBuilder::new()
             .title("Anodium")
@@ -68,7 +70,11 @@ impl OutputSurfaceBuilder {
             )
             .expect("Failed to create X11 surface");
 
-        Self { surface, window }
+        Self {
+            surface,
+            window,
+            id,
+        }
     }
 
     fn build(self) -> (OutputSurface, NewOutputDescriptor) {
@@ -89,7 +95,7 @@ impl OutputSurfaceBuilder {
             model: "Winit".into(),
         };
 
-        let output_id = crate::OutputId { id: 1 };
+        let output_id = crate::OutputId { id: self.id };
         let output = NewOutputDescriptor {
             id: output_id,
             name: "X11".to_string(),
@@ -140,8 +146,8 @@ where
     let device = Arc::new(Mutex::new(device));
 
     let x11_outputs = vec![
-        OutputSurfaceBuilder::new(&handle, device.clone(), &context),
-        OutputSurfaceBuilder::new(&handle, device, &context),
+        OutputSurfaceBuilder::new(&handle, device.clone(), &context, 0),
+        OutputSurfaceBuilder::new(&handle, device, &context, 1),
     ];
 
     let renderer =
