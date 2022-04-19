@@ -2,12 +2,12 @@ Outputs.layout = [
     #{
         name: "HDMI-A-1",
         resolution: [1920, 1080],
-        refresh: 60
+        refresh: 60 * 1000
     },
     #{
         name: "eDP-1",
         resolution: [1920, 1080],
-        refresh: 60
+        refresh: 60 * 1000
     },
 ];
 

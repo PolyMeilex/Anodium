@@ -1,4 +1,4 @@
-use crate::State;
+use crate::{state::output::OutputState, State};
 
 use anodium_backend::{
     utils::cursor::PointerElement, NewOutputDescriptor, OutputHandler, OutputId,
@@ -9,11 +9,13 @@ use smithay::{
     desktop::space::SurfaceTree,
     wayland::output::{Mode, Output},
 };
+use smithay_egui::EguiFrame;
 
 smithay::custom_elements! {
     pub CustomElem<=Gles2Renderer>;
     SurfaceTree=SurfaceTree,
     PointerElement=PointerElement,
+    EguiFrame=EguiFrame,
 }
 
 impl OutputHandler for State {
@@ -108,7 +110,7 @@ impl OutputHandler for State {
         if let Some(tree) = self.pointer_icon.prepare_cursor_icon(location) {
             elems.push(tree.into());
         } else if let Some(texture) = pointer_image {
-            elems.push(PointerElement::new(texture.clone(), location, true).into());
+            elems.push(PointerElement::new(texture.clone(), location, false).into());
         }
 
         let output = self
@@ -118,9 +120,19 @@ impl OutputHandler for State {
             .unwrap()
             .clone();
 
-        Ok(self
+        let output_state = OutputState::from_output(&output);
+        let egui = output_state.egui_frame(&output, &self.start_time);
+        elems.push(egui.into());
+
+        let render_result = self
             .space
             .render_output(renderer, &output, age, [0.1, 0.1, 0.1, 1.0], &elems)
-            .unwrap())
+            .unwrap();
+
+        if render_result.is_some() {
+            output_state.fps_tick();
+        }
+
+        Ok(render_result)
     }
 }

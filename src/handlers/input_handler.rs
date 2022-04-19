@@ -1,4 +1,4 @@
-use crate::State;
+use crate::{state::seat::SeatState, State};
 use anodium_backend::{InputHandler, OutputId};
 
 use smithay::{
@@ -59,8 +59,9 @@ impl InputHandler for State {
             }
             InputEvent::PointerMotion { event } => {
                 let pointer = self.seat.get_pointer().unwrap();
+                let seat_state = SeatState::from_seat(&self.seat);
 
-                let mut position = pointer.current_location() + event.delta();
+                let mut position = seat_state.pointer_pos() + event.delta();
 
                 let max_x = self.space.outputs().fold(0, |acc, o| {
                     acc + self.space.output_geometry(o).unwrap().size.w
@@ -76,6 +77,7 @@ impl InputHandler for State {
                 position.x = position.x.max(0.0).min(max_x as f64 - 1.0);
                 position.y = position.y.max(0.0).min(max_y as f64 - 1.0);
 
+                seat_state.set_pointer_pos(position);
                 self.pointer_motion(pointer, position, event.time());
             }
             InputEvent::PointerMotionAbsolute { event } => {
@@ -88,6 +90,7 @@ impl InputHandler for State {
 
                 let position = output_loc + event.position_transformed(output_geo.size);
 
+                SeatState::from_seat(&self.seat).set_pointer_pos(position);
                 self.pointer_motion(pointer, position, event.time());
             }
             InputEvent::PointerButton { event } => {

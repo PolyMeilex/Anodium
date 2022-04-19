@@ -28,6 +28,7 @@ use smithay::{reexports::calloop::LoopHandle, xwayland::XWayland};
 mod cli;
 mod config;
 mod handlers;
+mod state;
 
 struct State {
     space: desktop::Space,
@@ -59,7 +60,7 @@ fn init_xwayland_connection(
 ) -> XWayland<State> {
     use smithay::xwayland::XWaylandEvent;
 
-    let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), None);
+    let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), slog_scope::logger());
 
     handle
         .insert_source(channel, {
@@ -82,6 +83,7 @@ fn init_log() -> slog::Logger {
             .build()
             .fuse(),
     )
+    .filter(Some("anodium"), slog::FilterLevel::Trace)
     .filter(Some("smithay"), slog::FilterLevel::Warning)
     .build()
     .fuse();
@@ -97,7 +99,7 @@ fn init_log() -> slog::Logger {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let log = init_log();
-    let _guard = slog_scope::set_global_logger(log.clone());
+    let _guard = slog_scope::set_global_logger(log);
 
     let opt = cli::AnodiumCliOptions::parse();
 
@@ -106,8 +108,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut event_loop = EventLoop::<State>::try_new()?;
     let display = Rc::new(RefCell::new(Display::new()));
 
-    init_shm_global(&mut display.borrow_mut(), vec![], None);
-    init_xdg_output_manager(&mut display.borrow_mut(), None);
+    init_shm_global(&mut display.borrow_mut(), vec![], slog_scope::logger());
+    init_xdg_output_manager(&mut display.borrow_mut(), slog_scope::logger());
 
     let pointer_icon = PointerIcon::new();
 
@@ -140,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let xwayland = init_xwayland_connection(&event_loop.handle(), &display);
 
     let mut state = State {
-        space: desktop::Space::new(None),
+        space: desktop::Space::new(slog_scope::logger()),
         display: display.clone(),
         shell_manager,
 
@@ -180,12 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .expect("Failed to init the wayland event source.");
 
-    anodium_backend::init(
-        &mut event_loop,
-        display,
-        &mut state,
-        anodium_backend::PreferedBackend::Auto,
-    );
+    anodium_backend::init(&mut event_loop, display, &mut state, opt.backend);
 
     event_loop.run(None, &mut state, |state| {
         state.shell_manager.refresh();
