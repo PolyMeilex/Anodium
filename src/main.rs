@@ -20,7 +20,7 @@ use smithay::{
     },
 };
 
-use std::{cell::RefCell, collections::HashSet, rc::Rc, time::Instant};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
 #[cfg(feature = "xwayland")]
 use smithay::{reexports::calloop::LoopHandle, xwayland::XWayland};
@@ -35,7 +35,6 @@ struct State {
     display: Rc<RefCell<Display>>,
 
     seat: Seat,
-    pressed_keys: HashSet<u32>,
 
     shell_manager: ShellManager<Self>,
 
@@ -147,7 +146,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         shell_manager,
 
         seat,
-        pressed_keys: Default::default(),
 
         start_time: Instant::now(),
         loop_signal: event_loop.get_signal(),

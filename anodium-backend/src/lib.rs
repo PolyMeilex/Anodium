@@ -1,3 +1,5 @@
+#![allow(clippy::result_unit_err)]
+
 #[macro_use]
 extern crate log;
 

@@ -3,7 +3,7 @@ use anodium_backend::{InputHandler, OutputId};
 
 use smithay::{
     backend::input::{
-        ButtonState, Event, InputEvent, KeyState, KeyboardKeyEvent, PointerButtonEvent,
+        ButtonState, Event, InputEvent, KeyboardKeyEvent, PointerButtonEvent,
         PointerMotionAbsoluteEvent, PointerMotionEvent,
     },
     desktop::WindowSurfaceType,
@@ -45,11 +45,7 @@ impl InputHandler for State {
                             self.loop_signal.stop();
                         }
 
-                        if let KeyState::Pressed = state {
-                            self.pressed_keys.insert(keysym);
-                        } else {
-                            self.pressed_keys.remove(&keysym);
-                        }
+                        SeatState::from_seat(&self.seat).update_pressed_keys(keysym, state);
 
                         self.config.key_action(modifiers, &handle, state);
 
