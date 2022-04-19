@@ -11,7 +11,7 @@ Outputs.layout = [
     },
 ];
 
-Keyboard.register(
+Keyboard.keybind(
     ["alt"], "return",
     || {
         Log.info("starting weston terminal");
@@ -21,7 +21,7 @@ Keyboard.register(
 
 for key in 1..=9 {
     let key_name = key.to_string();
-    Keyboard.register(
+    Keyboard.keybind(
         ["alt"], key_name,
         || {
             Log.info("workspace: " + key_name);

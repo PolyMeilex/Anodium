@@ -48,7 +48,7 @@ impl ConfigVM {
         keysym: &KeysymHandle,
         state: KeyState,
     ) {
-        self.keyboard.callbacks.key_action(
+        self.keyboard.key_action(
             &mut self.engine,
             &mut self.ast,
             (*modifiers).into(),

@@ -2,21 +2,8 @@ use rhai::{plugin::*, Scope};
 
 use std::{cell::RefCell, rc::Rc};
 
-pub mod output_descriptor;
-pub use output_descriptor::OutputDescriptor;
-
-#[derive(Debug, Default, Clone)]
-pub struct OutputLayout(Vec<OutputDescriptor>);
-
-impl OutputLayout {
-    pub fn find_output(&self, name: &str) -> Option<&OutputDescriptor> {
-        self.0.iter().find(|o| o.name() == name)
-    }
-
-    pub fn iter(&self) -> std::slice::Iter<OutputDescriptor> {
-        self.0.iter()
-    }
-}
+pub mod layout;
+pub use layout::{OutputDescriptor, OutputLayout};
 
 #[derive(Debug, Default, Clone)]
 pub struct Outputs {
