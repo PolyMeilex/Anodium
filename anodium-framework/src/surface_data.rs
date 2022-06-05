@@ -6,7 +6,7 @@ use smithay::{
         wayland_server::protocol::{wl_shell_surface, wl_surface::WlSurface},
     },
     utils::{Logical, Point, Size},
-    wayland::{compositor, Serial},
+    wayland::compositor,
 };
 
 #[derive(Default)]
@@ -71,8 +71,6 @@ pub enum MoveAfterResizeState {
     None,
     /// The surface was resized and moved
     Current(MoveAfterResizeData),
-    /// The resize and move was requested, and the surface needs to ack the configure
-    WaitingForAck(MoveAfterResizeData),
     /// Waiting for commit
     WaitingForCommit(MoveAfterResizeData),
 }
@@ -101,8 +99,6 @@ pub enum ResizeState {
     NotResizing,
     /// The surface is currently being resized.
     Resizing(ResizeData),
-    /// The resize has finished, and the surface needs to ack the final configure.
-    WaitingForFinalAck(ResizeData, Serial),
     /// The resize has finished, and the surface needs to commit its final state.
     WaitingForCommit(ResizeData),
 }

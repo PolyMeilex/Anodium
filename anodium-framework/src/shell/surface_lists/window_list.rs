@@ -14,16 +14,11 @@ impl ShellWindowList {
     /// Finds the toplevel corresponding to the given `WlSurface`.
     pub fn find<S: AsWlSurface>(&mut self, surface: &S) -> Option<&Window> {
         if let Some(surface) = surface.as_surface() {
-            self.windows.iter().find_map(|w| {
-                if w.toplevel()
+            self.windows.iter().find(|w| {
+                w.toplevel()
                     .get_surface()
                     .map(|s| s.as_ref().equals(surface.as_ref()))
                     .unwrap_or(false)
-                {
-                    Some(w)
-                } else {
-                    None
-                }
             })
         } else {
             None

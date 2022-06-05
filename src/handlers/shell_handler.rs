@@ -352,23 +352,15 @@ impl PointerGrab for ResizeSurfaceGrab {
                 if ret.is_ok() {
                     xdg.send_configure();
                 }
-
-                SurfaceData::with_mut(self.window.toplevel().get_surface().unwrap(), |data| {
-                    if let ResizeState::Resizing(resize_data) = data.resize_state {
-                        data.resize_state = ResizeState::WaitingForFinalAck(resize_data, serial);
-                    } else {
-                        panic!("invalid resize state: {:?}", data.resize_state);
-                    }
-                });
-            } else {
-                SurfaceData::with_mut(self.window.toplevel().get_surface().unwrap(), |data| {
-                    if let ResizeState::Resizing(resize_data) = data.resize_state {
-                        data.resize_state = ResizeState::WaitingForCommit(resize_data);
-                    } else {
-                        panic!("invalid resize state: {:?}", data.resize_state);
-                    }
-                });
             }
+
+            SurfaceData::with_mut(self.window.toplevel().get_surface().unwrap(), |data| {
+                if let ResizeState::Resizing(resize_data) = data.resize_state {
+                    data.resize_state = ResizeState::WaitingForCommit(resize_data);
+                } else {
+                    panic!("invalid resize state: {:?}", data.resize_state);
+                }
+            });
         }
     }
 
