@@ -2,7 +2,6 @@ use std::{
     cell::RefCell,
     collections::hash_map::{DefaultHasher, HashMap},
     hash::{Hash, Hasher},
-    io::Error as IoError,
     os::unix::io::{AsRawFd, RawFd},
     path::PathBuf,
     rc::Rc,
@@ -26,10 +25,7 @@ use smithay::{
         SwapBuffersError,
     },
     reexports::{
-        calloop::{
-            timer::{Timer, TimerHandle},
-            EventLoop, LoopHandle,
-        },
+        calloop::{timer::Timer, EventLoop, LoopHandle},
         drm::{
             self,
             control::{connector, crtc, Device as _, Mode as DrmMode, ModeTypeFlags},
@@ -37,7 +33,7 @@ use smithay::{
         gbm::Device as GbmDevice,
         input::Libinput,
         nix::sys::stat::dev_t,
-        wayland_server::{protocol::wl_output, Display},
+        wayland_server::{protocol::wl_output, DisplayHandle},
     },
     utils::{
         signaling::{Linkable, SignalToken, Signaler},
@@ -45,7 +41,6 @@ use smithay::{
     },
     wayland::{
         self,
-        dmabuf::init_dmabuf_global,
         output::{Mode, PhysicalProperties},
     },
 };
@@ -59,7 +54,7 @@ mod device_map;
 use device_map::Device;
 
 pub struct UdevState {
-    display: Rc<RefCell<Display>>,
+    display: DisplayHandle,
     session: AutoSession,
     primary_gpu: Option<PathBuf>,
     pointer_image: cursor::Cursor,
@@ -121,11 +116,11 @@ impl UdevOutputId {
     }
 }
 
-type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
+// type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
 
 pub fn run_udev<D>(
     event_loop: &mut EventLoop<'static, D>,
-    display: Rc<RefCell<Display>>,
+    display: &DisplayHandle,
     handler: &mut D,
 ) -> Result<(), ()>
 where
@@ -207,27 +202,28 @@ where
             formats.extend(backend_data.renderer.borrow().dmabuf_formats().cloned());
         }
 
-        init_dmabuf_global(
-            &mut *display.borrow_mut(),
-            formats,
-            move |buffer, mut ddata| {
-                let handler = ddata.get::<D>().unwrap();
-                let udev_devices = handler.backend_state().udev().udev_devices.borrow();
+        // TODO(0.30)
+        // init_dmabuf_global(
+        //     &mut *display.borrow_mut(),
+        //     formats,
+        //     move |buffer, mut ddata| {
+        //         let handler = ddata.get::<D>().unwrap();
+        //         let udev_devices = handler.backend_state().udev().udev_devices.borrow();
 
-                for backend_data in udev_devices.values() {
-                    if backend_data
-                        .renderer
-                        .borrow_mut()
-                        .import_dmabuf(buffer, None)
-                        .is_ok()
-                    {
-                        return true;
-                    }
-                }
-                false
-            },
-            None,
-        );
+        //         for backend_data in udev_devices.values() {
+        //             if backend_data
+        //                 .renderer
+        //                 .borrow_mut()
+        //                 .import_dmabuf(buffer, None)
+        //                 .is_ok()
+        //             {
+        //                 return true;
+        //             }
+        //         }
+        //         false
+        //     },
+        //     None,
+        // );
     }
 
     let handle = event_loop.handle();
@@ -244,7 +240,6 @@ where
                 error!("Udev device ({:?}) removed: unimplemented", device_id);
             }
         })
-        .map_err(|e| -> IoError { e.into() })
         .unwrap();
 
     /*
@@ -273,7 +268,6 @@ struct OutputSurfaceData {
     _drm_modes: Vec<DrmMode>,
 
     surface: RenderSurface,
-    _render_timer: RenderTimerHandle,
     _connector_info: connector::Info,
     crtc: crtc::Handle,
 }
@@ -319,7 +313,7 @@ where
 {
     let scan_result = device.scan_connectors();
 
-    let drm: &DrmDevice<SessionFd> = &*device.drm.as_source_ref();
+    let drm = device.drm.as_source_ref();
 
     let mut backends = IndexMap::new();
 
@@ -392,7 +386,7 @@ where
                 }
             };
 
-            let timer = Timer::new().unwrap();
+            // let timer = Timer::new().unwrap();
 
             entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
                 output_name,
@@ -404,16 +398,15 @@ where
                 _drm_modes: drm_modes.to_owned(),
 
                 surface: gbm_surface,
-                _render_timer: timer.handle(),
                 _connector_info: connector_info,
                 crtc,
             })));
 
-            handle
-                .insert_source(timer, move |(dev_id, crtc), _, handler| {
-                    udev_render(handler, dev_id, Some(crtc))
-                })
-                .unwrap();
+            // handle
+            //     .insert_source(timer, move |(dev_id, crtc), _, handler| {
+            //         udev_render(handler, dev_id, Some(crtc))
+            //     })
+            //     .unwrap();
         }
     }
 
@@ -452,7 +445,7 @@ fn device_added<D>(
             if path.canonicalize().ok() == handler.backend_state().udev().primary_gpu {
                 info!("Initializing EGL Hardware Acceleration via {:?}", path);
 
-                device.bind_wl_display(&display.borrow());
+                device.bind_wl_display(&display);
             }
 
             let outputs = scan_connectors(handle.clone(), &mut device, session_signal);

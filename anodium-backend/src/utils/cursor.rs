@@ -6,7 +6,8 @@ use smithay::{
         Frame, Texture,
     },
     desktop::space::{RenderElement, SpaceOutputTuple},
-    utils::{Logical, Point, Rectangle, Size, Transform},
+    reexports::wayland_server::DisplayHandle,
+    utils::{Logical, Physical, Point, Rectangle, Scale, Size, Transform},
 };
 use xcursor::{
     parser::{parse_xcursor, Image},
@@ -135,16 +136,23 @@ impl RenderElement<Gles2Renderer> for PointerElement {
         0
     }
 
-    fn geometry(&self) -> Rectangle<i32, Logical> {
-        Rectangle::from_loc_and_size(self.position, self.size)
+    fn location(&self, scale: impl Into<Scale<f64>>) -> Point<f64, Physical> {
+        self.position.to_f64().to_physical(scale)
+    }
+
+    fn geometry(&self, scale: impl Into<Scale<f64>>) -> Rectangle<i32, Physical> {
+        Rectangle::from_loc_and_size(self.position, self.size).to_physical_precise_round(scale)
     }
 
     fn accumulated_damage(
         &self,
+        scale: impl Into<Scale<f64>>,
         _: Option<SpaceOutputTuple<'_, '_>>,
-    ) -> Vec<Rectangle<i32, Logical>> {
+    ) -> Vec<Rectangle<i32, Physical>> {
+        let scale = scale.into();
         if self.damaged {
-            vec![Rectangle::from_loc_and_size((0, 0), self.size)]
+            vec![Rectangle::from_loc_and_size(self.position, self.size)
+                .to_physical_precise_up(scale)]
         } else {
             vec![]
         }
@@ -152,23 +160,25 @@ impl RenderElement<Gles2Renderer> for PointerElement {
 
     fn draw(
         &self,
+        _dh: &DisplayHandle,
         _renderer: &mut Gles2Renderer,
         frame: &mut Gles2Frame,
-        scale: f64,
-        location: Point<i32, Logical>,
-        damage: &[Rectangle<i32, Logical>],
+        scale: impl Into<Scale<f64>>,
+        location: Point<f64, Physical>,
+        _damage: &[Rectangle<i32, Physical>],
         _log: &slog::Logger,
     ) -> Result<(), Gles2Error> {
+        let scale = scale.into();
         frame.render_texture_at(
             &self.texture,
-            location.to_f64().to_physical(scale),
+            location.to_i32_round(),
             1,
-            scale as f64,
+            scale,
             Transform::Normal,
-            &*damage
-                .iter()
-                .map(|rect| rect.to_f64().to_physical(scale).to_i32_round())
-                .collect::<Vec<_>>(),
+            &[Rectangle::from_loc_and_size(
+                (0.0, 0.0),
+                self.size.to_physical_precise_round(scale),
+            )],
             1.0,
         )?;
         Ok(())

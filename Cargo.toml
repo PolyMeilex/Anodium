@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["anodium-backend", "anodium-framework", "anodium-smallervil"]
+members = ["anodium-backend"]
+# members = ["anodium-backend", "anodium-framework", "anodium-smallervil"]
 
 [dependencies]
 anodium-protocol = { path = "./anodium-protocol", features = ["server"] }
@@ -87,5 +88,5 @@ xwayland = [
   "anodium-framework/xwayland",
 ]
 
-[patch."https://github.com/Smithay/smithay.git"]
-smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }
+# [patch."https://github.com/Smithay/smithay.git"]
+# smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }

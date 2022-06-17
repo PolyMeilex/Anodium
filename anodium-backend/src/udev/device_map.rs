@@ -19,7 +19,7 @@ use smithay::{
     reexports::{
         drm::control::{connector, crtc, Device as _},
         gbm::Device as GbmDevice,
-        wayland_server::Display,
+        wayland_server::{Display, DisplayHandle},
     },
     utils::signaling::{Linkable, Signaler},
 };
@@ -89,7 +89,7 @@ impl<D> Device<D> {
         })
     }
 
-    pub fn bind_wl_display(&mut self, display: &Display) {
+    pub fn bind_wl_display(&mut self, display: &DisplayHandle) {
         if self.renderer.borrow_mut().bind_wl_display(display).is_ok() {
             info!("EGL hardware-acceleration enabled");
         }

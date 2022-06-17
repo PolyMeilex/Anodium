@@ -17,14 +17,14 @@ use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     reexports::{
         calloop::EventLoop,
-        wayland_server::{protocol::wl_output, Display},
+        wayland_server::{protocol::wl_output, DisplayHandle},
     },
-    utils::{Logical, Rectangle},
+    utils::{Physical, Rectangle},
     wayland,
     wayland::output::{self, PhysicalProperties},
 };
 
-use std::{cell::RefCell, rc::Rc, str::FromStr};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct OutputId {
@@ -98,7 +98,7 @@ pub trait OutputHandler {
         output: &OutputId,
         age: usize,
         pointer_image: Option<&Gles2Texture>,
-    ) -> Result<Option<Vec<Rectangle<i32, Logical>>>, smithay::backend::SwapBuffersError>;
+    ) -> Result<Option<Vec<Rectangle<i32, Physical>>>, smithay::backend::SwapBuffersError>;
 }
 
 pub trait InputHandler {
@@ -159,7 +159,7 @@ impl FromStr for PreferedBackend {
 
 pub fn init<D>(
     event_loop: &mut EventLoop<'static, D>,
-    display: Rc<RefCell<Display>>,
+    display: &DisplayHandle,
     handler: &mut D,
     backend: PreferedBackend,
 ) where
