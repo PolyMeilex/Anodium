@@ -13,16 +13,11 @@ impl ShellLayerList {
 
     pub fn find<S: AsWlSurface>(&self, surface: &S) -> Option<&LayerSurface> {
         surface.as_surface().and_then(|surface| {
-            self.layers.iter().find_map(|w| {
-                if w.layer_surface()
+            self.layers.iter().find(|w| {
+                w.layer_surface()
                     .get_surface()
                     .map(|s| s.as_ref().equals(surface.as_ref()))
                     .unwrap_or(false)
-                {
-                    Some(w)
-                } else {
-                    None
-                }
             })
         })
     }

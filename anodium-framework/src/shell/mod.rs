@@ -165,7 +165,6 @@ where
                 // accordingly.
                 match data.resize_state {
                     ResizeState::Resizing(resize_data)
-                    | ResizeState::WaitingForFinalAck(resize_data, _)
                     | ResizeState::WaitingForCommit(resize_data) => {
                         let ResizeData {
                             edges,

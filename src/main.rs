@@ -1,79 +1,154 @@
 #![allow(irrefutable_let_patterns)]
 
 use anodium_backend::BackendState;
-use anodium_framework::{pointer_icon::PointerIcon, shell::ShellManager};
+use anodium_framework::pointer_icon::PointerIcon;
 
 use clap::StructOpt;
-use config::ConfigVM;
 use slog::Drain;
 use smithay::{
     desktop,
     reexports::{
-        calloop::{self, generic::Generic, EventLoop, Interest, LoopSignal, PostAction},
-        wayland_server::Display,
+        calloop::{
+            generic::Generic, EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction,
+        },
+        wayland_server::{
+            backend::{ClientData, ClientId, DisconnectReason},
+            Display, DisplayHandle, Resource,
+        },
     },
     wayland::{
-        data_device::{self},
-        output::xdg::init_xdg_output_manager,
-        seat::Seat,
-        shm::init_shm_global,
+        compositor::CompositorState,
+        data_device::{self, DataDeviceState},
+        dmabuf::DmabufState,
+        output::OutputManagerState,
+        seat::{Seat, SeatState},
+        shell::xdg::XdgShellState,
+        shm::ShmState,
+        socket::ListeningSocketSource,
     },
 };
 
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{ffi::OsString, sync::Arc, time::Instant};
 
 #[cfg(feature = "xwayland")]
-use smithay::{reexports::calloop::LoopHandle, xwayland::XWayland};
+use smithay::xwayland::XWayland;
 
 mod cli;
-mod config;
+mod data;
+mod grabs;
 mod handlers;
-mod state;
 
-struct State {
+struct CalloopData {
+    state: State,
+    display: Display<State>,
+}
+
+pub struct State {
     space: desktop::Space,
-    display: Rc<RefCell<Display>>,
-
-    seat: Seat,
-
-    shell_manager: ShellManager<Self>,
+    display: DisplayHandle,
 
     start_time: Instant,
     loop_signal: LoopSignal,
+    _loop_handle: LoopHandle<'static, CalloopData>,
+
+    seat: Seat<Self>,
+
+    compositor_state: CompositorState,
+    xdg_shell_state: XdgShellState,
+    shm_state: ShmState,
+    _output_manager_state: OutputManagerState,
+    seat_state: SeatState<Self>,
+    data_device_state: DataDeviceState,
+    dmabuf_state: DmabufState,
 
     pointer_icon: PointerIcon,
 
     backend: BackendState,
 
-    config: ConfigVM,
+    socket_name: OsString,
 
     #[cfg(feature = "xwayland")]
-    xwayland: XWayland<Self>,
+    xwayland: XWayland,
 }
 
 /// init the xwayland connection
 #[cfg(feature = "xwayland")]
 fn init_xwayland_connection(
-    handle: &LoopHandle<'static, State>,
-    display: &Rc<RefCell<Display>>,
-) -> XWayland<State> {
+    handle: &LoopHandle<'static, CalloopData>,
+    display: &DisplayHandle,
+) -> XWayland {
     use smithay::xwayland::XWaylandEvent;
 
-    let (xwayland, channel) = XWayland::new(handle.clone(), display.clone(), slog_scope::logger());
+    let (xwayland, channel) = XWayland::new(slog_scope::logger(), display);
 
     handle
         .insert_source(channel, {
             let handle = handle.clone();
             move |event, _, state| match event {
-                XWaylandEvent::Ready { connection, client } => state
-                    .shell_manager
-                    .xwayland_ready(&handle, connection, client),
+                XWaylandEvent::Ready {
+                    connection,
+                    client,
+                    client_fd,
+                    display,
+                } => {
+                    // state
+                    // .shell_manager
+                    // .xwayland_ready(&handle, connection, client)
+                }
                 XWaylandEvent::Exited => {}
             }
         })
         .unwrap();
 
     xwayland
+}
+
+struct ClientState;
+impl ClientData for ClientState {
+    fn initialized(&self, _client_id: ClientId) {}
+    fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
+}
+
+fn init_wayland_listener<D>(
+    display: &mut Display<D>,
+    event_loop: &mut EventLoop<CalloopData>,
+    log: slog::Logger,
+) -> OsString {
+    // Creates a new listening socket, automatically choosing the next available `wayland` socket name.
+    let listening_socket = ListeningSocketSource::new_auto(log).unwrap();
+
+    // Get the name of the listening socket.
+    // Clients will connect to this socket.
+    let socket_name = listening_socket.socket_name().to_os_string();
+
+    let handle = event_loop.handle();
+
+    event_loop
+        .handle()
+        .insert_source(listening_socket, move |client_stream, _, state| {
+            // Inside the callback, you should insert the client into the display.
+            //
+            // You may also associate some data with the client when inserting the client.
+            state
+                .display
+                .handle()
+                .insert_client(client_stream, Arc::new(ClientState))
+                .unwrap();
+        })
+        .expect("Failed to init the wayland event source.");
+
+    // You also need to add the display itself to the event loop, so that client events will be processed by wayland-server.
+    handle
+        .insert_source(
+            Generic::new(display.backend().poll_fd(), Interest::READ, Mode::Level),
+            |_, _, state| {
+                state.display.dispatch_clients(&mut state.state).unwrap();
+                Ok(PostAction::Continue)
+            },
+        )
+        .unwrap();
+
+    socket_name
 }
 
 fn init_log() -> slog::Logger {
@@ -102,90 +177,76 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let opt = cli::AnodiumCliOptions::parse();
 
-    let config = ConfigVM::new(opt.config)?;
+    let mut event_loop = EventLoop::<CalloopData>::try_new()?;
+    let mut display = Display::new()?;
 
-    let mut event_loop = EventLoop::<State>::try_new()?;
-    let display = Rc::new(RefCell::new(Display::new()));
-
-    init_shm_global(&mut display.borrow_mut(), vec![], slog_scope::logger());
-    init_xdg_output_manager(&mut display.borrow_mut(), slog_scope::logger());
+    let socket_name = init_wayland_listener(&mut display, &mut event_loop, slog_scope::logger());
 
     let pointer_icon = PointerIcon::new();
 
-    data_device::init_data_device(
-        &mut display.borrow_mut(),
-        {
-            let pointer_icon = pointer_icon.clone();
-            move |event| pointer_icon.on_data_device_event(event)
-        },
-        data_device::default_action_chooser,
-        None,
-    );
+    let dh = display.handle();
+    let compositor_state = CompositorState::new::<State, _>(&dh, slog_scope::logger());
+    let xdg_shell_state = XdgShellState::new::<State, _>(&dh, slog_scope::logger());
+    let shm_state = ShmState::new::<State, _>(&dh, vec![], slog_scope::logger());
+    let output_manager_state = OutputManagerState::new_with_xdg_output::<State>(&dh);
+    let seat_state = SeatState::<State>::new();
+    let data_device_state = DataDeviceState::new::<State, _>(&dh, slog_scope::logger());
 
-    let shell_manager = ShellManager::init_shell(&mut display.borrow_mut());
+    let dmabuf_state = DmabufState::new();
 
-    let (mut seat, _) = Seat::new(
-        &mut display.borrow_mut(),
-        "seat0".into(),
-        slog_scope::logger(),
-    );
+    let mut seat = Seat::<State>::new(&display.handle(), "seat0", slog_scope::logger());
 
     seat.add_pointer({
         let pointer_icon = pointer_icon.clone();
         move |cursor| pointer_icon.on_new_cursor(cursor)
     });
-    seat.add_keyboard(Default::default(), 200, 25, |seat, focus| {
-        data_device::set_data_device_focus(seat, focus.and_then(|s| s.as_ref().client()))
+
+    seat.add_keyboard(Default::default(), 200, 25, move |seat, focus| {
+        let focus = focus.and_then(|s| dh.get_client(s.id()).ok());
+        data_device::set_data_device_focus(&dh, seat, focus);
     })?;
 
-    let xwayland = init_xwayland_connection(&event_loop.handle(), &display);
+    #[cfg(feature = "xwayland")]
+    let xwayland = init_xwayland_connection(&event_loop.handle(), &display.handle());
 
-    let mut state = State {
+    let state = State {
         space: desktop::Space::new(slog_scope::logger()),
-        display: display.clone(),
-        shell_manager,
-
-        seat,
+        display: display.handle(),
 
         start_time: Instant::now(),
         loop_signal: event_loop.get_signal(),
+        _loop_handle: event_loop.handle(),
+
+        seat,
+
+        compositor_state,
+        xdg_shell_state,
+        shm_state,
+        _output_manager_state: output_manager_state,
+        seat_state,
+        data_device_state,
+        dmabuf_state,
 
         pointer_icon,
         backend: BackendState::default(),
 
-        config,
-
+        socket_name,
+        #[cfg(feature = "xwayland")]
         xwayland,
     };
 
-    event_loop
-        .handle()
-        .insert_source(
-            Generic::from_fd(
-                display.borrow().get_poll_fd(),
-                Interest::READ,
-                calloop::Mode::Level,
-            ),
-            |_, _, state| {
-                let display = state.display.clone();
-                let mut display = display.borrow_mut();
-                match display.dispatch(std::time::Duration::from_millis(0), state) {
-                    Ok(_) => Ok(PostAction::Continue),
-                    Err(e) => {
-                        state.loop_signal.stop();
-                        Err(e)
-                    }
-                }
-            },
-        )
-        .expect("Failed to init the wayland event source.");
+    let mut data = CalloopData { state, display };
 
-    anodium_backend::init(&mut event_loop, display, &mut state, opt.backend);
+    anodium_backend::init(
+        &mut event_loop,
+        &data.display.handle(),
+        &mut data,
+        opt.backend,
+    );
 
-    event_loop.run(None, &mut state, |state| {
-        state.shell_manager.refresh();
-        state.space.refresh();
-        state.display.borrow_mut().flush_clients(&mut ());
+    event_loop.run(None, &mut data, |data| {
+        data.state.space.refresh(&data.display.handle());
+        data.display.flush_clients().unwrap();
     })?;
 
     Ok(())

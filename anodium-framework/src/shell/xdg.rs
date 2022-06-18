@@ -1,20 +1,13 @@
-use std::sync::Mutex;
-
 use smithay::{
     desktop::{Kind, PopupKind},
-    reexports::wayland_protocols::xdg_shell::server::xdg_toplevel,
     wayland::{
-        compositor,
         seat::{PointerGrabStartData, Seat},
-        shell::xdg::{Configure, XdgRequest, XdgToplevelSurfaceRoleAttributes},
+        shell::xdg::XdgRequest,
         Serial,
     },
 };
 
-use super::{
-    super::surface_data::{MoveAfterResizeState, ResizeState, SurfaceData},
-    ShellHandler,
-};
+use super::ShellHandler;
 
 use super::utils::AsWlSurface;
 
@@ -137,65 +130,6 @@ where
                         location,
                     );
                 }
-            }
-
-            XdgRequest::AckConfigure {
-                surface,
-                configure: Configure::Toplevel(configure),
-            } => {
-                let waiting_for_serial = SurfaceData::with(&surface, |data| {
-                    if let ResizeState::WaitingForFinalAck(_, serial) = data.resize_state {
-                        Some(serial)
-                    } else {
-                        None
-                    }
-                });
-
-                if let Some(serial) = waiting_for_serial {
-                    // When the resize grab is released the surface
-                    // resize state will be set to WaitingForFinalAck
-                    // and the client will receive a configure request
-                    // without the resize state to inform the client
-                    // resizing has finished. Here we will wait for
-                    // the client to acknowledge the end of the
-                    // resizing. To check if the surface was resizing
-                    // before sending the configure we need to use
-                    // the current state as the received acknowledge
-                    // will no longer have the resize state set
-                    let is_resizing = compositor::with_states(&surface, |states| {
-                        states
-                            .data_map
-                            .get::<Mutex<XdgToplevelSurfaceRoleAttributes>>()
-                            .unwrap()
-                            .lock()
-                            .unwrap()
-                            .current
-                            .states
-                            .contains(xdg_toplevel::State::Resizing)
-                    })
-                    .unwrap();
-
-                    if configure.serial >= serial && is_resizing {
-                        SurfaceData::with_mut(&surface, |data| {
-                            if let ResizeState::WaitingForFinalAck(resize_data, _) =
-                                data.resize_state
-                            {
-                                data.resize_state = ResizeState::WaitingForCommit(resize_data);
-                            } else {
-                                unreachable!()
-                            }
-                        });
-                    }
-                }
-
-                // Maximize / Fullscreen
-                SurfaceData::with_mut(&surface, |data| {
-                    if let MoveAfterResizeState::WaitingForAck(mdata) = data.move_after_resize_state
-                    {
-                        data.move_after_resize_state =
-                            MoveAfterResizeState::WaitingForCommit(mdata);
-                    }
-                });
             }
             _ => {}
         }

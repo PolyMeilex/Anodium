@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace]
-members = ["anodium-backend", "anodium-framework", "anodium-smallervil"]
+members = ["anodium-backend", "anodium-framework"]
 
 [dependencies]
 anodium-protocol = { path = "./anodium-protocol", features = ["server"] }
@@ -12,9 +12,7 @@ anodium-backend = { path = "./anodium-backend" }
 anodium-framework = { path = "./anodium-framework" }
 
 bitflags = "1.3"
-thiserror = "1"
 fps_ticker = "1.0"
-rand = "0.8"
 
 slog = { version = "2.1" }
 slog-term = "2.8"
@@ -22,36 +20,16 @@ slog-async = "2.2"
 slog-stdlog = "4.1"
 slog-envlogger = "2.2"
 slog-scope = "4.4"
-slog-stream = "1.2"
-slog-json = "2.4"
 
 xkbcommon = "0.4"
-generational-arena = "0.2"
-cgmath = "0.18"
 
-rhai = { version = "1.3", features = ["serde"] }
-serde = { version = "1.0", features = ["derive"] }
-
-futures = "0.3"
-shell-words = "1.0"
-
-lazy_static = "1.4"
-
-chrono = "0.4"
-
-egui = "0.16"
-
-gumdrop = "0.8"
-strum = { version = "0.23", features = ["derive"] }
 clap = { version = "3.1.9", features = ["derive"] }
-
-indexmap = "1.8.0"
 
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
 default-features = false
 features = [
-  "use_system_lib",
+  # "use_system_lib",
   "renderer_gl",
   "backend_egl",
   "wayland_frontend",
@@ -61,19 +39,16 @@ features = [
 
 [dependencies.x11rb]
 optional = true
-version = "0.9"
+version = "0.10.1"
 default-features = false
 features = ["composite"]
 
 [dependencies.calloop]
-version = "0.9"
-features = ["executor", "futures-io"]
-
-[dependencies.smithay-egui]
-git = "https://github.com/Smithay/smithay-egui.git"
+version = "0.10.0"
+features = []
 
 [features]
-default = ["udev", "winit", "x11", "debug", "xwayland"]
+default = ["udev", "winit", "x11", "debug"]
 
 x11 = ["anodium-backend/x11", "x11rb"]
 winit = ["anodium-backend/winit"]
@@ -87,5 +62,8 @@ xwayland = [
   "anodium-framework/xwayland",
 ]
 
-[patch."https://github.com/Smithay/smithay.git"]
-smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }
+# [patch."https://github.com/Smithay/smithay.git"]
+# smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }
+
+[patch.crates-io]
+winit = { git = "https://github.com/rust-windowing/winit", rev = "4c39b3188cee29548761b57f38e4aa046cbe31ea" }

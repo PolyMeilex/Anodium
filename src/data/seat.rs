@@ -6,6 +6,8 @@ use smithay::{
     wayland::seat::Seat,
 };
 
+use crate::State;
+
 #[derive(Debug, Default)]
 pub struct SeatState {
     pointer_pos: Cell<Point<f64, Logical>>,
@@ -13,7 +15,7 @@ pub struct SeatState {
 }
 
 impl SeatState {
-    pub fn from_seat(seat: &Seat) -> &Self {
+    pub fn for_seat(seat: &Seat<State>) -> &Self {
         seat.user_data().insert_if_missing(Self::default);
         seat.user_data().get::<Self>().unwrap()
     }

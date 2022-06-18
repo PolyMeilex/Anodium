@@ -22,8 +22,8 @@ pub fn draw_cursor(
                 .unwrap()
                 .hotspot,
         )
-    })
-    .unwrap_or(None);
+    });
+
     position -= match ret {
         Some(h) => h,
         None => {

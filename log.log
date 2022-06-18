@@ -1,0 +1,180 @@
+warning: unused imports: `DmabufHandler`, `DrmDevice`, `timer::Timer`
+  --> anodium-backend/src/udev/mod.rs:16:15
+   |
+16 |         drm::{DrmDevice, DrmError, DrmEvent, GbmBufferedSurface},
+   |               ^^^^^^^^^
+...
+28 |         calloop::{timer::Timer, EventLoop, LoopHandle},
+   |                   ^^^^^^^^^^^^
+...
+44 |         dmabuf::{DmabufGlobal, DmabufHandler, DmabufState, ImportError},
+   |                                ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `Display`
+  --> anodium-backend/src/udev/device_map.rs:19:26
+   |
+19 |         wayland_server::{Display, DisplayHandle},
+   |                          ^^^^^^^
+
+warning: unused import: `renderer::ImportDma`
+ --> anodium-backend/src/winit/mod.rs:6:9
+  |
+6 |         renderer::ImportDma,
+  |         ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `renderer::ImportDma`
+ --> anodium-backend/src/x11/mod.rs:9:43
+  |
+9 | use smithay::backend::{input::InputEvent, renderer::ImportDma};
+  |                                           ^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `handle`
+   --> anodium-backend/src/udev/mod.rs:331:5
+    |
+331 |     handle: LoopHandle<'static, D>,
+    |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_handle`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `display`
+  --> anodium-backend/src/winit/mod.rs:24:5
+   |
+24 |     display: &DisplayHandle,
+   |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_display`
+
+warning: unused variable: `display`
+   --> anodium-backend/src/x11/mod.rs:158:5
+    |
+158 |     display: &DisplayHandle,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_display`
+
+warning: unused variable: `display`
+  --> anodium-backend/src/udev/device_map.rs:89:39
+   |
+89 |     pub fn bind_wl_display(&mut self, display: &DisplayHandle) {
+   |                                       ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_display`
+
+warning: `anodium-backend` (lib) generated 8 warnings
+warning: unused import: `ButtonState`
+ --> src/handlers/input_handler.rs:6:9
+  |
+6 |         ButtonState, Event, InputEvent, KeyState, KeyboardKeyEvent, PointerButtonEvent,
+  |         ^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: field is never read: `loop_handle`
+  --> src/main.rs:52:5
+   |
+52 |     loop_handle: LoopHandle<'static, CalloopData>,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: field is never read: `output_manager_state`
+  --> src/main.rs:59:5
+   |
+59 |     output_manager_state: OutputManagerState,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused `Result` that must be used
+  --> src/handlers/input_handler.rs:51:29
+   |
+51 | ...                   std::process::Command::new("gtk4-demo").spawn();
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_must_use)]` on by default
+   = note: this `Result` may be an `Err` variant, which should be handled
+
+warning: `anodium` (bin "anodium") generated 4 warnings
+    Finished dev [unoptimized + debuginfo] target(s) in 0.08s
+     Running `target/debug/anodium`
+Jun 18 01:02:20.696 INFO Starting with udev backend
+Jun 18 01:02:20.701 INFO Primary GPU: Some("/dev/dri/card0")
+Jun 18 01:02:20.702 WARN Unable to load xcursor: Theme has no default cursor, using fallback cursor
+Jun 18 01:02:20.807 INFO Device Added 57856 : "/dev/dri/card0"
+Jun 18 01:02:20.808 WARN Unable to become drm master, assuming unprivileged mode, smithay_module: backend_drm
+Jun 18 01:02:20.973 INFO Initializing EGL Hardware Acceleration via "/dev/dri/card0"
+Jun 18 01:02:21.016 INFO Connected: EmbeddedDisplayPort
+Jun 18 01:02:21.017 INFO Connected: HDMIA
+Jun 18 01:02:21.038 INFO Trying to setup connector EmbeddedDisplayPort-1 with crtc crtc::Handle(67)
+Jun 18 01:02:21.042 INFO Trying to setup connector HDMIA-1 with crtc crtc::Handle(70)
+Jun 18 01:02:21.043 TRCE Backends: [crtc::Handle(67), crtc::Handle(70)]
+Jun 18 01:02:21.043 TRCE Scheduling frame
+Jun 18 01:02:21.074 WARN Failed to destory old mode property blob: unknown system error: ENOENT: No such file or directory, drm_module: surface, smithay_module: backend_drm_atomic, smithay_module: backend_drm
+Jun 18 01:02:21.660 TRCE Scheduling frame
+Jun 18 01:02:21.665 WARN Failed to destory old mode property blob: unknown system error: ENOENT: No such file or directory, drm_module: surface, smithay_module: backend_drm_atomic, smithay_module: backend_drm
+[src/handlers/backend_handler.rs:19] &self.state.socket_name = "wayland-1"
+** Message: 03:02:23.754: For syntax highlighting, install the “highlight” program
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis
+libinput error: client bug: value requested for unset axis

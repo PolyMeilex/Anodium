@@ -1,18 +1,13 @@
 use std::{cell::RefCell, rc::Rc, time::Duration};
 
+use calloop::timer::TimeoutAction;
 use smithay::{
-    backend::{
-        renderer::{ImportDma, ImportEgl},
-        winit::{self, WinitEvent},
-    },
+    backend::winit::{self, WinitEvent},
     reexports::{
         calloop::{timer::Timer, EventLoop},
-        wayland_server::{protocol::wl_output, Display},
+        wayland_server::{protocol::wl_output, DisplayHandle},
     },
-    wayland::{
-        dmabuf::init_dmabuf_global,
-        output::{Mode, PhysicalProperties},
-    },
+    wayland::output::{Mode, PhysicalProperties},
 };
 
 use crate::{NewOutputDescriptor, OutputId};
@@ -23,7 +18,7 @@ pub const OUTPUT_NAME: &str = "winit";
 
 pub fn run_winit<D>(
     event_loop: &mut EventLoop<'static, D>,
-    display: Rc<RefCell<Display>>,
+    _display: &DisplayHandle,
     handler: &mut D,
 ) -> Result<(), ()>
 where
@@ -33,34 +28,6 @@ where
         error!("Failed to initialize Winit backend: {}", err);
     })?;
     let backend = Rc::new(RefCell::new(backend));
-
-    if backend
-        .borrow_mut()
-        .renderer()
-        .bind_wl_display(&display.borrow())
-        .is_ok()
-    {
-        info!("EGL hardware-acceleration enabled");
-        let dmabuf_formats = backend
-            .borrow_mut()
-            .renderer()
-            .dmabuf_formats()
-            .cloned()
-            .collect::<Vec<_>>();
-        let backend = backend.clone();
-        init_dmabuf_global(
-            &mut *display.borrow_mut(),
-            dmabuf_formats,
-            move |buffer, _| {
-                backend
-                    .borrow_mut()
-                    .renderer()
-                    .import_dmabuf(buffer, None)
-                    .is_ok()
-            },
-            None,
-        );
-    };
 
     let size = backend.borrow().window_size().physical_size;
 
@@ -96,12 +63,11 @@ where
 
     info!("Initialization completed, starting the main loop.");
 
-    let timer = Timer::new().unwrap();
-    let timer_handle = timer.handle();
+    let timer = Timer::immediate();
 
     event_loop
         .handle()
-        .insert_source(timer, move |_: (), timer_handle, handler| {
+        .insert_source(timer, move |_, _, handler| {
             let res = input.dispatch_new_events(|event| match event {
                 WinitEvent::Resized { size, .. } => {
                     let mode = Mode {
@@ -126,17 +92,21 @@ where
                         let damage = handler
                             .output_render(backend.renderer(), &output_id, age, None)
                             .unwrap();
-                        backend.submit(damage.as_deref(), 1.0).unwrap();
+                        backend.submit(damage.as_deref()).unwrap();
                     }
 
                     handler.send_frames();
 
-                    timer_handle.add_timeout(Duration::from_millis(16), ());
+                    TimeoutAction::ToDuration(Duration::from_millis(16))
                 }
-                Err(winit::WinitError::WindowClosed) => handler.close_compositor(),
+                Err(winit::WinitError::WindowClosed) => {
+                    handler.close_compositor();
+
+                    TimeoutAction::Drop
+                }
             }
         })
         .unwrap();
-    timer_handle.add_timeout(Duration::ZERO, ());
+
     Ok(())
 }

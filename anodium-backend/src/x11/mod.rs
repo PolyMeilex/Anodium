@@ -6,22 +6,19 @@ use std::{
 };
 
 use calloop::ping;
+use smithay::backend::input::InputEvent;
 use smithay::{
     backend::{
         egl::{EGLContext, EGLDisplay},
-        renderer::{gles2::Gles2Renderer, Bind, ImportEgl, Unbind},
+        renderer::{gles2::Gles2Renderer, Bind, Unbind},
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },
     reexports::{
         calloop::EventLoop,
         gbm,
-        wayland_server::{protocol::wl_output, Display},
+        wayland_server::{protocol::wl_output, DisplayHandle},
     },
     wayland::output::{Mode, PhysicalProperties},
-};
-use smithay::{
-    backend::{input::InputEvent, renderer::ImportDma},
-    wayland::dmabuf::init_dmabuf_global,
 };
 
 use crate::{NewOutputDescriptor, OutputId};
@@ -122,7 +119,7 @@ impl OutputSurfaceBuilder {
 
 pub fn run_x11<D>(
     event_loop: &mut EventLoop<'static, D>,
-    display: Rc<RefCell<Display>>,
+    display: &DisplayHandle,
     handler: &mut D,
 ) -> Result<(), ()>
 where
@@ -158,7 +155,7 @@ where
 }
 
 fn new_x11_window<D>(
-    display: Rc<RefCell<Display>>,
+    _display: &DisplayHandle,
 
     event_loop: &mut EventLoop<'static, D>,
     handler: &mut D,
@@ -170,26 +167,6 @@ fn new_x11_window<D>(
 where
     D: BackendHandler + 'static,
 {
-    if renderer
-        .borrow_mut()
-        .bind_wl_display(&*display.borrow())
-        .is_ok()
-    {
-        info!("EGL hardware-acceleration enabled");
-        let dmabuf_formats = renderer
-            .borrow_mut()
-            .dmabuf_formats()
-            .cloned()
-            .collect::<Vec<_>>();
-        let renderer = renderer.clone();
-        init_dmabuf_global(
-            &mut *display.borrow_mut(),
-            dmabuf_formats,
-            move |buffer, _| renderer.borrow_mut().import_dmabuf(buffer, None).is_ok(),
-            None,
-        );
-    }
-
     let surface_datas: Vec<_> = x11_outputs
         .into_iter()
         .map(|o| o.build())
