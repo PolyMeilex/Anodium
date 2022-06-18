@@ -6,10 +6,7 @@ use smithay::{
     backend::{
         drm::{DrmDevice, DrmError, DrmEvent, DrmEventMetadata},
         egl::{self, EGLContext, EGLDisplay},
-        renderer::{
-            gles2::{Gles2Error, Gles2Renderer},
-            ImportEgl,
-        },
+        renderer::gles2::{Gles2Error, Gles2Renderer},
         session::{
             auto::{self, AutoSession},
             Session, Signal as SessionSignal,
@@ -19,7 +16,7 @@ use smithay::{
     reexports::{
         drm::control::{connector, crtc, Device as _},
         gbm::Device as GbmDevice,
-        wayland_server::{Display, DisplayHandle},
+        wayland_server::DisplayHandle,
     },
     utils::signaling::{Linkable, Signaler},
 };
@@ -89,7 +86,10 @@ impl<D> Device<D> {
         })
     }
 
+    #[cfg(feature = "use_system_lib")]
     pub fn bind_wl_display(&mut self, display: &DisplayHandle) {
+        use smithay::backend::renderer::ImportEgl;
+
         if self.renderer.borrow_mut().bind_wl_display(display).is_ok() {
             info!("EGL hardware-acceleration enabled");
         }

@@ -9,7 +9,8 @@ use smithay::{
         Gles2Error, Gles2Frame, Gles2Renderer,
     },
     desktop::space::{RenderElement, SpaceOutputTuple},
-    utils::{Logical, Physical, Point, Rectangle, Size, Transform},
+    reexports::wayland_server::DisplayHandle,
+    utils::{Logical, Physical, Point, Rectangle, Scale, Size, Transform},
 };
 
 mod glow;
@@ -143,31 +144,37 @@ impl RenderElement<Gles2Renderer> for QuadElement {
         0
     }
 
-    fn geometry(&self) -> Rectangle<i32, Logical> {
-        Rectangle::from_loc_and_size(self.position, self.size)
+    fn location(&self, scale: impl Into<Scale<f64>>) -> Point<f64, Physical> {
+        self.position.to_f64().to_physical(scale)
+    }
+
+    fn geometry(&self, scale: impl Into<Scale<f64>>) -> Rectangle<i32, Physical> {
+        Rectangle::from_loc_and_size(self.position, self.size).to_physical_precise_round(scale)
     }
 
     fn accumulated_damage(
         &self,
+        scale: impl Into<Scale<f64>>,
         _: Option<SpaceOutputTuple<'_, '_>>,
-    ) -> Vec<Rectangle<i32, Logical>> {
-        vec![Rectangle::from_loc_and_size((0, 0), self.size)]
+    ) -> Vec<Rectangle<i32, Physical>> {
+        vec![Rectangle::from_loc_and_size((0, 0), self.size).to_physical_precise_up(scale)]
     }
 
     fn draw(
         &self,
+        _dh: &DisplayHandle,
         renderer: &mut Gles2Renderer,
         _frame: &mut Gles2Frame,
-        scale: f64,
-        location: Point<i32, Logical>,
-        _damage: &[Rectangle<i32, Logical>],
+        scale: impl Into<Scale<f64>>,
+        location: Point<f64, Physical>,
+        _damage: &[Rectangle<i32, Physical>],
         _log: &slog::Logger,
     ) -> Result<(), Gles2Error> {
         renderer.with_context(|_, gl| {
             self.pipeline.render(
                 self.output_geometry,
                 Rectangle::from_loc_and_size(
-                    self.output_geometry.loc.to_f64() + location.to_f64().to_physical(scale),
+                    self.output_geometry.loc.to_f64() + location,
                     self.size.to_f64().to_physical(scale),
                 ),
                 Transform::Flipped180,

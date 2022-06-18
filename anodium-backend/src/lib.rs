@@ -14,14 +14,22 @@ pub mod utils;
 
 use smithay::{
     backend::input::{InputBackend, InputEvent},
-    backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
+    backend::{
+        allocator::dmabuf::Dmabuf,
+        renderer::gles2::{Gles2Renderer, Gles2Texture},
+    },
     reexports::{
         calloop::EventLoop,
-        wayland_server::{protocol::wl_output, DisplayHandle},
+        wayland_protocols::wp::linux_dmabuf::zv1::server::zwp_linux_dmabuf_v1,
+        wayland_server::{protocol::wl_output, DisplayHandle, GlobalDispatch},
     },
     utils::{Physical, Rectangle},
     wayland,
-    wayland::output::{self, PhysicalProperties},
+    wayland::{
+        buffer::BufferHandler,
+        dmabuf::{DmabufGlobal, DmabufGlobalData, DmabufHandler, DmabufState, ImportError},
+        output::{self, PhysicalProperties},
+    },
 };
 
 use std::str::FromStr;
@@ -82,6 +90,18 @@ impl BackendState {
             BackendState::None => {}
         }
     }
+
+    pub fn dmabuf_imported(
+        &mut self,
+        dh: &DisplayHandle,
+        global: &DmabufGlobal,
+        dmabuf: Dmabuf,
+    ) -> Result<(), ImportError> {
+        match self {
+            BackendState::Udev(state) => state.dmabuf_imported(dh, global, dmabuf),
+            BackendState::None => Ok(()),
+        }
+    }
 }
 
 pub trait OutputHandler {
@@ -111,6 +131,11 @@ pub trait InputHandler {
 }
 
 pub trait BackendHandler: OutputHandler + InputHandler {
+    type WaylandState: GlobalDispatch<zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1, DmabufGlobalData>
+        + BufferHandler
+        + DmabufHandler
+        + 'static;
+
     fn backend_state(&mut self) -> &mut BackendState;
 
     fn send_frames(&mut self);
@@ -163,7 +188,7 @@ pub fn init<D>(
     handler: &mut D,
     backend: PreferedBackend,
 ) where
-    D: BackendHandler + 'static,
+    D: BackendHandler + AsMut<DmabufState> + 'static,
 {
     match backend {
         PreferedBackend::Auto => {

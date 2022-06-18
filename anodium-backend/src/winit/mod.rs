@@ -2,10 +2,7 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use calloop::timer::TimeoutAction;
 use smithay::{
-    backend::{
-        renderer::{ImportDma, ImportEgl},
-        winit::{self, WinitEvent},
-    },
+    backend::winit::{self, WinitEvent},
     reexports::{
         calloop::{timer::Timer, EventLoop},
         wayland_server::{protocol::wl_output, DisplayHandle},
@@ -21,7 +18,7 @@ pub const OUTPUT_NAME: &str = "winit";
 
 pub fn run_winit<D>(
     event_loop: &mut EventLoop<'static, D>,
-    display: &DisplayHandle,
+    _display: &DisplayHandle,
     handler: &mut D,
 ) -> Result<(), ()>
 where
@@ -31,35 +28,6 @@ where
         error!("Failed to initialize Winit backend: {}", err);
     })?;
     let backend = Rc::new(RefCell::new(backend));
-
-    // TODO(0.30)
-    // if backend
-    //     .borrow_mut()
-    //     .renderer()
-    //     .bind_wl_display(&display.borrow())
-    //     .is_ok()
-    // {
-    //     info!("EGL hardware-acceleration enabled");
-    //     let dmabuf_formats = backend
-    //         .borrow_mut()
-    //         .renderer()
-    //         .dmabuf_formats()
-    //         .cloned()
-    //         .collect::<Vec<_>>();
-    //     let backend = backend.clone();
-    //     init_dmabuf_global(
-    //         &mut *display.borrow_mut(),
-    //         dmabuf_formats,
-    //         move |buffer, _| {
-    //             backend
-    //                 .borrow_mut()
-    //                 .renderer()
-    //                 .import_dmabuf(buffer, None)
-    //                 .is_ok()
-    //         },
-    //         None,
-    //     );
-    // };
 
     let size = backend.borrow().window_size().physical_size;
 

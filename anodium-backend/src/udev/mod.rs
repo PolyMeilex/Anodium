@@ -13,7 +13,7 @@ use indexmap::{map::Entry, IndexMap};
 use smithay::{
     backend::{
         allocator::dmabuf::Dmabuf,
-        drm::{DrmDevice, DrmError, DrmEvent, GbmBufferedSurface},
+        drm::{DrmError, DrmEvent, GbmBufferedSurface},
         input::InputEvent,
         libinput::{LibinputInputBackend, LibinputSessionInterface},
         renderer::{
@@ -25,7 +25,7 @@ use smithay::{
         SwapBuffersError,
     },
     reexports::{
-        calloop::{timer::Timer, EventLoop, LoopHandle},
+        calloop::{EventLoop, LoopHandle},
         drm::{
             self,
             control::{connector, crtc, Device as _, Mode as DrmMode, ModeTypeFlags},
@@ -41,6 +41,7 @@ use smithay::{
     },
     wayland::{
         self,
+        dmabuf::{DmabufGlobal, DmabufState, ImportError},
         output::{Mode, PhysicalProperties},
     },
 };
@@ -90,6 +91,25 @@ impl UdevState {
             error!("Mode: {:?} not found in drm", mode);
         }
     }
+
+    pub fn dmabuf_imported(
+        &mut self,
+        _dh: &DisplayHandle,
+        _global: &DmabufGlobal,
+        dmabuf: Dmabuf,
+    ) -> Result<(), ImportError> {
+        for backend_data in self.udev_devices.borrow().values() {
+            if backend_data
+                .renderer
+                .borrow_mut()
+                .import_dmabuf(&dmabuf, None)
+                .is_ok()
+            {
+                return Ok(());
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -116,15 +136,13 @@ impl UdevOutputId {
     }
 }
 
-// type RenderTimerHandle = TimerHandle<(u64, crtc::Handle)>;
-
 pub fn run_udev<D>(
     event_loop: &mut EventLoop<'static, D>,
     display: &DisplayHandle,
     handler: &mut D,
 ) -> Result<(), ()>
 where
-    D: BackendHandler + 'static,
+    D: BackendHandler + AsMut<DmabufState> + 'static,
 {
     let (session, notifier) = AutoSession::new(None).expect("Could not init session!");
 
@@ -192,39 +210,20 @@ where
         )
     }
 
-    // init dmabuf support with format list from all gpus
-    // TODO: We need to update this list, when the set of gpus changes
-    // TODO2: This does not necessarily depend on egl, but mesa makes no use of it without wl_drm right now
+    let mut formats = Vec::new();
+    for backend_data in handler
+        .backend_state()
+        .udev()
+        .udev_devices
+        .borrow()
+        .values()
     {
-        let udev_devices = handler.backend_state().udev().udev_devices.borrow();
-        let mut formats = Vec::new();
-        for backend_data in udev_devices.values() {
-            formats.extend(backend_data.renderer.borrow().dmabuf_formats().cloned());
-        }
-
-        // TODO(0.30)
-        // init_dmabuf_global(
-        //     &mut *display.borrow_mut(),
-        //     formats,
-        //     move |buffer, mut ddata| {
-        //         let handler = ddata.get::<D>().unwrap();
-        //         let udev_devices = handler.backend_state().udev().udev_devices.borrow();
-
-        //         for backend_data in udev_devices.values() {
-        //             if backend_data
-        //                 .renderer
-        //                 .borrow_mut()
-        //                 .import_dmabuf(buffer, None)
-        //                 .is_ok()
-        //             {
-        //                 return true;
-        //             }
-        //         }
-        //         false
-        //     },
-        //     None,
-        // );
+        formats.extend(backend_data.renderer.borrow().dmabuf_formats().cloned());
     }
+
+    handler
+        .as_mut()
+        .create_global::<D::WaylandState, _>(display, formats, None);
 
     let handle = event_loop.handle();
     let _udev_event_source = event_loop
@@ -246,12 +245,6 @@ where
      * Start XWayland and Wayland Socket
      */
     handler.start_compositor();
-
-    // Cleanup stuff
-
-    // event_loop.handle().remove(session_event_source);
-    // event_loop.handle().remove(libinput_event_source);
-    // event_loop.handle().remove(udev_event_source);
 
     Ok(())
 }
@@ -277,9 +270,6 @@ pub struct UdevDeviceData {
     surfaces: IndexMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
     renderer: Rc<RefCell<Gles2Renderer>>,
-    // gbm: GbmDevice<SessionFd>,
-    // registration_token: RegistrationToken,
-    // event_dispatcher: Dispatcher<'static, DrmDevice<SessionFd>, BackendState>,
     device_id: u64,
 }
 
@@ -304,7 +294,6 @@ pub fn format_connector_name(interface: connector::Interface, interface_id: u32)
 }
 
 fn scan_connectors<D>(
-    handle: LoopHandle<'static, D>,
     device: &mut Device<D>,
     signaler: &Signaler<SessionSignal>,
 ) -> IndexMap<crtc::Handle, Rc<RefCell<OutputSurfaceData>>>
@@ -386,8 +375,6 @@ where
                 }
             };
 
-            // let timer = Timer::new().unwrap();
-
             entry.insert(Rc::new(RefCell::new(OutputSurfaceData {
                 output_name,
                 physical_properties,
@@ -401,12 +388,6 @@ where
                 _connector_info: connector_info,
                 crtc,
             })));
-
-            // handle
-            //     .insert_source(timer, move |(dev_id, crtc), _, handler| {
-            //         udev_render(handler, dev_id, Some(crtc))
-            //     })
-            //     .unwrap();
         }
     }
 
@@ -442,13 +423,14 @@ fn device_added<D>(
         Ok(mut device) => {
             let display = handler.backend_state().udev().display.clone();
 
+            #[cfg(feature = "use_system_lib")]
             if path.canonicalize().ok() == handler.backend_state().udev().primary_gpu {
                 info!("Initializing EGL Hardware Acceleration via {:?}", path);
 
                 device.bind_wl_display(&display);
             }
 
-            let outputs = scan_connectors(handle.clone(), &mut device, session_signal);
+            let outputs = scan_connectors(&mut device, session_signal);
 
             let mut new_outputs = Vec::new();
             for (_, output_surface) in outputs.iter() {
@@ -515,11 +497,8 @@ fn device_added<D>(
                 device_id,
                 UdevDeviceData {
                     _restart_token: restart_token,
-                    // registration_token,
-                    // event_dispatcher,
                     surfaces: outputs,
                     renderer: device.renderer,
-                    // gbm,
                     pointer_images: Vec::new(),
                     device_id,
                 },

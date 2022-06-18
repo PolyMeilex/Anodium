@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 use smithay::{
     desktop::space::SurfaceTree,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
-    utils::{Logical, Point},
-    wayland::{data_device::DataDeviceEvent, seat::CursorImageStatus},
+    utils::{IsAlive, Logical, Point},
+    wayland::seat::CursorImageStatus,
 };
 
 #[derive(Debug, Clone)]
@@ -27,16 +27,12 @@ impl PointerIcon {
         Self::default()
     }
 
-    pub fn on_data_device_event(&self, event: DataDeviceEvent) {
-        match event {
-            DataDeviceEvent::DnDStarted { icon, .. } => {
-                *self.dnd_surface.lock().unwrap() = icon;
-            }
-            DataDeviceEvent::DnDDropped { .. } => {
-                *self.dnd_surface.lock().unwrap() = None;
-            }
-            _ => {}
-        }
+    pub fn dnd_started(&self, icon: Option<WlSurface>) {
+        *self.dnd_surface.lock().unwrap() = icon;
+    }
+
+    pub fn dnd_dropped(&self) {
+        *self.dnd_surface.lock().unwrap() = None;
     }
 
     pub fn on_new_cursor(&self, status: CursorImageStatus) {
@@ -46,8 +42,7 @@ impl PointerIcon {
     pub fn prepare_dnd_icon(&self, location: Point<i32, Logical>) -> Option<SurfaceTree> {
         if let Some(surface) = &*self.dnd_surface.lock().unwrap() {
             surface
-                .as_ref()
-                .is_alive()
+                .alive()
                 .then(|| crate::draw::draw_dnd_icon(surface.clone(), location))
         } else {
             None
@@ -59,7 +54,7 @@ impl PointerIcon {
 
         // reset the cursor if the surface is no longer alive
         let reset = if let CursorImageStatus::Image(ref surface) = *cursor_status {
-            !surface.as_ref().is_alive()
+            !surface.alive()
         } else {
             false
         };

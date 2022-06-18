@@ -17,13 +17,7 @@ indexmap = "1.8"
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
 default-features = false
-features = [
-  "use_system_lib",
-  "renderer_gl",
-  "backend_egl",
-  "wayland_frontend",
-  "desktop",
-]
+features = ["renderer_gl", "backend_egl", "wayland_frontend", "desktop"]
 
 [dependencies.calloop]
 version = "0.10.0"
@@ -34,8 +28,9 @@ version = "0.9"
 default-features = false
 
 [features]
-default = ["udev", "winit", "x11"]
+default = ["udev", "winit", "x11", "use_system_lib"]
 
+use_system_lib = ["smithay/use_system_lib"]
 x11 = ["smithay/backend_x11", "x11rb"]
 winit = ["smithay/backend_winit"]
 udev = [
@@ -49,6 +44,3 @@ udev = [
   "image",
   "xcursor",
 ]
-
-[[example]]
-name = "simple"

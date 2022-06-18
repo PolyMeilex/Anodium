@@ -1,35 +1,33 @@
-use crate::State;
+use crate::{CalloopData, State};
 use anodium_backend::{BackendHandler, BackendState};
 
-impl BackendHandler for State {
+impl BackendHandler for CalloopData {
+    type WaylandState = State;
+
     fn backend_state(&mut self) -> &mut BackendState {
-        &mut self.backend
+        &mut self.state.backend
     }
 
     fn send_frames(&mut self) {
-        self.space
-            .send_frames(self.start_time.elapsed().as_millis() as u32);
+        self.state
+            .space
+            .send_frames(self.state.start_time.elapsed().as_millis() as u32);
     }
 
     fn start_compositor(&mut self) {
-        let socket_name = self
-            .display
-            .borrow_mut()
-            .add_socket_auto()
-            .unwrap()
-            .into_string()
-            .unwrap();
-
-        ::std::env::set_var("WAYLAND_DISPLAY", &socket_name);
-        dbg!(&socket_name);
+        ::std::env::set_var("WAYLAND_DISPLAY", &self.state.socket_name);
+        dbg!(&self.state.socket_name);
 
         #[cfg(feature = "xwayland")]
         {
-            self.xwayland.start().ok();
+            self.state
+                .xwayland
+                .start::<CalloopData>(self.state.loop_handle.clone())
+                .ok();
         }
     }
 
     fn close_compositor(&mut self) {
-        self.loop_signal.stop();
+        self.state.loop_signal.stop();
     }
 }
