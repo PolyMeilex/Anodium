@@ -29,17 +29,19 @@ impl XdgShellHandler for State {
     }
 
     fn new_toplevel(&mut self, _dh: &DisplayHandle, surface: ToplevelSurface) {
+        let wl_surface = surface.wl_surface().clone();
         let window = Window::new(Kind::Xdg(surface));
         self.space.map_window(&window, (0, 0), false);
 
-        self.on_commit_dispatcher.on_next_commit(|state, surface| {
-            if let Some(win) = state
-                .space
-                .window_for_surface(surface, WindowSurfaceType::all())
-            {
-                win.configure();
-            }
-        });
+        self.on_commit_dispatcher
+            .on_next_commit(wl_surface, |state, surface| {
+                if let Some(win) = state
+                    .space
+                    .window_for_surface(surface, WindowSurfaceType::all())
+                {
+                    win.configure();
+                }
+            });
     }
     fn new_popup(
         &mut self,
