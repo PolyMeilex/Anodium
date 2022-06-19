@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.58"
 input = { version = "0.7", features = ["udev"], optional = true }
 xcursor = { version = "0.3", optional = true }
 image = { version = "0.24", default-features = false, optional = true, features = [
@@ -13,14 +14,18 @@ slog = "2.7"
 log = "0.4"
 thiserror = "1"
 indexmap = "1.8"
+bitflags = "1.3.2"
 
 [dependencies.smithay]
 git = "https://github.com/Smithay/smithay.git"
 default-features = false
-features = ["renderer_gl", "backend_egl", "wayland_frontend", "desktop"]
-
-[dependencies.calloop]
-version = "0.10.0"
+features = [
+  "renderer_gl",
+  "renderer_multi",
+  "backend_egl",
+  "wayland_frontend",
+  "desktop",
+]
 
 [dependencies.x11rb]
 optional = true
@@ -28,18 +33,18 @@ version = "0.9"
 default-features = false
 
 [features]
-default = ["udev", "winit", "x11", "use_system_lib"]
+default = ["drm", "winit", "x11"]
 
 use_system_lib = ["smithay/use_system_lib"]
 x11 = ["smithay/backend_x11", "x11rb"]
 winit = ["smithay/backend_winit"]
-udev = [
+drm = [
   "smithay/backend_libinput",
   "smithay/backend_udev",
   "smithay/backend_drm",
   "smithay/backend_gbm",
   "smithay/backend_session",
-  "smithay/backend_session_logind",
+  "smithay/backend_session_libseat",
   "input",
   "image",
   "xcursor",

@@ -5,7 +5,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use calloop::ping;
 use smithay::backend::input::InputEvent;
 use smithay::{
     backend::{
@@ -14,7 +13,7 @@ use smithay::{
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },
     reexports::{
-        calloop::EventLoop,
+        calloop::{ping, EventLoop},
         gbm,
         wayland_server::{protocol::wl_output, DisplayHandle},
     },

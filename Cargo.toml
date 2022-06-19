@@ -48,11 +48,11 @@ version = "0.10.0"
 features = []
 
 [features]
-default = ["udev", "winit", "x11", "debug"]
+default = ["drm", "winit", "x11", "debug"]
 
 x11 = ["anodium-backend/x11", "x11rb"]
 winit = ["anodium-backend/winit"]
-udev = ["anodium-backend/udev"]
+drm = ["anodium-backend/drm"]
 
 debug = []
 xwayland = [

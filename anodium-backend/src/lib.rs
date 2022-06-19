@@ -2,9 +2,11 @@
 
 #[macro_use]
 extern crate log;
+#[cfg(feature = "drm")]
+pub mod drm;
+#[cfg(feature = "drm")]
+pub mod libinput;
 
-#[cfg(feature = "udev")]
-pub mod udev;
 #[cfg(feature = "winit")]
 pub mod winit;
 #[cfg(feature = "x11")]
@@ -52,7 +54,7 @@ pub struct NewOutputDescriptor {
 }
 
 pub enum BackendState {
-    Udev(udev::UdevState),
+    Drm(drm::DrmBackendState),
     None,
 }
 
@@ -63,12 +65,12 @@ impl Default for BackendState {
 }
 
 impl BackendState {
-    fn init_udev(&mut self, inner: udev::UdevState) {
-        *self = Self::Udev(inner);
+    fn init_drm(&mut self, inner: drm::DrmBackendState) {
+        *self = Self::Drm(inner);
     }
 
-    fn udev(&mut self) -> &mut udev::UdevState {
-        if let Self::Udev(i) = self {
+    fn drm(&mut self) -> &mut drm::DrmBackendState {
+        if let Self::Drm(i) = self {
             i
         } else {
             unreachable!("Only one backend at the time");
@@ -77,16 +79,9 @@ impl BackendState {
 }
 
 impl BackendState {
-    pub fn change_vt(&mut self, vt: i32) {
-        match self {
-            BackendState::Udev(inner) => inner.change_vt(vt),
-            BackendState::None => {}
-        }
-    }
-
     pub fn update_mode(&mut self, output_id: &OutputId, mode: &wayland::output::Mode) {
         match self {
-            BackendState::Udev(inner) => inner.update_mode(output_id, mode),
+            BackendState::Drm(state) => state.update_mode(output_id, mode),
             BackendState::None => {}
         }
     }
@@ -98,7 +93,7 @@ impl BackendState {
         dmabuf: Dmabuf,
     ) -> Result<(), ImportError> {
         match self {
-            BackendState::Udev(state) => state.dmabuf_imported(dh, global, dmabuf),
+            BackendState::Drm(state) => state.dmabuf_imported(dh, global, dmabuf),
             BackendState::None => Ok(()),
         }
     }
@@ -199,8 +194,8 @@ pub fn init<D>(
                     .expect("Failed to initialize winit backend.");
             } else {
                 info!("Starting with udev backend");
-                #[cfg(feature = "udev")]
-                udev::run_udev(event_loop, display, handler)
+                #[cfg(feature = "drm")]
+                drm::run_drm_backend(event_loop, handler)
                     .expect("Failed to initialize tty backend.");
             }
         }
@@ -216,9 +211,8 @@ pub fn init<D>(
                 .expect("Failed to initialize winit backend.")
         }
         PreferedBackend::Udev => {
-            #[cfg(feature = "udev")]
-            udev::run_udev(event_loop, display, handler)
-                .expect("Failed to initialize tty backend.");
+            #[cfg(feature = "drm")]
+            drm::run_drm_backend(event_loop, handler).expect("Failed to initialize tty backend.");
         }
     }
 }
