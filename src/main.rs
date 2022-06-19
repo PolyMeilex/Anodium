@@ -4,6 +4,7 @@ use anodium_backend::BackendState;
 use anodium_framework::pointer_icon::PointerIcon;
 
 use clap::StructOpt;
+use on_commit::OnCommitDispatcher;
 use slog::Drain;
 use smithay::{
     desktop,
@@ -37,6 +38,7 @@ mod cli;
 mod data;
 mod grabs;
 mod handlers;
+mod on_commit;
 
 struct CalloopData {
     state: State,
@@ -52,6 +54,8 @@ pub struct State {
     _loop_handle: LoopHandle<'static, CalloopData>,
 
     seat: Seat<Self>,
+
+    on_commit_dispatcher: OnCommitDispatcher,
 
     compositor_state: CompositorState,
     xdg_shell_state: XdgShellState,
@@ -218,6 +222,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _loop_handle: event_loop.handle(),
 
         seat,
+
+        on_commit_dispatcher: Default::default(),
 
         compositor_state,
         xdg_shell_state,

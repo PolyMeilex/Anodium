@@ -1,4 +1,4 @@
-use crate::{grabs::resize_grab, State};
+use crate::{grabs::resize_grab, on_commit::OnCommitDispatcher, State};
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
@@ -20,6 +20,9 @@ impl CompositorHandler for State {
 
     fn commit(&mut self, dh: &DisplayHandle, surface: &WlSurface) {
         on_commit_buffer_handler(dh, surface);
+
+        OnCommitDispatcher::handle_commit(self, surface);
+
         self.space.commit(surface);
 
         resize_grab::handle_commit(&mut self.space, surface);
