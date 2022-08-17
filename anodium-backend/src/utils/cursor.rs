@@ -6,7 +6,6 @@ use smithay::{
         Frame, Texture,
     },
     desktop::space::{RenderElement, SpaceOutputTuple},
-    reexports::wayland_server::DisplayHandle,
     utils::{Logical, Physical, Point, Rectangle, Scale, Size, Transform},
 };
 use xcursor::{
@@ -160,7 +159,6 @@ impl RenderElement<Gles2Renderer> for PointerElement {
 
     fn draw(
         &self,
-        _dh: &DisplayHandle,
         _renderer: &mut Gles2Renderer,
         frame: &mut Gles2Frame,
         scale: impl Into<Scale<f64>>,
@@ -176,11 +174,18 @@ impl RenderElement<Gles2Renderer> for PointerElement {
             scale,
             Transform::Normal,
             &[Rectangle::from_loc_and_size(
-                (0.0, 0.0),
+                (0, 0),
                 self.size.to_physical_precise_round(scale),
             )],
             1.0,
         )?;
         Ok(())
+    }
+
+    fn opaque_regions(
+        &self,
+        _scale: impl Into<Scale<f64>>,
+    ) -> Option<Vec<Rectangle<i32, Physical>>> {
+        None
     }
 }

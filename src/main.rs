@@ -7,7 +7,7 @@ use clap::StructOpt;
 use on_commit::OnCommitDispatcher;
 use slog::Drain;
 use smithay::{
-    desktop,
+    desktop::{self, PopupManager},
     reexports::{
         calloop::{
             generic::Generic, EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction,
@@ -47,6 +47,8 @@ struct CalloopData {
 
 pub struct State {
     space: desktop::Space,
+    popups: PopupManager,
+
     display: DisplayHandle,
 
     start_time: Instant,
@@ -215,6 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let state = State {
         space: desktop::Space::new(slog_scope::logger()),
+        popups: PopupManager::new(slog_scope::logger()),
         display: display.handle(),
 
         start_time: Instant::now(),
@@ -252,6 +255,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     event_loop.run(None, &mut data, |data| {
         data.state.space.refresh(&data.display.handle());
+        data.state.popups.cleanup();
         data.display.flush_clients().unwrap();
     })?;
 

@@ -18,8 +18,8 @@ impl CompositorHandler for State {
         &mut self.compositor_state
     }
 
-    fn commit(&mut self, dh: &DisplayHandle, surface: &WlSurface) {
-        on_commit_buffer_handler(dh, surface);
+    fn commit(&mut self, _dh: &DisplayHandle, surface: &WlSurface) {
+        on_commit_buffer_handler(surface);
 
         OnCommitDispatcher::handle_commit(self, surface);
 

@@ -241,10 +241,7 @@ impl GpuConnector {
             |_, frame| {
                 frame.clear(
                     [0.2, 0.2, 0.2, 1.0],
-                    &[Rectangle::from_loc_and_size(
-                        (0.0, 0.0),
-                        (f64::MAX, f64::MAX),
-                    )],
+                    &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
                 )
             },
         )??;

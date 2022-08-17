@@ -126,14 +126,7 @@ impl OutputHandler for CalloopData {
         let render_result = self
             .state
             .space
-            .render_output(
-                &self.display.handle(),
-                renderer,
-                &output,
-                age,
-                [0.1, 0.1, 0.1, 1.0],
-                &elems,
-            )
+            .render_output(renderer, &output, age, [0.1, 0.1, 0.1, 1.0], &elems)
             .unwrap();
 
         if render_result.is_some() {

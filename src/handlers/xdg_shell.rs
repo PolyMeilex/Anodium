@@ -1,6 +1,9 @@
 use smithay::{
     delegate_xdg_shell,
-    desktop::{Kind, Window, WindowSurfaceType},
+    desktop::{
+        Kind, PopupKeyboardGrab, PopupKind, PopupPointerGrab, PopupUngrabStrategy, Window,
+        WindowSurfaceType,
+    },
     reexports::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{
@@ -10,7 +13,7 @@ use smithay::{
     },
     utils::Rectangle,
     wayland::{
-        seat::{PointerGrabStartData, Seat},
+        seat::{Focus, PointerGrabStartData, Seat},
         shell::xdg::{
             PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
         },
@@ -30,25 +33,73 @@ impl XdgShellHandler for State {
 
     fn new_toplevel(&mut self, _dh: &DisplayHandle, surface: ToplevelSurface) {
         let wl_surface = surface.wl_surface().clone();
+
         let window = Window::new(Kind::Xdg(surface));
-        self.space.map_window(&window, (0, 0), false);
+        self.space.map_window(&window, (0, 0), None, false);
 
         self.on_commit_dispatcher
-            .on_next_commit(wl_surface, |state, surface| {
-                if let Some(win) = state
-                    .space
-                    .window_for_surface(surface, WindowSurfaceType::all())
-                {
-                    win.configure();
-                }
+            .on_next_commit(wl_surface, move |_, _| {
+                window.configure();
             });
     }
+
     fn new_popup(
         &mut self,
         _dh: &DisplayHandle,
-        _surface: PopupSurface,
-        _positioner: PositionerState,
+        surface: PopupSurface,
+        positioner: PositionerState,
     ) {
+        let wl_surface = surface.wl_surface().clone();
+
+        surface.with_pending_state(|state| {
+            // TODO: Proper positioning
+            state.geometry = positioner.get_geometry();
+        });
+
+        self.popups
+            .track_popup(PopupKind::from(surface.clone()))
+            .ok();
+
+        self.on_commit_dispatcher
+            .on_next_commit(wl_surface, move |_, _| {
+                surface.send_configure().ok();
+            });
+    }
+
+    fn grab(
+        &mut self,
+        dh: &DisplayHandle,
+        surface: PopupSurface,
+        seat: wl_seat::WlSeat,
+        serial: Serial,
+    ) {
+        let seat: Seat<Self> = Seat::from_resource(&seat).unwrap();
+        let ret = self.popups.grab_popup(dh, surface.into(), &seat, serial);
+
+        if let Ok(mut grab) = ret {
+            if let Some(keyboard) = seat.get_keyboard() {
+                if keyboard.is_grabbed()
+                    && !(keyboard.has_grab(serial)
+                        || keyboard.has_grab(grab.previous_serial().unwrap_or(serial)))
+                {
+                    grab.ungrab(dh, PopupUngrabStrategy::All);
+                    return;
+                }
+                keyboard.set_focus(dh, grab.current_grab().as_ref(), serial);
+                keyboard.set_grab(PopupKeyboardGrab::new(&grab), serial);
+            }
+            if let Some(pointer) = seat.get_pointer() {
+                if pointer.is_grabbed()
+                    && !(pointer.has_grab(serial)
+                        || pointer
+                            .has_grab(grab.previous_serial().unwrap_or_else(|| grab.serial())))
+                {
+                    grab.ungrab(dh, PopupUngrabStrategy::All);
+                    return;
+                }
+                pointer.set_grab(PopupPointerGrab::new(&grab), serial, Focus::Keep);
+            }
+        }
     }
 
     fn move_request(
@@ -78,7 +129,7 @@ impl XdgShellHandler for State {
                 initial_window_location,
             };
 
-            pointer.set_grab(grab, serial, 0);
+            pointer.set_grab(grab, serial, Focus::Clear);
         }
     }
 
@@ -118,18 +169,8 @@ impl XdgShellHandler for State {
                 Rectangle::from_loc_and_size(initial_window_location, initial_window_size),
             );
 
-            pointer.set_grab(grab, serial, 0);
+            pointer.set_grab(grab, serial, Focus::Clear);
         }
-    }
-
-    fn grab(
-        &mut self,
-        _dh: &DisplayHandle,
-        _surface: PopupSurface,
-        _seat: wl_seat::WlSeat,
-        _serial: Serial,
-    ) {
-        // TODO popup grabs
     }
 }
 

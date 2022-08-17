@@ -61,9 +61,3 @@ xwayland = [
   "x11rb",
   "anodium-framework/xwayland",
 ]
-
-# [patch."https://github.com/Smithay/smithay.git"]
-# smithay = { git = "https://github.com/PolyMeilex/smithay.git", branch = "seat-ddata" }
-
-[patch.crates-io]
-winit = { git = "https://github.com/rust-windowing/winit", rev = "4c39b3188cee29548761b57f38e4aa046cbe31ea" }

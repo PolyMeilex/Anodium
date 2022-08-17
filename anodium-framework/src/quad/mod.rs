@@ -9,7 +9,6 @@ use smithay::{
         Gles2Error, Gles2Frame, Gles2Renderer,
     },
     desktop::space::{RenderElement, SpaceOutputTuple},
-    reexports::wayland_server::DisplayHandle,
     utils::{Logical, Physical, Point, Rectangle, Scale, Size, Transform},
 };
 
@@ -162,7 +161,6 @@ impl RenderElement<Gles2Renderer> for QuadElement {
 
     fn draw(
         &self,
-        _dh: &DisplayHandle,
         renderer: &mut Gles2Renderer,
         _frame: &mut Gles2Frame,
         scale: impl Into<Scale<f64>>,
@@ -182,6 +180,13 @@ impl RenderElement<Gles2Renderer> for QuadElement {
                 1.0,
             )
         })
+    }
+
+    fn opaque_regions(
+        &self,
+        _scale: impl Into<Scale<f64>>,
+    ) -> Option<Vec<Rectangle<i32, Physical>>> {
+        None
     }
 }
 
