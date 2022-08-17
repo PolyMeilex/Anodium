@@ -17,7 +17,7 @@ impl OnCommitDispatcher {
     pub fn handle_commit(state: &mut State, surface: &WlSurface) {
         let mut queue = Vec::new();
 
-        let cbs = &mut state.on_commit_dispatcher.cbs;
+        let cbs = &mut state.commit_dispatcher.cbs;
 
         // Drain filter
         while let Some(id) = cbs.iter().position(|(s, _)| s == surface) {

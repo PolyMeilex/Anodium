@@ -57,7 +57,7 @@ pub struct State {
 
     seat: Seat<Self>,
 
-    on_commit_dispatcher: OnCommitDispatcher,
+    commit_dispatcher: OnCommitDispatcher,
 
     compositor_state: CompositorState,
     xdg_shell_state: XdgShellState,
@@ -226,7 +226,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         seat,
 
-        on_commit_dispatcher: Default::default(),
+        commit_dispatcher: Default::default(),
 
         compositor_state,
         xdg_shell_state,

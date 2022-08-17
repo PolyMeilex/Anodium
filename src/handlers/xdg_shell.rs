@@ -37,7 +37,7 @@ impl XdgShellHandler for State {
         let window = Window::new(Kind::Xdg(surface));
         self.space.map_window(&window, (0, 0), None, false);
 
-        self.on_commit_dispatcher
+        self.commit_dispatcher
             .on_next_commit(wl_surface, move |_, _| {
                 window.configure();
             });
@@ -60,7 +60,7 @@ impl XdgShellHandler for State {
             .track_popup(PopupKind::from(surface.clone()))
             .ok();
 
-        self.on_commit_dispatcher
+        self.commit_dispatcher
             .on_next_commit(wl_surface, move |_, _| {
                 surface.send_configure().ok();
             });
