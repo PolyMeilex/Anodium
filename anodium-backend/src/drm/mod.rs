@@ -163,6 +163,9 @@ where
         _restart_token: restart_token,
     });
 
+    // TODO: This should handle potential SwapBuffersError::TemporaryFailure errors and retry
+    handler.backend_state().drm().clear_all();
+
     for crtc in outputs {
         let id = DrmOutputId {
             drm_node: primary_gpu_node,
