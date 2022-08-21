@@ -3,7 +3,7 @@ name: Continuous Integration
 on:
   push:
     branches:
-    - master
+      - master
   pull_request:
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-  
+
   check:
     runs-on: ubuntu-22.04
     steps:
@@ -58,4 +58,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all-features
+          # args: --all-features
