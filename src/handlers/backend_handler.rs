@@ -1,5 +1,5 @@
 use crate::{CalloopData, State};
-use anodium_backend::{BackendHandler, BackendState};
+use anodium_backend::{BackendHandler, BackendState, OutputId};
 use smithay::wayland::dmabuf::DmabufState;
 
 impl BackendHandler for CalloopData {
@@ -11,12 +11,6 @@ impl BackendHandler for CalloopData {
 
     fn dmabuf_state(&mut self) -> &mut DmabufState {
         &mut self.state.dmabuf_state
-    }
-
-    fn send_frames(&mut self) {
-        self.state
-            .space
-            .send_frames(self.state.start_time.elapsed().as_millis() as u32);
     }
 
     fn start_compositor(&mut self) {

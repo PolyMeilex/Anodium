@@ -135,4 +135,29 @@ impl OutputHandler for CalloopData {
 
         Ok(render_result)
     }
+
+    fn send_frames(&mut self, output_id: &OutputId) {
+        // Send frames only to relevant outputs
+        for window in self.state.space.windows() {
+            let mut output = self.state.space.outputs_for_window(window);
+
+            // Sort by refresh
+            output.sort_by_key(|o| o.current_mode().map(|o| o.refresh).unwrap_or(0));
+            // Get output with highest refresh
+            let best_output_id = output.last().and_then(|o| o.user_data().get::<OutputId>());
+
+            if let Some(best_output_id) = best_output_id {
+                if best_output_id == output_id {
+                    window.send_frame(self.state.start_time.elapsed().as_millis() as u32);
+                }
+            } else {
+                window.send_frame(self.state.start_time.elapsed().as_millis() as u32);
+            }
+        }
+
+        // TODO: Upstream the above code?
+        // self.state
+        //     .space
+        //     .send_frames(self.state.start_time.elapsed().as_millis() as u32);
+    }
 }

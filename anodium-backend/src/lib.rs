@@ -114,6 +114,9 @@ pub trait OutputHandler {
         age: usize,
         pointer_image: Option<&Gles2Texture>,
     ) -> Result<Option<Vec<Rectangle<i32, Physical>>>, smithay::backend::SwapBuffersError>;
+
+    /// Send frames to clients on given output
+    fn send_frames(&mut self, output_id: &OutputId);
 }
 
 pub trait InputHandler {
@@ -133,8 +136,6 @@ pub trait BackendHandler: OutputHandler + InputHandler {
 
     fn backend_state(&mut self) -> &mut BackendState;
     fn dmabuf_state(&mut self) -> &mut DmabufState;
-
-    fn send_frames(&mut self);
 
     fn start_compositor(&mut self);
     fn close_compositor(&mut self);

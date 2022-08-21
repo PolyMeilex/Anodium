@@ -238,9 +238,9 @@ where
                             // }
                         }
                     }
-                }
 
-                handler.send_frames();
+                    handler.send_frames(&surface_data.output_id);
+                }
             }
         })
         .unwrap();

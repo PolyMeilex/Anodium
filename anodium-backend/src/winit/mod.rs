@@ -94,7 +94,7 @@ where
                         backend.submit(damage.as_deref()).unwrap();
                     }
 
-                    handler.send_frames();
+                    handler.send_frames(&output_id);
 
                     TimeoutAction::ToDuration(Duration::from_millis(16))
                 }

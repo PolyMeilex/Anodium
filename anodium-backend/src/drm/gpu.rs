@@ -179,14 +179,10 @@ impl Gpu {
             age
         };
 
-        handler.output_render(
-            renderer.as_mut(),
-            &DrmOutputId { drm_node, crtc }.output_id(),
-            age as usize,
-            None,
-        )?;
+        let output_id = DrmOutputId { drm_node, crtc }.output_id();
+        handler.output_render(renderer.as_mut(), &output_id, age as usize, None)?;
 
-        handler.send_frames();
+        handler.send_frames(&output_id);
 
         handler
             .backend_state()
