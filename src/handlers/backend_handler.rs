@@ -1,5 +1,5 @@
 use crate::{CalloopData, State};
-use anodium_backend::{BackendHandler, BackendState, OutputId};
+use anodium_backend::{BackendHandler, BackendState};
 use smithay::wayland::dmabuf::DmabufState;
 
 impl BackendHandler for CalloopData {
