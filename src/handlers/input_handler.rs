@@ -40,22 +40,25 @@ impl InputHandler for CalloopData {
                     event.state(),
                     SERIAL_COUNTER.next_serial(),
                     event.time(),
-                    |_modifiers, handle| {
+                    |modifiers, handle| {
                         let keysym = handle.modified_sym();
+
+                        SeatState::for_seat(&self.state.seat).update_pressed_keys(keysym, state);
 
                         if keysym == xkb::KEY_Escape {
                             self.state.loop_signal.stop();
                         }
 
-                        if keysym == xkb::KEY_t && event.state() == KeyState::Released {
+                        if keysym == xkb::KEY_t
+                            && modifiers.alt
+                            && event.state() == KeyState::Pressed
+                        {
                             std::process::Command::new("weston-terminal").spawn().ok();
+
+                            FilterResult::Intercept(())
+                        } else {
+                            FilterResult::Forward
                         }
-
-                        SeatState::for_seat(&self.state.seat).update_pressed_keys(keysym, state);
-
-                        // self.config.key_action(modifiers, &handle, state);
-
-                        FilterResult::Forward
                     },
                 );
             }
