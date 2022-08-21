@@ -247,8 +247,14 @@ impl GpuConnector {
         )??;
 
         self.gbm_surface.queue_buffer()?;
+        self.reset_buffers();
 
         Ok(())
+    }
+
+    /// Reset age of buffers
+    pub fn reset_buffers(&mut self) {
+        self.gbm_surface.reset_buffers();
     }
 
     pub fn use_mode(&mut self, mode: &WlMode) -> Result<()> {
