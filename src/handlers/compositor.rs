@@ -21,11 +21,10 @@ impl CompositorHandler for State {
     fn commit(&mut self, _dh: &DisplayHandle, surface: &WlSurface) {
         on_commit_buffer_handler(surface);
 
-        OnCommitDispatcher::handle_commit(self, surface);
-
         self.space.commit(surface);
-
         resize_grab::handle_commit(&mut self.space, surface);
+
+        OnCommitDispatcher::handle_commit(self, surface);
     }
 }
 
