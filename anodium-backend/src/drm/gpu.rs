@@ -9,7 +9,7 @@ use smithay::{
         renderer::{
             gles2::Gles2Renderbuffer,
             multigpu::{egl::EglGlesBackend, GpuManager},
-            Bind, Frame, Renderer,
+            Bind, Frame, ImportMem, Renderer,
         },
         session::{auto::AutoSession, Signal as SessionSignal},
     },
@@ -179,8 +179,37 @@ impl Gpu {
             age
         };
 
+        let pointer_image = {
+            let backend_state = handler.backend_state().drm();
+
+            let frame = backend_state.pointer_image.get_image(1);
+
+            backend_state
+                .pointer_images
+                .iter()
+                .find_map(|(image, texture)| if image == &frame { Some(texture) } else { None })
+                .cloned()
+                .unwrap_or_else(|| {
+                    let texture = renderer
+                        .as_mut()
+                        .import_memory(
+                            &frame.pixels_rgba,
+                            (frame.width as i32, frame.height as i32).into(),
+                            false,
+                        )
+                        .expect("Failed to import cursor bitmap");
+                    backend_state.pointer_images.push((frame, texture.clone()));
+                    texture
+                })
+        };
+
         let output_id = DrmOutputId { drm_node, crtc }.output_id();
-        handler.output_render(renderer.as_mut(), &output_id, age as usize, None)?;
+        handler.output_render(
+            renderer.as_mut(),
+            &output_id,
+            age as usize,
+            Some(&pointer_image),
+        )?;
 
         handler.send_frames(&output_id);
 

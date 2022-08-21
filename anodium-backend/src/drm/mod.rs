@@ -11,7 +11,7 @@ use smithay::{
         allocator::dmabuf::Dmabuf,
         drm::DrmNode,
         renderer::{
-            gles2::Gles2Renderbuffer,
+            gles2::{Gles2Renderbuffer, Gles2Texture},
             multigpu::{egl::EglGlesBackend, GpuManager, MultiRenderer},
             ImportDma,
         },
@@ -68,6 +68,8 @@ pub struct DrmBackendState {
     gpus: HashMap<DrmNode, Gpu>,
     gpu_manager: Rc<RefCell<GpuManager<EglGlesBackend>>>,
     primary_gpu: DrmNode,
+    pointer_image: crate::utils::cursor::Cursor,
+    pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
     _restart_token: SignalToken,
 }
 
@@ -170,6 +172,8 @@ where
         gpus,
         gpu_manager,
         primary_gpu: primary_gpu_node,
+        pointer_image: crate::utils::cursor::Cursor::load(),
+        pointer_images: Vec::new(),
         _restart_token: restart_token,
     });
 
