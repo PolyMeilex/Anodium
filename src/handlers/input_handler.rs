@@ -48,7 +48,7 @@ impl InputHandler for CalloopData {
                         }
 
                         if keysym == xkb::KEY_t && event.state() == KeyState::Released {
-                            std::process::Command::new("gtk4-demo").spawn().ok();
+                            std::process::Command::new("weston-terminal").spawn().ok();
                         }
 
                         SeatState::for_seat(&self.state.seat).update_pressed_keys(keysym, state);
