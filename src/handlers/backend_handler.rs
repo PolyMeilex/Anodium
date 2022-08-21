@@ -1,11 +1,16 @@
 use crate::{CalloopData, State};
 use anodium_backend::{BackendHandler, BackendState};
+use smithay::wayland::dmabuf::DmabufState;
 
 impl BackendHandler for CalloopData {
     type WaylandState = State;
 
     fn backend_state(&mut self) -> &mut BackendState {
         &mut self.state.backend
+    }
+
+    fn dmabuf_state(&mut self) -> &mut DmabufState {
+        &mut self.state.dmabuf_state
     }
 
     fn send_frames(&mut self) {

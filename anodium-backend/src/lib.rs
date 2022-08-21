@@ -132,6 +132,7 @@ pub trait BackendHandler: OutputHandler + InputHandler {
         + 'static;
 
     fn backend_state(&mut self) -> &mut BackendState;
+    fn dmabuf_state(&mut self) -> &mut DmabufState;
 
     fn send_frames(&mut self);
 
@@ -195,7 +196,7 @@ pub fn init<D>(
             } else {
                 info!("Starting with udev backend");
                 #[cfg(feature = "drm")]
-                drm::run_drm_backend(event_loop, handler)
+                drm::run_drm_backend(event_loop, display, handler)
                     .expect("Failed to initialize tty backend.");
             }
         }
@@ -212,7 +213,8 @@ pub fn init<D>(
         }
         PreferedBackend::Udev => {
             #[cfg(feature = "drm")]
-            drm::run_drm_backend(event_loop, handler).expect("Failed to initialize tty backend.");
+            drm::run_drm_backend(event_loop, display, handler)
+                .expect("Failed to initialize tty backend.");
         }
     }
 }

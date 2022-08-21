@@ -13,6 +13,7 @@ use smithay::{
         renderer::{
             gles2::Gles2Renderbuffer,
             multigpu::{egl::EglGlesBackend, GpuManager, MultiRenderer},
+            ImportDma,
         },
         session::{auto::AutoSession, Session, Signal as SessionSignal},
     },
@@ -87,9 +88,14 @@ impl DrmBackendState {
         &mut self,
         _dh: &DisplayHandle,
         _global: &DmabufGlobal,
-        _dmabuf: Dmabuf,
+        dmabuf: Dmabuf,
     ) -> Result<(), ImportError> {
-        Ok(())
+        self.gpu_manager
+            .borrow_mut()
+            .renderer::<Gles2Renderbuffer>(&self.primary_gpu, &self.primary_gpu)
+            .and_then(|mut renderer| renderer.import_dmabuf(&dmabuf, None))
+            .map(|_| ())
+            .map_err(|_| ImportError::Failed)
     }
 
     pub fn update_mode(&mut self, output: &OutputId, mode: &wayland::output::Mode) {
@@ -108,7 +114,11 @@ impl DrmBackendState {
     }
 }
 
-pub fn run_drm_backend<D>(event_loop: &mut EventLoop<'static, D>, handler: &mut D) -> Result<()>
+pub fn run_drm_backend<D>(
+    event_loop: &mut EventLoop<'static, D>,
+    display: &DisplayHandle,
+    handler: &mut D,
+) -> Result<()>
 where
     D: BackendHandler,
     D: 'static,
@@ -165,6 +175,44 @@ where
 
     // TODO: This should handle potential SwapBuffersError::TemporaryFailure errors and retry
     handler.backend_state().drm().clear_all();
+
+    // Bind egl wl_display, uses c wayland libs
+    // TODO: replace with implementation of wl_drm to keep the backwards compatibility, but with no c libs
+    #[cfg(feature = "use_system_lib")]
+    {
+        use smithay::backend::renderer::ImportEgl;
+
+        let state = handler.backend_state().drm();
+        let mut gpu_manager = state.gpu_manager.borrow_mut();
+
+        let mut renderer = gpu_manager
+            .renderer::<Gles2Renderbuffer>(&state.primary_gpu, &state.primary_gpu)
+            .unwrap();
+
+        info!(
+            "Trying to initialize EGL Hardware Acceleration via {:?}",
+            state.primary_gpu
+        );
+        if renderer.bind_wl_display(display).is_ok() {
+            info!("EGL hardware-acceleration enabled");
+        }
+    }
+
+    // Init dmabuf_globabl for primary gpu
+    let dmabuf_formats = {
+        let state = handler.backend_state().drm();
+        let mut gpu_manager = state.gpu_manager.borrow_mut();
+
+        let renderer = gpu_manager
+            .renderer::<Gles2Renderbuffer>(&state.primary_gpu, &state.primary_gpu)
+            .unwrap();
+
+        renderer.dmabuf_formats().cloned().collect::<Vec<_>>()
+    };
+
+    handler
+        .dmabuf_state()
+        .create_global::<D::WaylandState, _>(display, dmabuf_formats, None);
 
     for crtc in outputs {
         let id = DrmOutputId {

@@ -28,7 +28,7 @@ features = [
 ]
 
 [features]
-default = ["drm", "winit", "x11"]
+default = ["drm", "winit", "x11", "use_system_lib"]
 
 use_system_lib = ["smithay/use_system_lib"]
 x11 = ["smithay/backend_x11"]
