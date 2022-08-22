@@ -137,6 +137,8 @@ impl OutputHandler for CalloopData {
     }
 
     fn send_frames(&mut self, output_id: &OutputId) {
+        let time = self.state.start_time.elapsed().as_millis() as u32;
+
         // Send frames only to relevant outputs
         for window in self.state.space.windows() {
             let mut output = self.state.space.outputs_for_window(window);
@@ -151,7 +153,16 @@ impl OutputHandler for CalloopData {
                     window.send_frame(self.state.start_time.elapsed().as_millis() as u32);
                 }
             } else {
-                window.send_frame(self.state.start_time.elapsed().as_millis() as u32);
+                window.send_frame(time);
+            }
+        }
+
+        for output in self.state.space.outputs() {
+            if output.user_data().get::<OutputId>() == Some(output_id) {
+                let map = smithay::desktop::layer_map_for_output(output);
+                for layer in map.layers() {
+                    layer.send_frame(time);
+                }
             }
         }
 
