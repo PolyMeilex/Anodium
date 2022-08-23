@@ -3,8 +3,8 @@ use anodium_backend::{InputHandler, OutputId};
 
 use smithay::{
     backend::input::{
-        Event, InputEvent, KeyState, KeyboardKeyEvent, PointerButtonEvent,
-        PointerMotionAbsoluteEvent, PointerMotionEvent,
+        AbsolutePositionEvent, Event, InputEvent, KeyState, KeyboardKeyEvent, PointerButtonEvent,
+        PointerMotionEvent,
     },
     desktop::WindowSurfaceType,
     reexports::wayland_server::protocol::wl_pointer,

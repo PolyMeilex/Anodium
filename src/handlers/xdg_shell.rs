@@ -9,7 +9,7 @@ use smithay::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{
             protocol::{wl_seat, wl_surface::WlSurface},
-            DisplayHandle, Resource,
+            Resource,
         },
     },
     utils::Rectangle,
@@ -33,7 +33,7 @@ impl XdgShellHandler for State {
         &mut self.xdg_shell_state
     }
 
-    fn new_toplevel(&mut self, _dh: &DisplayHandle, surface: ToplevelSurface) {
+    fn new_toplevel(&mut self, surface: ToplevelSurface) {
         let wl_surface = surface.wl_surface().clone();
 
         let window = Window::new(Kind::Xdg(surface));
@@ -64,7 +64,7 @@ impl XdgShellHandler for State {
 
             fn on_commit(state: &mut State, window: Window, surface: &WlSurface) {
                 let buffer_attached =
-                    with_renderer_surface_state(&surface, |data| data.wl_buffer().is_some());
+                    with_renderer_surface_state(surface, |data| data.wl_buffer().is_some());
 
                 if buffer_attached {
                     // Window got mapped so we can position it
@@ -88,12 +88,7 @@ impl XdgShellHandler for State {
             });
     }
 
-    fn new_popup(
-        &mut self,
-        _dh: &DisplayHandle,
-        surface: PopupSurface,
-        positioner: PositionerState,
-    ) {
+    fn new_popup(&mut self, surface: PopupSurface, positioner: PositionerState) {
         let wl_surface = surface.wl_surface().clone();
 
         surface.with_pending_state(|state| {
@@ -111,15 +106,11 @@ impl XdgShellHandler for State {
             });
     }
 
-    fn grab(
-        &mut self,
-        dh: &DisplayHandle,
-        surface: PopupSurface,
-        seat: wl_seat::WlSeat,
-        serial: Serial,
-    ) {
+    fn grab(&mut self, surface: PopupSurface, seat: wl_seat::WlSeat, serial: Serial) {
         let seat: Seat<Self> = Seat::from_resource(&seat).unwrap();
-        let ret = self.popups.grab_popup(dh, surface.into(), &seat, serial);
+        let ret = self
+            .popups
+            .grab_popup(&self.display, surface.into(), &seat, serial);
 
         if let Ok(mut grab) = ret {
             if let Some(keyboard) = seat.get_keyboard() {
@@ -127,10 +118,10 @@ impl XdgShellHandler for State {
                     && !(keyboard.has_grab(serial)
                         || keyboard.has_grab(grab.previous_serial().unwrap_or(serial)))
                 {
-                    grab.ungrab(dh, PopupUngrabStrategy::All);
+                    grab.ungrab(PopupUngrabStrategy::All);
                     return;
                 }
-                keyboard.set_focus(dh, grab.current_grab().as_ref(), serial);
+                keyboard.set_focus(&self.display, grab.current_grab().as_ref(), serial);
                 keyboard.set_grab(PopupKeyboardGrab::new(&grab), serial);
             }
             if let Some(pointer) = seat.get_pointer() {
@@ -139,7 +130,7 @@ impl XdgShellHandler for State {
                         || pointer
                             .has_grab(grab.previous_serial().unwrap_or_else(|| grab.serial())))
                 {
-                    grab.ungrab(dh, PopupUngrabStrategy::All);
+                    grab.ungrab(PopupUngrabStrategy::All);
                     return;
                 }
                 pointer.set_grab(PopupPointerGrab::new(&grab), serial, Focus::Keep);
@@ -147,13 +138,7 @@ impl XdgShellHandler for State {
         }
     }
 
-    fn move_request(
-        &mut self,
-        _dh: &DisplayHandle,
-        surface: ToplevelSurface,
-        seat: wl_seat::WlSeat,
-        serial: Serial,
-    ) {
+    fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
         let seat = Seat::from_resource(&seat).unwrap();
 
         let wl_surface = surface.wl_surface();
@@ -180,7 +165,6 @@ impl XdgShellHandler for State {
 
     fn resize_request(
         &mut self,
-        _dh: &DisplayHandle,
         surface: ToplevelSurface,
         seat: wl_seat::WlSeat,
         serial: Serial,

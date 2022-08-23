@@ -1,7 +1,6 @@
 use smithay::{
     backend::allocator::dmabuf::Dmabuf,
     delegate_dmabuf,
-    reexports::wayland_server::DisplayHandle,
     wayland::dmabuf::{DmabufGlobal, DmabufHandler, DmabufState, ImportError},
 };
 
@@ -14,11 +13,10 @@ impl DmabufHandler for State {
 
     fn dmabuf_imported(
         &mut self,
-        dh: &DisplayHandle,
         global: &DmabufGlobal,
         dmabuf: Dmabuf,
     ) -> Result<(), ImportError> {
-        self.backend.dmabuf_imported(dh, global, dmabuf)
+        self.backend.dmabuf_imported(&self.display, global, dmabuf)
     }
 }
 

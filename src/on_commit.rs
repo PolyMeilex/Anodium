@@ -1,9 +1,11 @@
 use crate::State;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 
+type CommitCallback = dyn FnOnce(&mut State, &WlSurface);
+
 #[derive(Default)]
 pub struct OnCommitDispatcher {
-    cbs: Vec<(WlSurface, Box<dyn FnOnce(&mut State, &WlSurface)>)>,
+    cbs: Vec<(WlSurface, Box<CommitCallback>)>,
 }
 
 impl OnCommitDispatcher {
