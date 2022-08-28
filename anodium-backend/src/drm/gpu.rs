@@ -15,7 +15,7 @@ use smithay::{
     },
     reexports::{
         calloop::LoopHandle,
-        drm::control::{crtc, Device as _, ModeTypeFlags},
+        drm::control::{connector, crtc, Device as _, ModeTypeFlags},
         gbm::Device as GbmDevice,
     },
     utils::{
@@ -84,10 +84,10 @@ impl Gpu {
 
         let mut outputs: IndexMap<crtc::Handle, GpuConnector> = IndexMap::new();
 
-        for (conn, crtc) in res.map {
+        for (connector, crtc) in res.map {
             let drm = drm.inner();
 
-            let connector_info = drm.get_connector(conn).unwrap();
+            let connector_info = drm.get_connector(connector).unwrap();
 
             let connector_name = utils::format_connector_name(
                 connector_info.interface(),
@@ -119,7 +119,7 @@ impl Gpu {
 
             let drm_mode = drm_modes[mode_id];
 
-            let mut drm_surface = drm.create_surface(crtc, drm_mode, &[conn])?;
+            let mut drm_surface = drm.create_surface(crtc, drm_mode, &[connector])?;
             drm_surface.link(session_signal.clone());
 
             let gbm_surface =
@@ -128,6 +128,7 @@ impl Gpu {
             outputs.insert(
                 crtc,
                 GpuConnector {
+                    connector,
                     gbm_surface,
                     drm_modes: drm_modes.to_vec(),
                     wl_modes,
@@ -236,18 +237,29 @@ impl Gpu {
             let scan = gpu.drm.scan_connectors();
             info!("connectors: {:#?}", &scan);
 
-            for _output in scan.removed {
-                //
+            let removed: Vec<crtc::Handle> = scan
+                .removed
+                .iter()
+                .flat_map(|connector| {
+                    gpu.outputs
+                        .iter()
+                        .filter(|(_, o)| o.connector == *connector)
+                        .map(|(crtc, _)| *crtc)
+                })
+                .collect();
+
+            for crtc in removed {
+                let id = super::DrmOutputId { drm_node, crtc };
+                handler.output_removed(&id.output_id());
             }
 
-            for _output in scan.added {
-                //
-            }
+            for _connector in scan.added {}
         }
     }
 }
 
 pub struct GpuConnector {
+    connector: connector::Handle,
     gbm_surface: GbmBufferedSurface<Rc<RefCell<GbmDevice<Device>>>, Device>,
     drm_modes: Vec<smithay::reexports::drm::control::Mode>,
     wl_modes: Vec<WlMode>,

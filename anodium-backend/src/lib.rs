@@ -106,6 +106,9 @@ pub trait OutputHandler {
     /// Output got resized
     fn output_mode_updated(&mut self, output_id: &OutputId, mode: wayland::output::Mode);
 
+    /// Output was disconected
+    fn output_removed(&mut self, output: &OutputId);
+
     /// Render the ouput
     fn output_render(
         &mut self,

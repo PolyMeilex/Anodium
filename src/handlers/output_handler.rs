@@ -81,6 +81,10 @@ impl OutputHandler for CalloopData {
         }
     }
 
+    fn output_removed(&mut self, _output: &OutputId) {
+        // TODO:
+    }
+
     fn output_render(
         &mut self,
         renderer: &mut Gles2Renderer,
