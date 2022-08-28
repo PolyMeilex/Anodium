@@ -5,6 +5,7 @@ use smithay::{
         Kind, PopupKeyboardGrab, PopupKind, PopupPointerGrab, PopupUngrabStrategy, Window,
         WindowSurfaceType,
     },
+    input::{pointer::Focus, pointer::GrabStartData as PointerGrabStartData, Seat},
     reexports::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{
@@ -12,13 +13,9 @@ use smithay::{
             Resource,
         },
     },
-    utils::Rectangle,
-    wayland::{
-        seat::{Focus, PointerGrabStartData, Seat},
-        shell::xdg::{
-            PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
-        },
-        Serial,
+    utils::{Rectangle, Serial},
+    wayland::shell::xdg::{
+        PopupSurface, PositionerState, ToplevelSurface, XdgShellHandler, XdgShellState,
     },
 };
 
@@ -108,9 +105,9 @@ impl XdgShellHandler for State {
 
     fn grab(&mut self, surface: PopupSurface, seat: wl_seat::WlSeat, serial: Serial) {
         let seat: Seat<Self> = Seat::from_resource(&seat).unwrap();
-        let ret = self
-            .popups
-            .grab_popup(&self.display, surface.into(), &seat, serial);
+        let ret =
+            self.popups
+                .grab_popup(&self.display, surface.wl_surface().clone(), &seat, serial);
 
         if let Ok(mut grab) = ret {
             if let Some(keyboard) = seat.get_keyboard() {
@@ -121,7 +118,7 @@ impl XdgShellHandler for State {
                     grab.ungrab(PopupUngrabStrategy::All);
                     return;
                 }
-                keyboard.set_focus(&self.display, grab.current_grab().as_ref(), serial);
+                keyboard.set_focus(self, grab.current_grab().map(|(_, s)| s), serial);
                 keyboard.set_grab(PopupKeyboardGrab::new(&grab), serial);
             }
             if let Some(pointer) = seat.get_pointer() {
@@ -133,7 +130,7 @@ impl XdgShellHandler for State {
                     grab.ungrab(PopupUngrabStrategy::All);
                     return;
                 }
-                pointer.set_grab(PopupPointerGrab::new(&grab), serial, Focus::Keep);
+                pointer.set_grab(self, PopupPointerGrab::new(&grab), serial, Focus::Keep);
             }
         }
     }
@@ -159,7 +156,7 @@ impl XdgShellHandler for State {
                 initial_window_location,
             };
 
-            pointer.set_grab(grab, serial, Focus::Clear);
+            pointer.set_grab(self, grab, serial, Focus::Clear);
         }
     }
 
@@ -198,7 +195,7 @@ impl XdgShellHandler for State {
                 Rectangle::from_loc_and_size(initial_window_location, initial_window_size),
             );
 
-            pointer.set_grab(grab, serial, Focus::Clear);
+            pointer.set_grab(self, grab, serial, Focus::Clear);
         }
     }
 }
@@ -210,7 +207,7 @@ fn check_grab(
     seat: &Seat<State>,
     surface: &WlSurface,
     serial: Serial,
-) -> Option<PointerGrabStartData> {
+) -> Option<PointerGrabStartData<State>> {
     let pointer = seat.get_pointer()?;
 
     // Check that this surface has a click grab.

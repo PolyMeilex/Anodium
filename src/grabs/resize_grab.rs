@@ -4,23 +4,20 @@ use crate::{
 };
 use smithay::{
     desktop::{Kind, Space, Window, WindowSurfaceType},
+    input::pointer::{
+        AxisFrame, ButtonEvent, GrabStartData as PointerGrabStartData, MotionEvent, PointerGrab,
+        PointerInnerHandle,
+    },
     reexports::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
-        wayland_server::{protocol::wl_surface::WlSurface, DisplayHandle},
+        wayland_server::protocol::wl_surface::WlSurface,
     },
     utils::{Logical, Point, Rectangle, Size},
-    wayland::{
-        compositor,
-        seat::{
-            AxisFrame, ButtonEvent, MotionEvent, PointerGrab, PointerGrabStartData,
-            PointerInnerHandle,
-        },
-        shell::xdg::SurfaceCachedState,
-    },
+    wayland::{compositor, shell::xdg::SurfaceCachedState},
 };
 
 pub struct ResizeSurfaceGrab {
-    start_data: PointerGrabStartData,
+    start_data: PointerGrabStartData<State>,
     window: Window,
 
     edges: ResizeEdge,
@@ -31,7 +28,7 @@ pub struct ResizeSurfaceGrab {
 
 impl ResizeSurfaceGrab {
     pub fn start(
-        start_data: PointerGrabStartData,
+        start_data: PointerGrabStartData<State>,
         window: Window,
         edges: ResizeEdge,
         initial_window_rect: Rectangle<i32, Logical>,
@@ -58,12 +55,12 @@ impl ResizeSurfaceGrab {
 impl PointerGrab<State> for ResizeSurfaceGrab {
     fn motion(
         &mut self,
-        _data: &mut State,
-        _dh: &DisplayHandle,
+        state: &mut State,
         handle: &mut PointerInnerHandle<'_, State>,
+        _focus: Option<(WlSurface, Point<i32, Logical>)>,
         event: &MotionEvent,
     ) {
-        handle.motion(event.location, None, event.serial, event.time);
+        handle.motion(state, None, event);
 
         let mut delta = event.location - self.start_data.location;
 
@@ -115,12 +112,11 @@ impl PointerGrab<State> for ResizeSurfaceGrab {
 
     fn button(
         &mut self,
-        _data: &mut State,
-        _dh: &DisplayHandle,
+        state: &mut State,
         handle: &mut PointerInnerHandle<'_, State>,
         event: &ButtonEvent,
     ) {
-        handle.button(event.button, event.state, event.serial, event.time);
+        handle.button(state, event);
 
         // The button is a button code as defined in the
         // Linux kernel's linux/input-event-codes.h header file, e.g. BTN_LEFT.
@@ -128,7 +124,7 @@ impl PointerGrab<State> for ResizeSurfaceGrab {
 
         if !handle.current_pressed().contains(&BTN_LEFT) {
             // No more buttons are pressed, release the grab.
-            handle.unset_grab(event.serial, event.time);
+            handle.unset_grab(state, event.serial, event.time);
 
             if let Kind::Xdg(xdg) = self.window.toplevel() {
                 xdg.with_pending_state(|state| {
@@ -150,15 +146,14 @@ impl PointerGrab<State> for ResizeSurfaceGrab {
 
     fn axis(
         &mut self,
-        _data: &mut State,
-        _dh: &DisplayHandle,
+        state: &mut State,
         handle: &mut PointerInnerHandle<'_, State>,
         details: AxisFrame,
     ) {
-        handle.axis(details)
+        handle.axis(state, details);
     }
 
-    fn start_data(&self) -> &PointerGrabStartData {
+    fn start_data(&self) -> &PointerGrabStartData<State> {
         &self.start_data
     }
 }

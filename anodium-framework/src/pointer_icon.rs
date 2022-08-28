@@ -2,9 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use smithay::{
     desktop::space::SurfaceTree,
+    input::pointer::CursorImageStatus,
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{IsAlive, Logical, Point},
-    wayland::seat::CursorImageStatus,
 };
 
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ impl PointerIcon {
         let mut cursor_status = self.pointer_icon.lock().unwrap();
 
         // reset the cursor if the surface is no longer alive
-        let reset = if let CursorImageStatus::Image(ref surface) = *cursor_status {
+        let reset = if let CursorImageStatus::Surface(ref surface) = *cursor_status {
             !surface.alive()
         } else {
             false
@@ -63,7 +63,7 @@ impl PointerIcon {
             *cursor_status = CursorImageStatus::Default;
         }
 
-        if let CursorImageStatus::Image(ref wl_surface) = *cursor_status {
+        if let CursorImageStatus::Surface(ref wl_surface) = *cursor_status {
             Some(crate::draw::draw_cursor(wl_surface.clone(), location))
         } else {
             None

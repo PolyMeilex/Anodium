@@ -8,23 +8,19 @@ use on_commit::OnCommitDispatcher;
 use slog::Drain;
 use smithay::{
     desktop::{self, PopupManager},
+    input::{Seat, SeatState},
     reexports::{
         calloop::{
             generic::Generic, EventLoop, Interest, LoopHandle, LoopSignal, Mode, PostAction,
         },
         wayland_server::{
             backend::{ClientData, ClientId, DisconnectReason},
-            Display, DisplayHandle, Resource,
+            Display, DisplayHandle,
         },
     },
     wayland::{
-        compositor::CompositorState,
-        data_device::{self, DataDeviceState},
-        dmabuf::DmabufState,
-        output::OutputManagerState,
-        seat::{Seat, SeatState},
-        shell::xdg::XdgShellState,
-        shm::ShmState,
+        compositor::CompositorState, data_device::DataDeviceState, dmabuf::DmabufState,
+        output::OutputManagerState, shell::xdg::XdgShellState, shm::ShmState,
         socket::ListeningSocketSource,
     },
 };
@@ -195,22 +191,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let xdg_shell_state = XdgShellState::new::<State, _>(&dh, slog_scope::logger());
     let shm_state = ShmState::new::<State, _>(&dh, vec![], slog_scope::logger());
     let output_manager_state = OutputManagerState::new_with_xdg_output::<State>(&dh);
-    let seat_state = SeatState::<State>::new();
+    let mut seat_state = SeatState::<State>::new();
     let data_device_state = DataDeviceState::new::<State, _>(&dh, slog_scope::logger());
 
     let dmabuf_state = DmabufState::new();
 
-    let mut seat = Seat::<State>::new(&display.handle(), "seat0", slog_scope::logger());
+    let mut seat = seat_state.new_wl_seat(&display.handle(), "seat0", slog_scope::logger());
 
-    seat.add_pointer({
-        let pointer_icon = pointer_icon.clone();
-        move |cursor| pointer_icon.on_new_cursor(cursor)
-    });
-
-    seat.add_keyboard(Default::default(), 200, 25, move |seat, focus| {
-        let focus = focus.and_then(|s| dh.get_client(s.id()).ok());
-        data_device::set_data_device_focus(&dh, seat, focus);
-    })?;
+    seat.add_pointer();
+    seat.add_keyboard(Default::default(), 200, 25)?;
 
     #[cfg(feature = "xwayland")]
     let xwayland = init_xwayland_connection(&event_loop.handle(), &display.handle());

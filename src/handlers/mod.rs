@@ -1,7 +1,6 @@
 mod backend_handler;
 mod input_handler;
 mod output_handler;
-// mod shell_handler;
 
 mod compositor;
 mod dmabuf;
@@ -11,19 +10,36 @@ mod xdg_shell;
 // Wl Seat
 //
 
+use smithay::input::{Seat, SeatHandler, SeatState};
 use smithay::reexports::wayland_server::protocol::wl_data_source::WlDataSource;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+use smithay::reexports::wayland_server::Resource;
 use smithay::wayland::data_device::{
-    ClientDndGrabHandler, DataDeviceHandler, ServerDndGrabHandler,
+    self, ClientDndGrabHandler, DataDeviceHandler, ServerDndGrabHandler,
 };
-use smithay::wayland::seat::{SeatHandler, SeatState};
 use smithay::{delegate_data_device, delegate_output, delegate_seat};
 
 use crate::State;
 
 impl SeatHandler for State {
+    type KeyboardFocus = WlSurface;
+    type PointerFocus = WlSurface;
+
     fn seat_state(&mut self) -> &mut SeatState<Self> {
         &mut self.seat_state
+    }
+
+    fn focus_changed(&mut self, seat: &Seat<Self>, focused: Option<&Self::KeyboardFocus>) {
+        let focus = focused.and_then(|s| self.display.get_client(s.id()).ok());
+        data_device::set_data_device_focus(&self.display, seat, focus);
+    }
+
+    fn cursor_image(
+        &mut self,
+        _seat: &Seat<Self>,
+        image: smithay::input::pointer::CursorImageStatus,
+    ) {
+        self.pointer_icon.on_new_cursor(image);
     }
 }
 
@@ -44,12 +60,12 @@ impl ClientDndGrabHandler for State {
         &mut self,
         _source: Option<WlDataSource>,
         icon: Option<WlSurface>,
-        _seat: smithay::wayland::seat::Seat<Self>,
+        _seat: Seat<Self>,
     ) {
         self.pointer_icon.dnd_started(icon);
     }
 
-    fn dropped(&mut self, _seat: smithay::wayland::seat::Seat<Self>) {
+    fn dropped(&mut self, _seat: Seat<Self>) {
         self.pointer_icon.dnd_dropped();
     }
 }

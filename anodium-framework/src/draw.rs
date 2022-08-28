@@ -1,10 +1,9 @@
-use std::sync::Mutex;
-
 use smithay::{
     desktop::space::SurfaceTree,
+    input::pointer::CursorImageSurfaceData,
     reexports::wayland_server::protocol::wl_surface,
     utils::{Logical, Point},
-    wayland::{compositor, seat::CursorImageAttributes},
+    wayland::compositor,
 };
 
 pub fn draw_cursor(
@@ -16,7 +15,7 @@ pub fn draw_cursor(
         Some(
             states
                 .data_map
-                .get::<Mutex<CursorImageAttributes>>()
+                .get::<CursorImageSurfaceData>()
                 .unwrap()
                 .lock()
                 .unwrap()

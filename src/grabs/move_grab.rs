@@ -1,15 +1,16 @@
 use crate::State;
 use smithay::{
     desktop::Window,
-    reexports::wayland_server::DisplayHandle,
-    utils::{Logical, Point},
-    wayland::seat::{
-        AxisFrame, ButtonEvent, MotionEvent, PointerGrab, PointerGrabStartData, PointerInnerHandle,
+    input::pointer::{
+        AxisFrame, ButtonEvent, GrabStartData as PointerGrabStartData, MotionEvent, PointerGrab,
+        PointerInnerHandle,
     },
+    reexports::wayland_server::protocol::wl_surface::WlSurface,
+    utils::{Logical, Point},
 };
 
 pub struct MoveSurfaceGrab {
-    pub start_data: PointerGrabStartData,
+    pub start_data: PointerGrabStartData<State>,
     pub window: Window,
     pub initial_window_location: Point<i32, Logical>,
 }
@@ -17,27 +18,27 @@ pub struct MoveSurfaceGrab {
 impl PointerGrab<State> for MoveSurfaceGrab {
     fn motion(
         &mut self,
-        data: &mut State,
-        _dh: &DisplayHandle,
+        state: &mut State,
         handle: &mut PointerInnerHandle<'_, State>,
+        _focus: Option<(WlSurface, Point<i32, Logical>)>,
         event: &MotionEvent,
     ) {
-        handle.motion(event.location, None, event.serial, event.time);
+        handle.motion(state, None, event);
 
         let delta = event.location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
-        data.space
+        state
+            .space
             .map_window(&self.window, new_location.to_i32_round(), None, true);
     }
 
     fn button(
         &mut self,
-        _data: &mut State,
-        _dh: &DisplayHandle,
+        state: &mut State,
         handle: &mut PointerInnerHandle<'_, State>,
         event: &ButtonEvent,
     ) {
-        handle.button(event.button, event.state, event.serial, event.time);
+        handle.button(state, event);
 
         // The button is a button code as defined in the
         // Linux kernel's linux/input-event-codes.h header file, e.g. BTN_LEFT.
@@ -45,21 +46,20 @@ impl PointerGrab<State> for MoveSurfaceGrab {
 
         if !handle.current_pressed().contains(&BTN_LEFT) {
             // No more buttons are pressed, release the grab.
-            handle.unset_grab(event.serial, event.time);
+            handle.unset_grab(state, event.serial, event.time);
         }
     }
 
     fn axis(
         &mut self,
-        _data: &mut State,
-        _dh: &DisplayHandle,
+        state: &mut State,
         handle: &mut PointerInnerHandle<'_, State>,
         details: AxisFrame,
     ) {
-        handle.axis(details)
+        handle.axis(state, details);
     }
 
-    fn start_data(&self) -> &PointerGrabStartData {
+    fn start_data(&self) -> &PointerGrabStartData<State> {
         &self.start_data
     }
 }

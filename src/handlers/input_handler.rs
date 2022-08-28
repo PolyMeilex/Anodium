@@ -3,16 +3,16 @@ use anodium_backend::{InputHandler, OutputId};
 
 use smithay::{
     backend::input::{
-        AbsolutePositionEvent, Event, InputEvent, KeyState, KeyboardKeyEvent, PointerButtonEvent,
-        PointerMotionEvent,
+        AbsolutePositionEvent, ButtonState, Event, InputEvent, KeyState, KeyboardKeyEvent,
+        PointerButtonEvent, PointerMotionEvent,
     },
     desktop::WindowSurfaceType,
-    reexports::wayland_server::protocol::wl_pointer,
-    utils::{Logical, Point},
-    wayland::{
-        seat::{keysyms as xkb, ButtonEvent, FilterResult, MotionEvent, PointerHandle},
-        SERIAL_COUNTER,
+    input::{
+        keyboard::{keysyms as xkb, FilterResult},
+        pointer::{ButtonEvent, MotionEvent, PointerHandle},
     },
+    utils::SERIAL_COUNTER,
+    utils::{Logical, Point},
 };
 
 impl InputHandler for CalloopData {
@@ -34,8 +34,12 @@ impl InputHandler for CalloopData {
 
                 let state = event.state();
 
+                // TODO: remove this once #722 is merged
+                let seat = self.state.seat.clone();
+                let loop_signal = self.state.loop_signal.clone();
+
                 keyboard.input::<(), _>(
-                    &self.display.handle(),
+                    &mut self.state,
                     event.key_code(),
                     event.state(),
                     SERIAL_COUNTER.next_serial(),
@@ -43,10 +47,10 @@ impl InputHandler for CalloopData {
                     |modifiers, handle| {
                         let keysym = handle.modified_sym();
 
-                        SeatState::for_seat(&self.state.seat).update_pressed_keys(keysym, state);
+                        SeatState::for_seat(&seat).update_pressed_keys(keysym, state);
 
                         if keysym == xkb::KEY_Escape {
-                            self.state.loop_signal.stop();
+                            loop_signal.stop();
                         }
 
                         if keysym == xkb::KEY_t
@@ -100,8 +104,6 @@ impl InputHandler for CalloopData {
                 self.state.pointer_motion(pointer, position, event.time());
             }
             InputEvent::PointerButton { event } => {
-                let dh = &self.display.handle();
-
                 let pointer = self.state.seat.get_pointer().unwrap();
                 let keyboard = self.state.seat.get_keyboard().unwrap();
 
@@ -111,12 +113,16 @@ impl InputHandler for CalloopData {
 
                 let button = event.button_code();
 
-                let button_state = wl_pointer::ButtonState::from(event.state());
+                let button_state = event.state();
 
-                if wl_pointer::ButtonState::Pressed == button_state && !pointer.is_grabbed() {
+                if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
                     if let Some(window) = self.state.space.window_under(pointer_pos).cloned() {
                         self.state.space.raise_window(&window, true);
-                        keyboard.set_focus(dh, Some(window.toplevel().wl_surface()), serial);
+                        keyboard.set_focus(
+                            &mut self.state,
+                            Some(window.toplevel().wl_surface().clone()),
+                            serial,
+                        );
                         window.set_activated(true);
                         window.configure();
                     } else {
@@ -124,13 +130,12 @@ impl InputHandler for CalloopData {
                             window.set_activated(false);
                             window.configure();
                         });
-                        keyboard.set_focus(dh, None, serial);
+                        keyboard.set_focus(&mut self.state, None, serial);
                     }
                 };
 
                 pointer.button(
                     &mut self.state,
-                    dh,
                     &ButtonEvent {
                         button,
                         state: button_state,
@@ -143,7 +148,7 @@ impl InputHandler for CalloopData {
                 let frame = anodium_framework::input::basic_axis_frame::<I>(&event);
 
                 let pointer = self.state.seat.get_pointer().unwrap();
-                pointer.axis(&mut self.state, &self.display.handle(), frame);
+                pointer.axis(&mut self.state, frame);
             }
             _ => {}
         }
@@ -162,13 +167,11 @@ impl State {
             .surface_under(position, WindowSurfaceType::all())
             .map(|(_, surface, location)| (surface, location));
 
-        let dh = self.display.clone();
         pointer.motion(
             self,
-            &dh,
+            under,
             &MotionEvent {
                 location: position,
-                focus: under,
                 serial: SERIAL_COUNTER.next_serial(),
                 time,
             },

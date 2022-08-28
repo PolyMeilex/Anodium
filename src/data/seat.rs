@@ -2,8 +2,8 @@ use std::{cell::Cell, cell::RefCell, collections::HashSet};
 
 use smithay::{
     backend::input::KeyState,
+    input::Seat,
     utils::{Logical, Point},
-    wayland::seat::Seat,
 };
 
 use crate::State;
