@@ -7,10 +7,12 @@ pub mod protocol {
     #![allow(missing_docs, clippy::all)]
 
     use wayland_client::*;
-    use wayland_commons::map::{Object, ObjectMetadata};
-    use wayland_commons::smallvec;
-    use wayland_commons::wire::{Argument, ArgumentType, Message, MessageDesc};
-    use wayland_commons::{Interface, MessageGroup};
+    use wayland_commons::{
+        map::{Object, ObjectMetadata},
+        smallvec,
+        wire::{Argument, ArgumentType, Message, MessageDesc},
+        Interface, MessageGroup,
+    };
     include!(concat!(env!("OUT_DIR"), "/client_api.rs"));
 }
 

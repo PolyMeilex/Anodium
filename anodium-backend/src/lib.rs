@@ -15,9 +15,9 @@ pub mod x11;
 pub mod utils;
 
 use smithay::{
-    backend::input::{InputBackend, InputEvent},
     backend::{
         allocator::dmabuf::Dmabuf,
+        input::{InputBackend, InputEvent},
         renderer::gles2::{Gles2Renderer, Gles2Texture},
     },
     reexports::{

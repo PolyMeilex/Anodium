@@ -5,10 +5,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use smithay::backend::input::InputEvent;
 use smithay::{
     backend::{
         egl::{EGLContext, EGLDisplay},
+        input::InputEvent,
         renderer::{gles2::Gles2Renderer, Bind, Unbind},
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },

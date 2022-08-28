@@ -14,8 +14,7 @@ use smithay::{
             Session,
         },
     },
-    nix::fcntl::OFlag,
-    nix::unistd,
+    nix::{fcntl::OFlag, unistd},
     reexports::{
         calloop::{Dispatcher, LoopHandle},
         drm::control::{connector, crtc, Device as _},

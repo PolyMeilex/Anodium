@@ -1,5 +1,4 @@
-use std::env::var;
-use std::path::Path;
+use std::{env::var, path::Path};
 use wayland_scanner::*;
 
 fn main() {

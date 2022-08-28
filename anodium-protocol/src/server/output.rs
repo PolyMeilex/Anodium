@@ -1,12 +1,10 @@
-use std::cell::RefCell;
-use std::ops::Deref;
-use std::rc::Rc;
+use std::{cell::RefCell, ops::Deref, rc::Rc};
 use wayland_server::{Filter, Main};
 
-use super::protocol::{
-    anodium_output::AnodiumOutput, anodium_workspace_manager::AnodiumWorkspaceManager,
+use super::{
+    protocol::{anodium_output::AnodiumOutput, anodium_workspace_manager::AnodiumWorkspaceManager},
+    workspace::AnodiumProtocolWorkspace,
 };
-use super::workspace::AnodiumProtocolWorkspace;
 
 #[derive(Default)]
 struct Inner {

@@ -1,8 +1,9 @@
-use smithay::delegate_seat;
-use smithay::input::{Seat, SeatHandler, SeatState};
-use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
-use smithay::reexports::wayland_server::Resource;
-use smithay::wayland::data_device;
+use smithay::{
+    delegate_seat,
+    input::{Seat, SeatHandler, SeatState},
+    reexports::wayland_server::{protocol::wl_surface::WlSurface, Resource},
+    wayland::data_device,
+};
 
 use crate::State;
 

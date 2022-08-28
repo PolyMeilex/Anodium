@@ -11,8 +11,7 @@ use smithay::{
         keyboard::{keysyms as xkb, FilterResult},
         pointer::{ButtonEvent, MotionEvent, PointerHandle},
     },
-    utils::SERIAL_COUNTER,
-    utils::{Logical, Point},
+    utils::{Logical, Point, SERIAL_COUNTER},
 };
 
 impl InputHandler for CalloopData {

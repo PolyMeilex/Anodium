@@ -5,7 +5,10 @@ use smithay::{
         Kind, PopupKeyboardGrab, PopupKind, PopupPointerGrab, PopupUngrabStrategy, Window,
         WindowSurfaceType,
     },
-    input::{pointer::Focus, pointer::GrabStartData as PointerGrabStartData, Seat},
+    input::{
+        pointer::{Focus, GrabStartData as PointerGrabStartData},
+        Seat,
+    },
     reexports::{
         wayland_protocols::xdg::shell::server::xdg_toplevel,
         wayland_server::{

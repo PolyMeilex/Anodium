@@ -3,7 +3,10 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 use smithay::{
     backend::winit::{self, WinitEvent},
     reexports::{
-        calloop::{timer::TimeoutAction, timer::Timer, EventLoop},
+        calloop::{
+            timer::{TimeoutAction, Timer},
+            EventLoop,
+        },
         wayland_server::{protocol::wl_output, DisplayHandle},
     },
     wayland::output::{Mode, PhysicalProperties},

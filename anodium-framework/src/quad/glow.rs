@@ -1,11 +1,8 @@
-use std::ffi::CString;
-use std::num::NonZeroU32;
+use std::{ffi::CString, num::NonZeroU32};
 
-use smithay::backend::renderer::gles2::ffi::types as native_gl;
-use smithay::backend::renderer::gles2::ffi::Gles2;
-use smithay::backend::renderer::gles2::ffi::COMPILE_STATUS;
-use smithay::backend::renderer::gles2::ffi::INFO_LOG_LENGTH;
-use smithay::backend::renderer::gles2::ffi::LINK_STATUS;
+use smithay::backend::renderer::gles2::ffi::{
+    types as native_gl, Gles2, COMPILE_STATUS, INFO_LOG_LENGTH, LINK_STATUS,
+};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Shader(pub NonZeroU32);

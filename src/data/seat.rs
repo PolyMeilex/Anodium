@@ -1,4 +1,7 @@
-use std::{cell::Cell, cell::RefCell, collections::HashSet};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashSet,
+};
 
 use smithay::{
     backend::input::KeyState,
