@@ -20,9 +20,8 @@ use smithay::{
     wayland::output::{Mode, PhysicalProperties},
 };
 
-use crate::{NewOutputDescriptor, OutputId};
-
 use super::BackendHandler;
+use crate::{NewOutputDescriptor, OutputId};
 
 pub const OUTPUT_NAME: &str = "x11";
 

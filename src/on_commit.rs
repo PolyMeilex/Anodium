@@ -1,5 +1,6 @@
-use crate::State;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+
+use crate::State;
 
 type CommitCallback = dyn FnOnce(&mut State, &WlSurface);
 

@@ -1,6 +1,7 @@
-use crate::{CalloopData, State};
 use anodium_backend::{BackendHandler, BackendState};
 use smithay::wayland::dmabuf::DmabufState;
+
+use crate::{CalloopData, State};
 
 impl BackendHandler for CalloopData {
     type WaylandState = State;

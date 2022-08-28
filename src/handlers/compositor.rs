@@ -1,4 +1,3 @@
-use crate::{grabs::resize_grab, on_commit::OnCommitDispatcher, State};
 use smithay::{
     backend::renderer::utils::on_commit_buffer_handler,
     delegate_compositor, delegate_shm,
@@ -9,6 +8,8 @@ use smithay::{
         shm::{ShmHandler, ShmState},
     },
 };
+
+use crate::{grabs::resize_grab, on_commit::OnCommitDispatcher, State};
 
 impl CompositorHandler for State {
     fn compositor_state(&mut self) -> &mut CompositorState {

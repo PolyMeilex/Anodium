@@ -1,7 +1,6 @@
 use std::{cell::RefCell, error::Error, rc::Rc, time::Duration};
 
 use anodium_protocol::server::AnodiumProtocol;
-
 use calloop::{EventLoop, LoopHandle};
 use wayland_server::Display;
 

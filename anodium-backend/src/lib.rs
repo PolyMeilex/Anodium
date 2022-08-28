@@ -14,6 +14,8 @@ pub mod x11;
 
 pub mod utils;
 
+use std::str::FromStr;
+
 use smithay::{
     backend::{
         allocator::dmabuf::Dmabuf,
@@ -33,8 +35,6 @@ use smithay::{
         output::{self, PhysicalProperties},
     },
 };
-
-use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct OutputId {

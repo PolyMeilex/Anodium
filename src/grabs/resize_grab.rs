@@ -1,7 +1,3 @@
-use crate::{
-    data::surface::{ResizeEdge, ResizeSurfaceState},
-    State,
-};
 use smithay::{
     desktop::{Kind, Space, Window, WindowSurfaceType},
     input::pointer::{
@@ -14,6 +10,11 @@ use smithay::{
     },
     utils::{Logical, Point, Rectangle, Size},
     wayland::{compositor, shell::xdg::SurfaceCachedState},
+};
+
+use crate::{
+    data::surface::{ResizeEdge, ResizeSurfaceState},
+    State,
 };
 
 pub struct ResizeSurfaceGrab {

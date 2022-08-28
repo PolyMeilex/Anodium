@@ -1,5 +1,6 @@
-use crate::State;
 use smithay::delegate_output;
+
+use crate::State;
 
 mod backend;
 mod input;

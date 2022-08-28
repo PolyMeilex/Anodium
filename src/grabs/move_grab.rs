@@ -1,4 +1,3 @@
-use crate::State;
 use smithay::{
     desktop::Window,
     input::pointer::{
@@ -8,6 +7,8 @@ use smithay::{
     reexports::wayland_server::protocol::wl_surface::WlSurface,
     utils::{Logical, Point},
 };
+
+use crate::State;
 
 pub struct MoveSurfaceGrab {
     pub start_data: PointerGrabStartData<State>,

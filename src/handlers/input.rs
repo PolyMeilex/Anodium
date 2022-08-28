@@ -1,6 +1,4 @@
-use crate::{data::seat::SeatState, CalloopData, State};
 use anodium_backend::{InputHandler, OutputId};
-
 use smithay::{
     backend::input::{
         AbsolutePositionEvent, ButtonState, Event, InputEvent, KeyState, KeyboardKeyEvent,
@@ -13,6 +11,8 @@ use smithay::{
     },
     utils::{Logical, Point, SERIAL_COUNTER},
 };
+
+use crate::{data::seat::SeatState, CalloopData, State};
 
 impl InputHandler for CalloopData {
     fn process_input_event<I: smithay::backend::input::InputBackend>(

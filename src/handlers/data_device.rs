@@ -1,10 +1,11 @@
-use crate::State;
 use smithay::{
     delegate_data_device,
     input::Seat,
     reexports::wayland_server::protocol::{wl_data_source::WlDataSource, wl_surface::WlSurface},
     wayland::data_device::{ClientDndGrabHandler, DataDeviceHandler, ServerDndGrabHandler},
 };
+
+use crate::State;
 
 impl DataDeviceHandler for State {
     fn data_device_state(&self) -> &smithay::wayland::data_device::DataDeviceState {

@@ -1,4 +1,5 @@
 use std::{cell::RefCell, ops::Deref, rc::Rc};
+
 use wayland_server::{Filter, Main};
 
 use super::{

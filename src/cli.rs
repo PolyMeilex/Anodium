@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-
 use anodium_backend::PreferedBackend;
+use clap::Parser;
 
 /// Rust wayland compositor
 #[derive(Parser, Debug)]

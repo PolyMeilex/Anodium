@@ -1,11 +1,14 @@
 #![allow(irrefutable_let_patterns)]
 
+use std::{ffi::OsString, sync::Arc, time::Instant};
+
 use anodium_backend::BackendState;
 use anodium_framework::pointer_icon::PointerIcon;
-
 use clap::StructOpt;
 use on_commit::OnCommitDispatcher;
 use slog::Drain;
+#[cfg(feature = "xwayland")]
+use smithay::xwayland::XWayland;
 use smithay::{
     desktop::{self, PopupManager},
     input::{Seat, SeatState},
@@ -24,11 +27,6 @@ use smithay::{
         socket::ListeningSocketSource,
     },
 };
-
-use std::{ffi::OsString, sync::Arc, time::Instant};
-
-#[cfg(feature = "xwayland")]
-use smithay::xwayland::XWayland;
 
 mod cli;
 mod data;

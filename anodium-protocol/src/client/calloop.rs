@@ -1,7 +1,6 @@
-use calloop::{LoopHandle, RegistrationToken};
-
 use std::{cell::RefCell, error::Error, rc::Rc};
 
+use calloop::{LoopHandle, RegistrationToken};
 use wayland_client::{DispatchData, Display, EventQueue, GlobalManager};
 
 use super::{init_global, AnodiumOutput};

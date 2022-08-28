@@ -1,14 +1,13 @@
-use crate::{data::output::OutputState, CalloopData, State};
-
 use anodium_backend::{
     utils::cursor::PointerElement, NewOutputDescriptor, OutputHandler, OutputId,
 };
-
 use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     desktop::space::SurfaceTree,
     wayland::output::{Mode, Output},
 };
+
+use crate::{data::output::OutputState, CalloopData, State};
 
 smithay::custom_elements! {
     pub CustomElem<=Gles2Renderer>;

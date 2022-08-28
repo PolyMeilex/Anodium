@@ -25,9 +25,8 @@ use smithay::{
     wayland::output::Mode as WlMode,
 };
 
-use crate::BackendHandler;
-
 use super::{utils, Device, DrmDevice, DrmOutputId, DrmRenderer};
+use crate::BackendHandler;
 
 pub struct Gpu {
     drm: DrmDevice,
