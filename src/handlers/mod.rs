@@ -1,15 +1,15 @@
 use crate::State;
 use smithay::delegate_output;
 
-mod backend_handler;
-mod input_handler;
-mod output_handler;
+mod backend;
+mod input;
+mod output;
 
 mod compositor;
-mod data_device_handler;
+mod data_device;
 mod dmabuf;
-mod seat_handler;
-mod xdg_shell;
+mod seat;
+mod xdg;
 
 //
 // Wl Output & Xdg Output
