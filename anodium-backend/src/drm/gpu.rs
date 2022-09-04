@@ -86,7 +86,7 @@ impl Gpu {
         for (connector, crtc) in res.map {
             let drm = drm.inner();
 
-            let connector_info = drm.get_connector(connector).unwrap();
+            let connector_info = drm.get_connector(connector, false).unwrap();
 
             let connector_name = utils::format_connector_name(
                 connector_info.interface(),

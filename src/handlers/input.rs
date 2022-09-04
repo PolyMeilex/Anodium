@@ -31,11 +31,7 @@ impl InputHandler for CalloopData {
             InputEvent::Keyboard { event } => {
                 let keyboard = self.state.seat.get_keyboard().unwrap();
 
-                let state = event.state();
-
-                // TODO: remove this once #722 is merged
-                let seat = self.state.seat.clone();
-                let loop_signal = self.state.loop_signal.clone();
+                let key_state = event.state();
 
                 keyboard.input::<(), _>(
                     &mut self.state,
@@ -43,13 +39,13 @@ impl InputHandler for CalloopData {
                     event.state(),
                     SERIAL_COUNTER.next_serial(),
                     event.time(),
-                    |modifiers, handle| {
+                    |state, modifiers, handle| {
                         let keysym = handle.modified_sym();
 
-                        SeatState::for_seat(&seat).update_pressed_keys(keysym, state);
+                        SeatState::for_seat(&state.seat).update_pressed_keys(keysym, key_state);
 
                         if keysym == xkb::KEY_Escape {
-                            loop_signal.stop();
+                            state.loop_signal.stop();
                         }
 
                         if keysym == xkb::KEY_t
@@ -57,6 +53,13 @@ impl InputHandler for CalloopData {
                             && event.state() == KeyState::Pressed
                         {
                             std::process::Command::new("weston-terminal").spawn().ok();
+
+                            FilterResult::Intercept(())
+                        } else if keysym == xkb::KEY_g
+                            && modifiers.alt
+                            && event.state() == KeyState::Pressed
+                        {
+                            std::process::Command::new("gtk4-demo").spawn().ok();
 
                             FilterResult::Intercept(())
                         } else {

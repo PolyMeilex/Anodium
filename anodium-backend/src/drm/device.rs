@@ -117,7 +117,7 @@ impl DrmDevice {
 
         for conn in connector_handles
             .iter()
-            .filter_map(|conn| drm.get_connector(*conn).ok())
+            .filter_map(|conn| drm.get_connector(*conn, true).ok())
         {
             let handle = conn.handle();
             let curr_state = conn.state();
@@ -145,7 +145,7 @@ impl DrmDevice {
 
         let connector_info = connector_handles
             .iter()
-            .map(|conn| drm.get_connector(*conn).unwrap())
+            .map(|conn| drm.get_connector(*conn, false).unwrap())
             .filter(|conn| conn.state() == connector::State::Connected)
             .inspect(|conn| info!("Connected: {:?}", conn.interface()));
 
@@ -153,8 +153,7 @@ impl DrmDevice {
             let encoder_infos = connector
                 .encoders()
                 .iter()
-                .filter_map(|e| *e)
-                .flat_map(|encoder_handle| drm.get_encoder(encoder_handle));
+                .flat_map(|encoder_handle| drm.get_encoder(*encoder_handle));
 
             'outer: for encoder_info in encoder_infos {
                 for crtc in res_handles.filter_crtcs(encoder_info.possible_crtcs()) {
