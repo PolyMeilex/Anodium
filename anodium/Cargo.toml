@@ -46,7 +46,7 @@ version = "0.10.0"
 features = []
 
 [features]
-default = ["drm", "winit", "x11"]
+default = ["drm", "winit", "x11", "xwayland"]
 
 x11 = ["anodium-backend/x11", "x11rb"]
 winit = ["anodium-backend/winit"]

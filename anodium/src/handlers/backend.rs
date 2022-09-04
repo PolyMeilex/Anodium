@@ -19,12 +19,7 @@ impl BackendHandler for CalloopData {
         dbg!(&self.state.socket_name);
 
         #[cfg(feature = "xwayland")]
-        {
-            self.state
-                .xwayland
-                .start::<CalloopData>(self.state.loop_handle.clone())
-                .ok();
-        }
+        self.state.xwayland.start(&self.state._loop_handle);
     }
 
     fn close_compositor(&mut self) {

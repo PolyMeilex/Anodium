@@ -25,7 +25,7 @@ use smithay::{
 use crate::{
     data::seat::SeatState,
     grabs::{MoveSurfaceGrab, ResizeSurfaceGrab},
-    State,
+    positioning, State,
 };
 
 impl XdgShellHandler for State {
@@ -43,32 +43,14 @@ impl XdgShellHandler for State {
             // Send initial configure
             window.configure();
 
-            /// Called once first buffer is attached
-            fn on_window_mapped(state: &mut State, window: Window) {
-                let pointer_pos = SeatState::for_seat(&state.seat).pointer_pos();
-
-                let loc = state.space.output_under(pointer_pos).next().map(|output| {
-                    let output = state.space.output_geometry(output).unwrap();
-                    let window = window.geometry();
-
-                    let x = output.size.w / 2 - window.size.w / 2;
-                    let y = output.size.h / 2 - window.size.h / 2;
-
-                    (output.loc.x + x, output.loc.y + y)
-                });
-
-                if let Some(loc) = loc {
-                    state.space.map_window(&window, loc, None, false);
-                }
-            }
-
             fn on_commit(state: &mut State, window: Window, surface: &WlSurface) {
                 let buffer_attached =
                     with_renderer_surface_state(surface, |data| data.wl_buffer().is_some());
 
                 if buffer_attached {
                     // Window got mapped so we can position it
-                    on_window_mapped(state, window);
+                    let pointer_pos = SeatState::for_seat(&state.seat).pointer_pos();
+                    positioning::position_window_center(&mut state.space, window, pointer_pos);
                 } else {
                     // Wait for nex commit
                     state

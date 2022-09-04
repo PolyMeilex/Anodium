@@ -9,7 +9,7 @@ use smithay::{
     },
 };
 
-use crate::{grabs::resize_grab, on_commit::OnCommitDispatcher, State};
+use crate::{grabs::resize_grab, on_commit::OnCommitDispatcher, xwayland, State};
 
 impl CompositorHandler for State {
     fn compositor_state(&mut self) -> &mut CompositorState {
@@ -21,6 +21,9 @@ impl CompositorHandler for State {
 
         self.space.commit(surface);
         resize_grab::handle_commit(&mut self.space, surface);
+
+        #[cfg(feature = "xwayland")]
+        xwayland::handle_commit(self, surface);
 
         OnCommitDispatcher::handle_commit(self, surface);
     }

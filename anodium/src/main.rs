@@ -7,8 +7,6 @@ use anodium_framework::pointer_icon::PointerIcon;
 use clap::StructOpt;
 use on_commit::OnCommitDispatcher;
 use slog::Drain;
-#[cfg(feature = "xwayland")]
-use smithay::xwayland::XWayland;
 use smithay::{
     desktop::{self, PopupManager},
     input::{Seat, SeatState},
@@ -33,8 +31,11 @@ mod data;
 mod grabs;
 mod handlers;
 mod on_commit;
+mod positioning;
+#[cfg(feature = "xwayland")]
+mod xwayland;
 
-struct CalloopData {
+pub struct CalloopData {
     state: State,
     display: Display<State>,
 }
@@ -68,39 +69,7 @@ pub struct State {
     socket_name: OsString,
 
     #[cfg(feature = "xwayland")]
-    xwayland: XWayland,
-}
-
-/// init the xwayland connection
-#[cfg(feature = "xwayland")]
-fn init_xwayland_connection(
-    handle: &LoopHandle<'static, CalloopData>,
-    display: &DisplayHandle,
-) -> XWayland {
-    use smithay::xwayland::XWaylandEvent;
-
-    let (xwayland, channel) = XWayland::new(slog_scope::logger(), display);
-
-    handle
-        .insert_source(channel, {
-            let handle = handle.clone();
-            move |event, _, state| match event {
-                XWaylandEvent::Ready {
-                    connection,
-                    client,
-                    client_fd,
-                    display,
-                } => {
-                    // state
-                    // .shell_manager
-                    // .xwayland_ready(&handle, connection, client)
-                }
-                XWaylandEvent::Exited => {}
-            }
-        })
-        .unwrap();
-
-    xwayland
+    xwayland: xwayland::XWaylandState,
 }
 
 struct ClientState;
@@ -159,6 +128,7 @@ fn init_log() -> slog::Logger {
     )
     .filter(Some("anodium"), slog::FilterLevel::Trace)
     .filter(Some("smithay"), slog::FilterLevel::Warning)
+    .filter(None, slog::FilterLevel::Warning)
     .build()
     .fuse();
 
@@ -200,7 +170,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     seat.add_keyboard(Default::default(), 200, 25)?;
 
     #[cfg(feature = "xwayland")]
-    let xwayland = init_xwayland_connection(&event_loop.handle(), &display.handle());
+    let xwayland_state =
+        xwayland::XWaylandState::init_xwayland_connection(&event_loop.handle(), &display.handle());
 
     let state = State {
         space: desktop::Space::new(slog_scope::logger()),
@@ -228,7 +199,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         socket_name,
         #[cfg(feature = "xwayland")]
-        xwayland,
+        xwayland: xwayland_state,
     };
 
     let mut data = CalloopData { state, display };

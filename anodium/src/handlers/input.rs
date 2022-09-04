@@ -156,7 +156,11 @@ impl InputHandler for CalloopData {
                         } else {
                             self.state.space.windows().for_each(|window| {
                                 window.set_activated(false);
-                                window.configure();
+
+                                // TODO: Remove once smithay supports xwayland
+                                if let desktop::Kind::Xdg(_) = window.toplevel() {
+                                    window.configure();
+                                }
                             });
                             keyboard.set_focus(&mut self.state, None, serial);
                         }
@@ -187,12 +191,20 @@ impl InputHandler for CalloopData {
 fn activate_and_brind_to_top(space: &mut desktop::Space, window: &desktop::Window) {
     space.windows().filter(|w| *w != window).for_each(|window| {
         window.set_activated(false);
-        window.configure();
+
+        // TODO: Remove once smithay supports xwayland
+        if let desktop::Kind::Xdg(_) = window.toplevel() {
+            window.configure();
+        }
     });
 
     space.raise_window(window, true);
     window.set_activated(true);
-    window.configure();
+
+    // TODO: Remove once smithay supports xwayland
+    if let desktop::Kind::Xdg(_) = window.toplevel() {
+        window.configure();
+    }
 }
 
 impl State {
