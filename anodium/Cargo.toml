@@ -46,13 +46,12 @@ version = "0.10.0"
 features = []
 
 [features]
-default = ["drm", "winit", "x11", "debug"]
+default = ["drm", "winit", "x11"]
 
 x11 = ["anodium-backend/x11", "x11rb"]
 winit = ["anodium-backend/winit"]
 drm = ["anodium-backend/drm"]
 
-debug = []
 xwayland = [
   "smithay/xwayland",
   "smithay/x11rb_event_source",
