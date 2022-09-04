@@ -3,6 +3,7 @@ use anodium_backend::{
 };
 use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
+    delegate_output,
     desktop::space::SurfaceTree,
     wayland::output::{Mode, Output},
 };
@@ -175,3 +176,8 @@ impl OutputHandler for CalloopData {
         //     .send_frames(self.state.start_time.elapsed().as_millis() as u32);
     }
 }
+
+//
+// Wl Output & Xdg Output
+//
+delegate_output!(State);
