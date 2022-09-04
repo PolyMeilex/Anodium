@@ -190,7 +190,7 @@ fn activate_and_brind_to_top(space: &mut desktop::Space, window: &desktop::Windo
         window.configure();
     });
 
-    space.raise_window(&window, true);
+    space.raise_window(window, true);
     window.set_activated(true);
     window.configure();
 }
