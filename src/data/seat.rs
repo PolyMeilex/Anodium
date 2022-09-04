@@ -38,4 +38,8 @@ impl SeatState {
             self.pressed_keys.borrow_mut().remove(&keysym);
         }
     }
+
+    pub fn is_key_pressed(&self, keysym: u32) -> bool {
+        self.pressed_keys.borrow().get(&keysym).is_some()
+    }
 }

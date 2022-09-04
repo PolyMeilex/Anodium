@@ -4,15 +4,15 @@ use smithay::{
         AbsolutePositionEvent, ButtonState, Event, InputEvent, KeyState, KeyboardKeyEvent,
         PointerButtonEvent, PointerMotionEvent,
     },
-    desktop::WindowSurfaceType,
+    desktop::{self, WindowSurfaceType},
     input::{
         keyboard::{keysyms as xkb, FilterResult},
-        pointer::{ButtonEvent, MotionEvent, PointerHandle},
+        pointer::{ButtonEvent, Focus, GrabStartData, MotionEvent, PointerHandle},
     },
     utils::{Logical, Point, SERIAL_COUNTER},
 };
 
-use crate::{data::seat::SeatState, CalloopData, State};
+use crate::{data::seat::SeatState, grabs::MoveSurfaceGrab, CalloopData, State};
 
 impl InputHandler for CalloopData {
     fn process_input_event<I: smithay::backend::input::InputBackend>(
@@ -109,32 +109,59 @@ impl InputHandler for CalloopData {
                 let pointer = self.state.seat.get_pointer().unwrap();
                 let keyboard = self.state.seat.get_keyboard().unwrap();
 
-                let pointer_pos = SeatState::for_seat(&self.state.seat).pointer_pos();
-
                 let serial = SERIAL_COUNTER.next_serial();
 
                 let button = event.button_code();
-
                 let button_state = event.state();
 
-                if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
-                    if let Some(window) = self.state.space.window_under(pointer_pos).cloned() {
-                        self.state.space.raise_window(&window, true);
-                        keyboard.set_focus(
-                            &mut self.state,
-                            Some(window.toplevel().wl_surface().clone()),
-                            serial,
-                        );
-                        window.set_activated(true);
-                        window.configure();
-                    } else {
-                        self.state.space.windows().for_each(|window| {
-                            window.set_activated(false);
-                            window.configure();
-                        });
-                        keyboard.set_focus(&mut self.state, None, serial);
-                    }
-                };
+                let seat_state = SeatState::for_seat(&self.state.seat);
+                let pointer_pos = seat_state.pointer_pos();
+                let is_alt_pressed = seat_state.is_key_pressed(xkb::KEY_Alt_L);
+
+                if ButtonState::Pressed == button_state {
+                    let window_under = self.state.space.window_under(pointer_pos).cloned();
+
+                    if !pointer.is_grabbed() {
+                        if let Some(window) = window_under {
+                            activate_and_brind_to_top(&mut self.state.space, &window);
+
+                            keyboard.set_focus(
+                                &mut self.state,
+                                Some(window.toplevel().wl_surface().clone()),
+                                serial,
+                            );
+
+                            // Check for compositor initiated move grab
+                            if is_alt_pressed {
+                                let start_data = GrabStartData {
+                                    focus: None,
+                                    button,
+                                    location: pointer_pos,
+                                };
+
+                                let initial_window_location =
+                                    self.state.space.window_location(&window).unwrap();
+
+                                let grab = MoveSurfaceGrab {
+                                    start_data,
+                                    window,
+                                    initial_window_location,
+                                };
+
+                                pointer.set_grab(&mut self.state, grab, serial, Focus::Clear);
+
+                                // Return early, we don't want to send button event to this window/surface
+                                return;
+                            }
+                        } else {
+                            self.state.space.windows().for_each(|window| {
+                                window.set_activated(false);
+                                window.configure();
+                            });
+                            keyboard.set_focus(&mut self.state, None, serial);
+                        }
+                    };
+                }
 
                 pointer.button(
                     &mut self.state,
@@ -155,6 +182,17 @@ impl InputHandler for CalloopData {
             _ => {}
         }
     }
+}
+
+fn activate_and_brind_to_top(space: &mut desktop::Space, window: &desktop::Window) {
+    space.windows().filter(|w| *w != window).for_each(|window| {
+        window.set_activated(false);
+        window.configure();
+    });
+
+    space.raise_window(&window, true);
+    window.set_activated(true);
+    window.configure();
 }
 
 impl State {
