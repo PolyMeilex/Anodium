@@ -13,6 +13,7 @@ use smithay::{
         },
         session::{auto::AutoSession, Signal as SessionSignal},
     },
+    output::Mode as WlMode,
     reexports::{
         calloop::LoopHandle,
         drm::control::{connector, crtc, Device as _, ModeTypeFlags},
@@ -22,7 +23,6 @@ use smithay::{
         signaling::{Linkable, Signaler},
         Rectangle,
     },
-    wayland::output::Mode as WlMode,
 };
 
 use super::{utils, Device, DrmDevice, DrmOutputId, DrmRenderer};
@@ -70,7 +70,7 @@ impl Gpu {
         info!("connectors: {:#?}", &res);
 
         let formats = {
-            let display = EGLDisplay::new(&*gbm.borrow(), None).unwrap();
+            let display = unsafe { EGLDisplay::new(&*gbm.borrow(), None).unwrap() };
 
             EGLDevice::device_for_display(&display)
                 .ok()

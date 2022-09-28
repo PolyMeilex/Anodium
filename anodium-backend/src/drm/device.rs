@@ -14,10 +14,10 @@ use smithay::{
             Session,
         },
     },
-    nix::{fcntl::OFlag, unistd},
     reexports::{
         calloop::{Dispatcher, LoopHandle},
         drm::control::{connector, crtc, Device as _},
+        nix::{fcntl::OFlag, unistd},
     },
 };
 

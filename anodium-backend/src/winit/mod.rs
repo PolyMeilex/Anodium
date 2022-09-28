@@ -2,14 +2,14 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 
 use smithay::{
     backend::winit::{self, WinitEvent},
+    output::{Mode, PhysicalProperties},
     reexports::{
         calloop::{
             timer::{TimeoutAction, Timer},
             EventLoop,
         },
-        wayland_server::{protocol::wl_output, DisplayHandle},
+        wayland_server::DisplayHandle,
     },
-    wayland::output::{Mode, PhysicalProperties},
 };
 
 use super::BackendHandler;
@@ -43,7 +43,7 @@ where
 
     let physical_properties = PhysicalProperties {
         size: (0, 0).into(),
-        subpixel: wl_output::Subpixel::Unknown,
+        subpixel: smithay::output::Subpixel::Unknown,
         make: "Smithay".into(),
         model: "Winit".into(),
     };
@@ -53,7 +53,7 @@ where
     let output = NewOutputDescriptor {
         id: output_id,
         physical_properties,
-        transform: wl_output::Transform::Flipped180,
+        transform: smithay::utils::Transform::Flipped180,
         name: OUTPUT_NAME.to_owned(),
         prefered_mode: mode,
         possible_modes: vec![mode],

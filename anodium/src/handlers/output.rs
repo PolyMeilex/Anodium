@@ -5,7 +5,7 @@ use smithay::{
     backend::renderer::gles2::{Gles2Renderer, Gles2Texture},
     delegate_output,
     desktop::space::SurfaceTree,
-    wayland::output::{Mode, Output},
+    output::{Mode, Output},
 };
 
 use crate::{data::output::OutputState, CalloopData, State};

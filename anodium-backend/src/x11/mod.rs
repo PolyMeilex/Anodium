@@ -12,12 +12,12 @@ use smithay::{
         renderer::{gles2::Gles2Renderer, Bind, Unbind},
         x11::{WindowBuilder, X11Backend, X11Event, X11Handle, X11Surface},
     },
+    output::{Mode, PhysicalProperties},
     reexports::{
         calloop::{ping, EventLoop},
         gbm,
-        wayland_server::{protocol::wl_output, DisplayHandle},
+        wayland_server::DisplayHandle,
     },
-    wayland::output::{Mode, PhysicalProperties},
 };
 
 use super::BackendHandler;
@@ -85,7 +85,7 @@ impl OutputSurfaceBuilder {
 
         let physical_properties = PhysicalProperties {
             size: (0, 0).into(),
-            subpixel: wl_output::Subpixel::Unknown,
+            subpixel: smithay::output::Subpixel::Unknown,
             make: "Smithay".into(),
             model: "Winit".into(),
         };
@@ -97,7 +97,7 @@ impl OutputSurfaceBuilder {
             physical_properties,
             prefered_mode: mode,
             possible_modes: vec![mode],
-            transform: wl_output::Transform::Normal,
+            transform: smithay::utils::Transform::Normal,
         };
 
         (
@@ -134,7 +134,7 @@ where
     // Create the gbm device for buffer allocation.
     let device = gbm::Device::new(fd).expect("Failed to create gbm device");
     // Initialize EGL using the GBM device.
-    let egl = EGLDisplay::new(&device, None).expect("Failed to create EGLDisplay");
+    let egl = unsafe { EGLDisplay::new(&device, None).expect("Failed to create EGLDisplay") };
     // Create the OpenGL context
     let context = EGLContext::new(&egl, None).expect("Failed to create EGLContext");
 

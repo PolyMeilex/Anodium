@@ -90,11 +90,14 @@ impl XdgShellHandler for State {
 
     fn grab(&mut self, surface: PopupSurface, seat: wl_seat::WlSeat, serial: Serial) {
         let seat: Seat<Self> = Seat::from_resource(&seat).unwrap();
-        let ret =
-            self.popups
-                .grab_popup(&self.display, surface.wl_surface().clone(), &seat, serial);
 
-        if let Ok(mut grab) = ret {
+        let kind = PopupKind::Xdg(surface);
+
+        let ret = smithay::desktop::find_popup_root_surface(&kind)
+            .ok()
+            .and_then(|root| self.popups.grab_popup(root, kind, &seat, serial).ok());
+
+        if let Some(mut grab) = ret {
             if let Some(keyboard) = seat.get_keyboard() {
                 if keyboard.is_grabbed()
                     && !(keyboard.has_grab(serial)
@@ -103,7 +106,7 @@ impl XdgShellHandler for State {
                     grab.ungrab(PopupUngrabStrategy::All);
                     return;
                 }
-                keyboard.set_focus(self, grab.current_grab().map(|(_, s)| s), serial);
+                keyboard.set_focus(self, grab.current_grab(), serial);
                 keyboard.set_grab(PopupKeyboardGrab::new(&grab), serial);
             }
             if let Some(pointer) = seat.get_pointer() {

@@ -22,17 +22,16 @@ use smithay::{
         input::{InputBackend, InputEvent},
         renderer::gles2::{Gles2Renderer, Gles2Texture},
     },
+    output::PhysicalProperties,
     reexports::{
         calloop::EventLoop,
         wayland_protocols::wp::linux_dmabuf::zv1::server::zwp_linux_dmabuf_v1,
-        wayland_server::{protocol::wl_output, DisplayHandle, GlobalDispatch},
+        wayland_server::{DisplayHandle, GlobalDispatch},
     },
     utils::{Physical, Rectangle},
-    wayland,
     wayland::{
         buffer::BufferHandler,
         dmabuf::{DmabufGlobal, DmabufGlobalData, DmabufHandler, DmabufState, ImportError},
-        output::{self, PhysicalProperties},
     },
 };
 
@@ -47,10 +46,10 @@ pub struct NewOutputDescriptor {
     pub name: String,
     pub physical_properties: PhysicalProperties,
 
-    pub prefered_mode: output::Mode,
-    pub possible_modes: Vec<output::Mode>,
+    pub prefered_mode: smithay::output::Mode,
+    pub possible_modes: Vec<smithay::output::Mode>,
 
-    pub transform: wl_output::Transform,
+    pub transform: smithay::utils::Transform,
 }
 
 pub enum BackendState {
@@ -79,7 +78,7 @@ impl BackendState {
 }
 
 impl BackendState {
-    pub fn update_mode(&mut self, output_id: &OutputId, mode: &wayland::output::Mode) {
+    pub fn update_mode(&mut self, output_id: &OutputId, mode: &smithay::output::Mode) {
         match self {
             BackendState::Drm(state) => state.update_mode(output_id, mode),
             BackendState::None => {}
@@ -104,7 +103,7 @@ pub trait OutputHandler {
     fn output_created(&mut self, output: NewOutputDescriptor);
 
     /// Output got resized
-    fn output_mode_updated(&mut self, output_id: &OutputId, mode: wayland::output::Mode);
+    fn output_mode_updated(&mut self, output_id: &OutputId, mode: smithay::output::Mode);
 
     /// Output was disconected
     fn output_removed(&mut self, output: &OutputId);

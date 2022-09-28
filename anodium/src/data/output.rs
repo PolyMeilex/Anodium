@@ -1,4 +1,4 @@
-use smithay::wayland::output::Output;
+use smithay::output::Output;
 
 #[derive(Default, Debug)]
 pub struct OutputState {

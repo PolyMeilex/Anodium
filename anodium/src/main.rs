@@ -1,6 +1,6 @@
 #![allow(irrefutable_let_patterns)]
 
-use std::{ffi::OsString, sync::Arc, time::Instant};
+use std::{ffi::OsString, os::unix::prelude::AsRawFd, sync::Arc, time::Instant};
 
 use anodium_backend::BackendState;
 use anodium_framework::pointer_icon::PointerIcon;
@@ -90,8 +90,6 @@ fn init_wayland_listener<D>(
     // Clients will connect to this socket.
     let socket_name = listening_socket.socket_name().to_os_string();
 
-    let handle = event_loop.handle();
-
     event_loop
         .handle()
         .insert_source(listening_socket, move |client_stream, _, state| {
@@ -107,9 +105,14 @@ fn init_wayland_listener<D>(
         .expect("Failed to init the wayland event source.");
 
     // You also need to add the display itself to the event loop, so that client events will be processed by wayland-server.
-    handle
+    event_loop
+        .handle()
         .insert_source(
-            Generic::new(display.backend().poll_fd(), Interest::READ, Mode::Level),
+            Generic::new(
+                display.backend().poll_fd().as_raw_fd(),
+                Interest::READ,
+                Mode::Level,
+            ),
             |_, _, state| {
                 state.display.dispatch_clients(&mut state.state).unwrap();
                 Ok(PostAction::Continue)

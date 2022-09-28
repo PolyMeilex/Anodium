@@ -17,17 +17,10 @@ use smithay::{
         },
         session::{auto::AutoSession, Session, Signal as SessionSignal},
     },
-    reexports::{
-        calloop::EventLoop,
-        drm::control::crtc,
-        wayland_server::{protocol::wl_output, DisplayHandle},
-    },
+    output::{Mode as WlMode, PhysicalProperties},
+    reexports::{calloop::EventLoop, drm::control::crtc, wayland_server::DisplayHandle},
     utils::signaling::SignalToken,
-    wayland::{
-        self,
-        dmabuf::{DmabufGlobal, ImportError},
-        output::{Mode as WlMode, PhysicalProperties},
-    },
+    wayland::dmabuf::{DmabufGlobal, ImportError},
 };
 
 mod device;
@@ -100,7 +93,7 @@ impl DrmBackendState {
             .map_err(|_| ImportError::Failed)
     }
 
-    pub fn update_mode(&mut self, output: &OutputId, mode: &wayland::output::Mode) {
+    pub fn update_mode(&mut self, output: &OutputId, mode: &smithay::output::Mode) {
         let id = OUTPUT_ID_MAP.with(|map| map.borrow().get(output).cloned());
 
         let output = id.and_then(|id| {
@@ -236,13 +229,13 @@ where
             name: "".into(),
             physical_properties: PhysicalProperties {
                 size: (1920, 1080).into(),
-                subpixel: wl_output::Subpixel::Unknown,
+                subpixel: smithay::output::Subpixel::Unknown,
                 make: "".into(),
                 model: "".into(),
             },
             prefered_mode: mode,
             possible_modes: vec![mode],
-            transform: wl_output::Transform::Normal,
+            transform: smithay::utils::Transform::Normal,
         })
     }
 
