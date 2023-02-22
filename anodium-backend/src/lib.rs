@@ -18,21 +18,14 @@ use std::str::FromStr;
 
 use smithay::{
     backend::{
-        allocator::dmabuf::Dmabuf,
+        allocator::{dmabuf::Dmabuf, Format},
         input::{InputBackend, InputEvent},
         renderer::gles2::{Gles2Renderer, Gles2Texture},
     },
     output::PhysicalProperties,
-    reexports::{
-        calloop::EventLoop,
-        wayland_protocols::wp::linux_dmabuf::zv1::server::zwp_linux_dmabuf_v1,
-        wayland_server::{DisplayHandle, GlobalDispatch},
-    },
+    reexports::{calloop::EventLoop, wayland_server::DisplayHandle},
     utils::{Physical, Rectangle},
-    wayland::{
-        buffer::BufferHandler,
-        dmabuf::{DmabufGlobal, DmabufGlobalData, DmabufHandler, DmabufState, ImportError},
-    },
+    wayland::dmabuf::{DmabufGlobal, ImportError},
 };
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -131,13 +124,8 @@ pub trait InputHandler {
 }
 
 pub trait BackendHandler: OutputHandler + InputHandler {
-    type WaylandState: GlobalDispatch<zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1, DmabufGlobalData>
-        + BufferHandler
-        + DmabufHandler
-        + 'static;
-
     fn backend_state(&mut self) -> &mut BackendState;
-    fn dmabuf_state(&mut self) -> &mut DmabufState;
+    fn create_dmabuf_global(&mut self, formats: Vec<Format>);
 
     fn start_compositor(&mut self);
     fn close_compositor(&mut self);
@@ -181,43 +169,37 @@ impl FromStr for PreferedBackend {
     }
 }
 
-pub fn init<D>(
-    event_loop: &mut EventLoop<'static, D>,
-    display: &DisplayHandle,
-    handler: &mut D,
-    backend: PreferedBackend,
-) where
-    D: BackendHandler + AsMut<DmabufState> + 'static,
+pub fn init<D>(event_loop: &mut EventLoop<'static, D>, handler: &mut D, backend: PreferedBackend)
+where
+    // D: BackendHandler + AsMut<DmabufState> + 'static,
+    D: BackendHandler + 'static,
 {
     match backend {
         PreferedBackend::Auto => {
             if std::env::var("WAYLAND_DISPLAY").is_ok() || std::env::var("DISPLAY").is_ok() {
                 info!("Starting with winit backend");
                 #[cfg(feature = "winit")]
-                winit::run_winit(event_loop, display, handler)
-                    .expect("Failed to initialize winit backend.");
+                winit::run_winit(event_loop, handler).expect("Failed to initialize winit backend.");
             } else {
                 info!("Starting with udev backend");
                 #[cfg(feature = "drm")]
-                drm::run_drm_backend(event_loop, display, handler)
+                drm::run_drm_backend(event_loop, handler)
                     .expect("Failed to initialize tty backend.");
             }
         }
         PreferedBackend::X11 =>
         {
             #[cfg(feature = "x11")]
-            x11::run_x11(event_loop, display, handler).expect("Failed to initialize x11 backend.")
+            x11::run_x11(event_loop, handler).expect("Failed to initialize x11 backend.")
         }
         PreferedBackend::Winit =>
         {
             #[cfg(feature = "winit")]
-            winit::run_winit(event_loop, display, handler)
-                .expect("Failed to initialize winit backend.")
+            winit::run_winit(event_loop, handler).expect("Failed to initialize winit backend.")
         }
         PreferedBackend::Udev => {
             #[cfg(feature = "drm")]
-            drm::run_drm_backend(event_loop, display, handler)
-                .expect("Failed to initialize tty backend.");
+            drm::run_drm_backend(event_loop, handler).expect("Failed to initialize tty backend.");
         }
     }
 }

@@ -8,23 +8,25 @@ use std::{
 use anyhow::Result;
 use smithay::{
     backend::{
-        allocator::dmabuf::Dmabuf,
-        drm::DrmNode,
+        allocator::{
+            dmabuf::Dmabuf,
+            gbm::{GbmAllocator, GbmBufferFlags},
+        },
+        drm::{DrmDeviceFd, DrmNode},
         renderer::{
-            gles2::{Gles2Renderbuffer, Gles2Texture},
-            multigpu::{egl::EglGlesBackend, GpuManager, MultiRenderer},
+            gles2::{Gles2Renderbuffer, Gles2Renderer, Gles2Texture},
+            multigpu::{gbm::GbmGlesBackend, GpuManager, GraphicsApi, MultiRenderer},
             ImportDma,
         },
-        session::{auto::AutoSession, Session, Signal as SessionSignal},
+        session::{libseat::LibSeatSession, Event as SessionEvent, Session},
     },
     output::{Mode as WlMode, PhysicalProperties},
     reexports::{calloop::EventLoop, drm::control::crtc, wayland_server::DisplayHandle},
-    utils::signaling::SignalToken,
     wayland::dmabuf::{DmabufGlobal, ImportError},
 };
 
 mod device;
-use device::{Device, DrmDevice};
+use device::DrmDevice;
 
 mod utils;
 
@@ -39,7 +41,8 @@ thread_local! {
     static OUTPUT_ID_MAP: RefCell<HashMap<OutputId, DrmOutputId>> = Default::default();
 }
 
-type DrmRenderer<'a> = MultiRenderer<'a, 'a, EglGlesBackend, EglGlesBackend, Gles2Renderbuffer>;
+type DrmRenderer<'a> =
+    MultiRenderer<'a, 'a, 'a, GbmGlesBackend<Gles2Renderer>, GbmGlesBackend<Gles2Renderer>>;
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 struct DrmOutputId {
@@ -59,11 +62,9 @@ impl DrmOutputId {
 
 pub struct DrmBackendState {
     gpus: HashMap<DrmNode, Gpu>,
-    gpu_manager: Rc<RefCell<GpuManager<EglGlesBackend>>>,
+    gpu_manager: Rc<RefCell<GpuManager<GbmGlesBackend<Gles2Renderer>>>>,
     primary_gpu: DrmNode,
-    pointer_image: crate::utils::cursor::Cursor,
     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
-    _restart_token: SignalToken,
 }
 
 impl DrmBackendState {
@@ -87,7 +88,7 @@ impl DrmBackendState {
     ) -> Result<(), ImportError> {
         self.gpu_manager
             .borrow_mut()
-            .renderer::<Gles2Renderbuffer>(&self.primary_gpu, &self.primary_gpu)
+            .single_renderer(&self.primary_gpu)
             .and_then(|mut renderer| renderer.import_dmabuf(&dmabuf, None))
             .map(|_| ())
             .map_err(|_| ImportError::Failed)
@@ -111,7 +112,7 @@ impl DrmBackendState {
 
 pub fn run_drm_backend<D>(
     event_loop: &mut EventLoop<'static, D>,
-    display: &DisplayHandle,
+    // display: &DisplayHandle,
     handler: &mut D,
 ) -> Result<()>
 where
@@ -119,15 +120,9 @@ where
     D: 'static,
 {
     // Init session
-    let (mut session, notifier) = AutoSession::new(None).expect("Could not init session!");
-    let session_signal = notifier.signaler();
+    let (mut session, notifier) = LibSeatSession::new().expect("Could not init session!");
 
-    crate::libinput::init(event_loop.handle(), session.clone(), session_signal.clone());
-
-    event_loop
-        .handle()
-        .insert_source(notifier, |_, _, _| {})
-        .unwrap();
+    crate::libinput::init(event_loop.handle(), session.clone());
 
     let (primary_gpu_path, primary_gpu_node) = udev::primary_gpu(&session.seat());
 
@@ -136,38 +131,44 @@ where
     udev::init(event_loop.handle(), session.seat())?;
 
     let handle = event_loop.handle();
-    let restart_token = session_signal.register(move |signal| match signal {
-        SessionSignal::ActivateSession | SessionSignal::ActivateDevice { .. } => {
-            handle.insert_idle(|data| {
-                data.backend_state().drm().clear_all();
-            });
-        }
-        SessionSignal::PauseSession | SessionSignal::PauseDevice { .. } => {}
-    });
+
+    event_loop
+        .handle()
+        .insert_source(notifier, move |event, _, _| match event {
+            SessionEvent::ActivateSession { .. } => {
+                handle.insert_idle(|data| {
+                    data.backend_state().drm().clear_all();
+                });
+            }
+            SessionEvent::PauseSession { .. } => {}
+        })
+        .unwrap();
 
     let gpu = Gpu::new(
         event_loop.handle(),
         &mut session,
-        session_signal,
         &primary_gpu_path,
         primary_gpu_node,
     )?;
 
     let outputs: Vec<_> = gpu.outputs.iter().map(|(crtc, _)| *crtc).collect();
 
+    let mut gpu_manager = GpuManager::new(GbmGlesBackend::<Gles2Renderer>::default())?;
+    gpu_manager
+        .as_mut()
+        .add_node(primary_gpu_node, gpu.gbm.clone())
+        .unwrap();
+
     let mut gpus = HashMap::new();
     gpus.insert(primary_gpu_node, gpu);
 
-    let gpu_manager = GpuManager::new(EglGlesBackend, None)?;
     let gpu_manager = Rc::new(RefCell::new(gpu_manager));
 
     handler.backend_state().init_drm(DrmBackendState {
         gpus,
         gpu_manager,
         primary_gpu: primary_gpu_node,
-        pointer_image: crate::utils::cursor::Cursor::load(),
         pointer_images: Vec::new(),
-        _restart_token: restart_token,
     });
 
     // TODO: This should handle potential SwapBuffersError::TemporaryFailure errors and retry
@@ -182,17 +183,15 @@ where
         let state = handler.backend_state().drm();
         let mut gpu_manager = state.gpu_manager.borrow_mut();
 
-        let mut renderer = gpu_manager
-            .renderer::<Gles2Renderbuffer>(&state.primary_gpu, &state.primary_gpu)
-            .unwrap();
+        let mut renderer = gpu_manager.single_renderer(&state.primary_gpu).unwrap();
 
         info!(
             "Trying to initialize EGL Hardware Acceleration via {:?}",
             state.primary_gpu
         );
-        if renderer.bind_wl_display(display).is_ok() {
-            info!("EGL hardware-acceleration enabled");
-        }
+        // if renderer.bind_wl_display(display).is_ok() {
+        //     info!("EGL hardware-acceleration enabled");
+        // }
     }
 
     // Init dmabuf_globabl for primary gpu
@@ -200,16 +199,12 @@ where
         let state = handler.backend_state().drm();
         let mut gpu_manager = state.gpu_manager.borrow_mut();
 
-        let renderer = gpu_manager
-            .renderer::<Gles2Renderbuffer>(&state.primary_gpu, &state.primary_gpu)
-            .unwrap();
+        let renderer = gpu_manager.single_renderer(&state.primary_gpu).unwrap();
 
         renderer.dmabuf_formats().cloned().collect::<Vec<_>>()
     };
 
-    handler
-        .dmabuf_state()
-        .create_global::<D::WaylandState, _>(display, dmabuf_formats, None);
+    handler.create_dmabuf_global(dmabuf_formats);
 
     for crtc in outputs {
         let id = DrmOutputId {

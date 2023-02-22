@@ -1,2 +1,3 @@
 [workspace]
-members = ["anodium-backend", "anodium-framework", "anodium"]
+# members = ["anodium-backend", "anodium-framework", "anodium"]
+members = ["anodium-backend"]

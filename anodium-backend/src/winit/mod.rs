@@ -3,12 +3,9 @@ use std::{cell::RefCell, rc::Rc, time::Duration};
 use smithay::{
     backend::winit::{self, WinitEvent},
     output::{Mode, PhysicalProperties},
-    reexports::{
-        calloop::{
-            timer::{TimeoutAction, Timer},
-            EventLoop,
-        },
-        wayland_server::DisplayHandle,
+    reexports::calloop::{
+        timer::{TimeoutAction, Timer},
+        EventLoop,
     },
 };
 
@@ -17,15 +14,11 @@ use crate::{NewOutputDescriptor, OutputId};
 
 pub const OUTPUT_NAME: &str = "winit";
 
-pub fn run_winit<D>(
-    event_loop: &mut EventLoop<'static, D>,
-    _display: &DisplayHandle,
-    handler: &mut D,
-) -> Result<(), ()>
+pub fn run_winit<D>(event_loop: &mut EventLoop<'static, D>, handler: &mut D) -> Result<(), ()>
 where
     D: BackendHandler + 'static,
 {
-    let (backend, mut input) = winit::init(None).map_err(|err| {
+    let (backend, mut input) = winit::init().map_err(|err| {
         error!("Failed to initialize Winit backend: {}", err);
     })?;
     let backend = Rc::new(RefCell::new(backend));

@@ -3,28 +3,23 @@ use smithay::{
     backend::{
         input::{InputEvent, KeyboardKeyEvent},
         libinput::{LibinputInputBackend, LibinputSessionInterface},
-        session::{auto::AutoSession, Session, Signal as SessionSignal},
+        session::{libseat::LibSeatSession, Session},
     },
     reexports::calloop::LoopHandle,
-    utils::signaling::{Linkable, Signaler},
 };
 
 use crate::InputHandler;
 
 /// Initialize libinput backend
-pub fn init<D>(
-    event_loop: LoopHandle<D>,
-    mut session: AutoSession,
-    session_signal: Signaler<SessionSignal>,
-) where
+pub fn init<D>(event_loop: LoopHandle<D>, mut session: LibSeatSession)
+where
     D: InputHandler,
 {
     let mut libinput_context =
-        Libinput::new_with_udev::<LibinputSessionInterface<AutoSession>>(session.clone().into());
+        Libinput::new_with_udev::<LibinputSessionInterface<LibSeatSession>>(session.clone().into());
     libinput_context.udev_assign_seat(&session.seat()).unwrap();
 
-    let mut libinput_backend = LibinputInputBackend::new(libinput_context, None);
-    libinput_backend.link(session_signal);
+    let libinput_backend = LibinputInputBackend::new(libinput_context);
 
     let mut abort_key_combo = AbortKeyCombo::empty();
     let mut modifiers = Modifiers::empty();

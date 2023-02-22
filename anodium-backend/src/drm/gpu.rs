@@ -1,35 +1,40 @@
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::{cell::RefCell, os::unix::prelude::FromRawFd, path::Path, rc::Rc};
 
 use anyhow::Result;
 use indexmap::IndexMap;
 use smithay::{
     backend::{
-        drm::{DrmEvent, DrmNode, GbmBufferedSurface},
+        allocator::{
+            dmabuf::DmabufAllocator,
+            gbm::{GbmAllocator, GbmBufferFlags},
+        },
+        drm::{DrmDeviceFd, DrmEvent, DrmNode, GbmBufferedSurface},
         egl::{EGLContext, EGLDevice, EGLDisplay},
         renderer::{
-            gles2::Gles2Renderbuffer,
-            multigpu::{egl::EglGlesBackend, GpuManager},
+            gles2::{Gles2Renderbuffer, Gles2Renderer},
+            multigpu::{gbm::GbmGlesBackend, GpuManager},
             Bind, Frame, ImportMem, Renderer,
         },
-        session::{auto::AutoSession, Signal as SessionSignal},
+        session::{libseat::LibSeatSession, Session},
     },
+    desktop::utils::OutputPresentationFeedback,
     output::Mode as WlMode,
     reexports::{
         calloop::LoopHandle,
         drm::control::{connector, crtc, Device as _, ModeTypeFlags},
         gbm::Device as GbmDevice,
+        nix::fcntl::OFlag,
     },
-    utils::{
-        signaling::{Linkable, Signaler},
-        Rectangle,
-    },
+    utils::{DeviceFd, Rectangle},
 };
 
-use super::{utils, Device, DrmDevice, DrmOutputId, DrmRenderer};
+use super::{utils, DrmDevice, DrmOutputId, DrmRenderer};
 use crate::BackendHandler;
 
 pub struct Gpu {
+    pub allocator: GbmAllocator<DrmDeviceFd>,
     drm: DrmDevice,
+    pub gbm: GbmDevice<DrmDeviceFd>,
     drm_node: DrmNode,
     pub outputs: IndexMap<crtc::Handle, GpuConnector>,
 }
@@ -37,8 +42,7 @@ pub struct Gpu {
 impl Gpu {
     pub fn new<D>(
         event_loop: LoopHandle<'static, D>,
-        session: &mut AutoSession,
-        session_signal: Signaler<SessionSignal>,
+        session: &mut LibSeatSession,
         path: &Path,
         drm_node: DrmNode,
     ) -> Result<Gpu>
@@ -46,7 +50,12 @@ impl Gpu {
         D: BackendHandler,
         D: 'static,
     {
-        let device = Device::open(session, path)?;
+        let fd = session.open(
+            path,
+            OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
+        )?;
+
+        let device = DrmDeviceFd::new(unsafe { DeviceFd::from_raw_fd(fd) });
 
         let mut drm = DrmDevice::new(
             &event_loop,
@@ -61,25 +70,27 @@ impl Gpu {
             },
         )?;
 
-        drm.inner_mut().link(session_signal.clone());
-
         let gbm = GbmDevice::new(device)?;
-        let gbm = Rc::new(RefCell::new(gbm));
 
         let res = drm.scan_connectors();
         info!("connectors: {:#?}", &res);
 
         let formats = {
-            let display = unsafe { EGLDisplay::new(&*gbm.borrow(), None).unwrap() };
+            let display = EGLDisplay::new(gbm.clone()).unwrap();
 
             EGLDevice::device_for_display(&display)
                 .ok()
                 .and_then(|x| x.try_get_render_node().ok());
 
-            let context = EGLContext::new(&display, None).unwrap();
+            let context = EGLContext::new(&display).unwrap();
 
             context.dmabuf_render_formats().clone()
         };
+
+        let allocator = GbmAllocator::new(
+            gbm.clone(),
+            GbmBufferFlags::RENDERING | GbmBufferFlags::SCANOUT,
+        );
 
         let mut outputs: IndexMap<crtc::Handle, GpuConnector> = IndexMap::new();
 
@@ -118,11 +129,10 @@ impl Gpu {
 
             let drm_mode = drm_modes[mode_id];
 
-            let mut drm_surface = drm.create_surface(crtc, drm_mode, &[connector])?;
-            drm_surface.link(session_signal.clone());
+            let drm_surface = drm.create_surface(crtc, drm_mode, &[connector])?;
 
             let gbm_surface =
-                GbmBufferedSurface::new(drm_surface, gbm.clone(), formats.clone(), None)?;
+                GbmBufferedSurface::new(drm_surface, allocator.clone(), formats.clone())?;
 
             outputs.insert(
                 crtc,
@@ -136,16 +146,21 @@ impl Gpu {
         }
 
         Ok(Gpu {
+            allocator,
             drm,
+            gbm,
             drm_node,
             outputs,
         })
     }
 
-    pub fn clear_all(&mut self, renderer: &mut GpuManager<EglGlesBackend>) -> Result<bool> {
+    pub fn clear_all(
+        &mut self,
+        renderer: &mut GpuManager<GbmGlesBackend<Gles2Renderer>>,
+    ) -> Result<bool> {
         let mut is_err = false;
 
-        let mut renderer = renderer.renderer(&self.drm_node, &self.drm_node)?;
+        let mut renderer = renderer.single_renderer(&self.drm_node)?;
 
         for (_, output) in self.outputs.iter_mut() {
             is_err |= output.clear(&mut renderer).is_err();
@@ -159,57 +174,63 @@ impl Gpu {
         D: BackendHandler,
     {
         let primary_gpu = handler.backend_state().drm().primary_gpu;
+        let allocator = handler
+            .backend_state()
+            .drm()
+            .gpus
+            .get(&primary_gpu)
+            .unwrap()
+            .allocator
+            .clone();
 
         let gpu_manager = handler.backend_state().drm().gpu_manager.clone();
         let mut gpu_manager = gpu_manager.borrow_mut();
 
-        let mut renderer = gpu_manager.renderer::<Gles2Renderbuffer>(&primary_gpu, &drm_node)?;
-
-        let age = {
+        let (format, dmabuf, age) = {
             let state = handler.backend_state().drm();
 
             let gpu = &mut state.gpu(&drm_node).unwrap();
             let output = gpu.outputs.get_mut(&crtc).unwrap();
 
             output.gbm_surface.frame_submitted()?;
+            let format = output.gbm_surface.format();
 
             let (dmabuf, age) = output.gbm_surface.next_buffer()?;
-            renderer.bind(dmabuf).unwrap();
 
-            age
+            (format, dmabuf, age)
         };
 
-        let pointer_image = {
-            let backend_state = handler.backend_state().drm();
+        let mut alloc = DmabufAllocator(allocator);
+        let mut renderer = gpu_manager.renderer(&primary_gpu, &drm_node, &mut alloc, format)?;
 
-            let frame = backend_state.pointer_image.get_image(1);
+        renderer.bind(dmabuf).unwrap();
 
-            backend_state
-                .pointer_images
-                .iter()
-                .find_map(|(image, texture)| if image == &frame { Some(texture) } else { None })
-                .cloned()
-                .unwrap_or_else(|| {
-                    let texture = renderer
-                        .as_mut()
-                        .import_memory(
-                            &frame.pixels_rgba,
-                            (frame.width as i32, frame.height as i32).into(),
-                            false,
-                        )
-                        .expect("Failed to import cursor bitmap");
-                    backend_state.pointer_images.push((frame, texture.clone()));
-                    texture
-                })
-        };
+        // let pointer_image = {
+        //     let backend_state = handler.backend_state().drm();
+
+        //     let frame = backend_state.pointer_image.get_image(1);
+
+        //     backend_state
+        //         .pointer_images
+        //         .iter()
+        //         .find_map(|(image, texture)| if image == &frame { Some(texture) } else { None })
+        //         .cloned()
+        //         .unwrap_or_else(|| {
+        //             let texture = renderer
+        //                 .as_mut()
+        //                 .import_memory(
+        //                     &frame.pixels_rgba,
+        //                     (frame.width as i32, frame.height as i32).into(),
+        //                     false,
+        //                 )
+        //                 .expect("Failed to import cursor bitmap");
+        //             backend_state.pointer_images.push((frame, texture.clone()));
+        //             texture
+        //         })
+        // };
 
         let output_id = DrmOutputId { drm_node, crtc }.output_id();
-        handler.output_render(
-            renderer.as_mut(),
-            &output_id,
-            age as usize,
-            Some(&pointer_image),
-        )?;
+        handler.output_render(renderer.as_mut(), &output_id, age as usize, None)?;
 
         handler.send_frames(&output_id);
 
@@ -222,7 +243,7 @@ impl Gpu {
             .get_mut(&crtc)
             .unwrap()
             .gbm_surface
-            .queue_buffer()?;
+            .queue_buffer(None, None)?;
 
         Ok(())
     }
@@ -259,7 +280,7 @@ impl Gpu {
 
 pub struct GpuConnector {
     connector: connector::Handle,
-    gbm_surface: GbmBufferedSurface<Rc<RefCell<GbmDevice<Device>>>, Device>,
+    gbm_surface: GbmBufferedSurface<GbmAllocator<DrmDeviceFd>, Option<OutputPresentationFeedback>>,
     drm_modes: Vec<smithay::reexports::drm::control::Mode>,
     wl_modes: Vec<WlMode>,
 }
@@ -271,18 +292,21 @@ impl GpuConnector {
         let (dmabuf, _) = self.gbm_surface.next_buffer()?;
         renderer.bind(dmabuf)?;
 
-        renderer.render(
+        let mut frame = renderer.render(
             (i32::MAX, i32::MAX).into(),
             smithay::utils::Transform::Normal,
-            |_, frame| {
-                frame.clear(
-                    [0.2, 0.2, 0.2, 1.0],
-                    &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-                )
-            },
-        )??;
+        )?;
 
-        self.gbm_surface.queue_buffer()?;
+        frame
+            .clear(
+                [0.0, 0.0, 0.0, 1.0],
+                &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+            )
+            .unwrap();
+
+        drop(frame);
+
+        self.gbm_surface.queue_buffer(None, None)?;
         self.reset_buffers();
 
         Ok(())

@@ -1,12 +1,11 @@
-use std::{
-    cell::RefCell,
-    os::unix::io::RawFd,
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
+use std::{cell::RefCell, rc::Rc};
 
 use smithay::{
     backend::{
+        allocator::{
+            dmabuf::DmabufAllocator,
+            gbm::{GbmAllocator, GbmBufferFlags},
+        },
         egl::{EGLContext, EGLDisplay},
         input::InputEvent,
         renderer::{gles2::Gles2Renderer, Bind, Unbind},
@@ -16,8 +15,8 @@ use smithay::{
     reexports::{
         calloop::{ping, EventLoop},
         gbm,
-        wayland_server::DisplayHandle,
     },
+    utils::DeviceFd,
 };
 
 use super::BackendHandler;
@@ -44,7 +43,7 @@ struct OutputSurfaceBuilder {
 impl OutputSurfaceBuilder {
     fn new(
         handle: &X11Handle,
-        device: Arc<Mutex<gbm::Device<RawFd>>>,
+        alloc: GbmAllocator<DeviceFd>,
         context: &EGLContext,
         id: u64,
     ) -> Self {
@@ -57,7 +56,7 @@ impl OutputSurfaceBuilder {
         let surface = handle
             .create_surface(
                 &window,
-                device,
+                DmabufAllocator(alloc),
                 context
                     .dmabuf_render_formats()
                     .iter()
@@ -115,15 +114,11 @@ impl OutputSurfaceBuilder {
     }
 }
 
-pub fn run_x11<D>(
-    event_loop: &mut EventLoop<'static, D>,
-    display: &DisplayHandle,
-    handler: &mut D,
-) -> Result<(), ()>
+pub fn run_x11<D>(event_loop: &mut EventLoop<'static, D>, handler: &mut D) -> Result<(), ()>
 where
     D: BackendHandler + 'static,
 {
-    let backend = X11Backend::new(None).expect("Failed to initilize X11 backend");
+    let backend = X11Backend::new().expect("Failed to initilize X11 backend");
     let handle = backend.handle();
 
     // Obtain the DRM node the X server uses for direct rendering.
@@ -132,29 +127,26 @@ where
         .expect("Could not get DRM node used by X server");
 
     // Create the gbm device for buffer allocation.
-    let device = gbm::Device::new(fd).expect("Failed to create gbm device");
+    let device = gbm::Device::new(DeviceFd::from(fd)).expect("Failed to create gbm device");
     // Initialize EGL using the GBM device.
-    let egl = unsafe { EGLDisplay::new(&device, None).expect("Failed to create EGLDisplay") };
+    let egl = EGLDisplay::new(device.clone()).expect("Failed to create EGLDisplay");
     // Create the OpenGL context
-    let context = EGLContext::new(&egl, None).expect("Failed to create EGLContext");
+    let context = EGLContext::new(&egl).expect("Failed to create EGLContext");
 
-    let device = Arc::new(Mutex::new(device));
+    let alloc = GbmAllocator::new(device, GbmBufferFlags::RENDERING);
 
     let x11_outputs = vec![
-        OutputSurfaceBuilder::new(&handle, device.clone(), &context, 0),
-        OutputSurfaceBuilder::new(&handle, device, &context, 1),
+        OutputSurfaceBuilder::new(&handle, alloc.clone(), &context, 0),
+        OutputSurfaceBuilder::new(&handle, alloc, &context, 1),
     ];
 
-    let renderer =
-        unsafe { Gles2Renderer::new(context, None) }.expect("Failed to initialize renderer");
+    let renderer = unsafe { Gles2Renderer::new(context) }.expect("Failed to initialize renderer");
     let renderer = Rc::new(RefCell::new(renderer));
 
-    new_x11_window(display, event_loop, handler, backend, renderer, x11_outputs)
+    new_x11_window(event_loop, handler, backend, renderer, x11_outputs)
 }
 
 fn new_x11_window<D>(
-    _display: &DisplayHandle,
-
     event_loop: &mut EventLoop<'static, D>,
     handler: &mut D,
 

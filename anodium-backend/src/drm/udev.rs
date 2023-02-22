@@ -35,7 +35,7 @@ pub fn init<D>(event_loop: LoopHandle<D>, seat: String) -> Result<()>
 where
     D: BackendHandler,
 {
-    let udev_backend = UdevBackend::new(seat, None)?;
+    let udev_backend = UdevBackend::new(seat)?;
 
     event_loop
         .insert_source(udev_backend, move |event, _, handler| match event {

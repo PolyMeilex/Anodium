@@ -1,73 +1,28 @@
 use std::{
     cell::{Ref, RefMut},
-    os::unix::prelude::{AsRawFd, RawFd},
-    path::Path,
-    sync::Arc,
+    rc::Rc,
 };
 
 use indexmap::IndexMap;
 use smithay::{
-    backend::{
-        drm,
-        session::{
-            auto::{AutoSession, Error as SessionError},
-            Session,
-        },
-    },
+    backend::drm::{self, DrmDeviceFd},
     reexports::{
         calloop::{Dispatcher, LoopHandle},
         drm::control::{connector, crtc, Device as _},
-        nix::{fcntl::OFlag, unistd},
     },
 };
 
-#[derive(Debug)]
-struct Inner {
-    fd: RawFd,
-}
-
-impl Drop for Inner {
-    fn drop(&mut self) {
-        unistd::close(self.fd).ok();
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Device {
-    inner: Arc<Inner>,
-}
-
-impl Device {
-    /// Try to open the device
-    pub fn open(session: &mut AutoSession, path: &Path) -> Result<Self, SessionError> {
-        let fd = session.open(
-            path,
-            OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
-        )?;
-
-        Ok(Device {
-            inner: Arc::new(Inner { fd }),
-        })
-    }
-}
-
-impl AsRawFd for Device {
-    fn as_raw_fd(&self) -> RawFd {
-        self.inner.fd
-    }
-}
-
 trait AsDrm {
-    fn as_drm(&self) -> Ref<drm::DrmDevice<Device>>;
-    fn as_drm_mut(&self) -> RefMut<drm::DrmDevice<Device>>;
+    fn as_drm(&self) -> Ref<drm::DrmDevice>;
+    fn as_drm_mut(&self) -> RefMut<drm::DrmDevice>;
 }
 
-impl<D> AsDrm for Dispatcher<'_, drm::DrmDevice<Device>, D> {
-    fn as_drm(&self) -> Ref<drm::DrmDevice<Device>> {
+impl<D> AsDrm for Dispatcher<'_, drm::DrmDevice, D> {
+    fn as_drm(&self) -> Ref<drm::DrmDevice> {
         self.as_source_ref()
     }
 
-    fn as_drm_mut(&self) -> RefMut<drm::DrmDevice<Device>> {
+    fn as_drm_mut(&self) -> RefMut<drm::DrmDevice> {
         self.as_source_mut()
     }
 }
@@ -80,14 +35,14 @@ pub struct DrmDevice {
 impl DrmDevice {
     pub fn new<D, F>(
         event_loop: &LoopHandle<'static, D>,
-        device: Device,
+        device: DrmDeviceFd,
         mut cb: F,
     ) -> Result<Self, drm::DrmError>
     where
         F: FnMut(drm::DrmEvent, &mut Option<drm::DrmEventMetadata>, &mut D) + 'static,
         D: 'static,
     {
-        let drm = drm::DrmDevice::new(device, true, None)?;
+        let drm = drm::DrmDevice::new(device, true)?;
 
         let drm = Dispatcher::new(drm, move |event, meta, data: &mut D| cb(event, meta, data));
         let _registration_token = event_loop.register_dispatcher(drm.clone()).unwrap();
@@ -98,11 +53,11 @@ impl DrmDevice {
         })
     }
 
-    pub fn inner(&self) -> Ref<drm::DrmDevice<Device>> {
+    pub fn inner(&self) -> Ref<drm::DrmDevice> {
         self.drm.as_drm()
     }
 
-    pub fn inner_mut(&self) -> RefMut<drm::DrmDevice<Device>> {
+    pub fn inner_mut(&self) -> RefMut<drm::DrmDevice> {
         self.drm.as_drm_mut()
     }
 
