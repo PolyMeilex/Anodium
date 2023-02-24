@@ -1068,7 +1068,7 @@ checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 [[package]]
 name = "smithay"
 version = "0.3.0"
-source = "git+https://github.com/PolyMeilex/smithay.git?branch=drm-notifier#681114d4e357eeacb462a9f701be40330464207c"
+source = "git+https://github.com/Smithay/smithay.git#d5c2f06eb05678634ddba6a10c89217515a4d109"
 dependencies = [
  "appendlist",
  "bitflags",

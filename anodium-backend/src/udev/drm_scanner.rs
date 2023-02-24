@@ -71,13 +71,13 @@ impl ConnectorScanner {
             if let Some(old) = old {
                 match (old.state(), curr_state) {
                     (State::Connected, State::Disconnected) => removed.push(conn),
-                    (State::Disconnected, State::Connected) => added.push(conn),
+                    (State::Disconnected | State::Unknown, State::Connected) => added.push(conn),
                     //
                     (State::Connected, State::Connected) => {}
                     (State::Disconnected, State::Disconnected) => {}
                     //
-                    (State::Unknown, _) => todo!(),
-                    (_, State::Unknown) => todo!(),
+                    (State::Unknown, _) => {}
+                    (_, State::Unknown) => {}
                 }
             } else if curr_state == State::Connected {
                 added.push(conn)
@@ -94,7 +94,7 @@ impl ConnectorScanner {
 
 #[derive(Debug, Default)]
 pub struct CrtcsScanner {
-    crtcs: HashMap<connector::Info, crtc::Handle>,
+    crtcs: HashMap<connector::Handle, crtc::Handle>,
 }
 
 impl CrtcsScanner {
@@ -116,7 +116,7 @@ impl CrtcsScanner {
         }
 
         for connector in connector_info {
-            self.for_connector(drm, connector);
+            self.for_connector(drm, &connector);
         }
     }
 
@@ -132,7 +132,7 @@ impl CrtcsScanner {
         let is_already_taken = self.crtcs.values().any(|v| *v == crtc);
 
         (!is_already_taken).then(|| {
-            self.crtcs.insert(connector.clone(), crtc);
+            self.crtcs.insert(connector.handle(), crtc);
             crtc
         })
     }
@@ -140,13 +140,13 @@ impl CrtcsScanner {
     pub fn for_connector(
         &mut self,
         drm: &drm::DrmDevice,
-        connector: connector::Info,
+        connector: &connector::Info,
     ) -> Option<crtc::Handle> {
-        if let Some(crtc) = self.crtcs.get(&connector) {
+        if let Some(crtc) = self.crtcs.get(&connector.handle()) {
             return Some(*crtc);
         }
 
-        if let Some(crtc) = self.restore_crtc_for_connector(drm, &connector) {
+        if let Some(crtc) = self.restore_crtc_for_connector(drm, connector) {
             return Some(crtc);
         }
 
@@ -160,7 +160,7 @@ impl CrtcsScanner {
         for encoder_info in encoder_infos {
             for crtc in res_handles.filter_crtcs(encoder_info.possible_crtcs()) {
                 if !self.crtcs.values().any(|v| *v == crtc) {
-                    self.crtcs.insert(connector, crtc);
+                    self.crtcs.insert(connector.handle(), crtc);
                     return Some(crtc);
                 }
             }
@@ -169,7 +169,7 @@ impl CrtcsScanner {
         None
     }
 
-    pub fn remove_connector(&mut self, connector: &connector::Info) -> Option<crtc::Handle> {
+    pub fn remove_connector(&mut self, connector: &connector::Handle) -> Option<crtc::Handle> {
         self.crtcs.remove(connector)
     }
 }

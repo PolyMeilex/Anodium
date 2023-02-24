@@ -18,8 +18,7 @@ indexmap = "1.8"
 bitflags = "1.3.2"
 
 [dependencies.smithay]
-git = "https://github.com/PolyMeilex/smithay.git"
-branch = "drm-notifier"
+git = "https://github.com/Smithay/smithay.git"
 default-features = false
 features = [
   "renderer_gl",

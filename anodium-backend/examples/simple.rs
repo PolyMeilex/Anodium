@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
-use anodium_backend::udev::{drm_device, drm_scanner};
+use anodium_backend::udev::{drm_scanner, new_drm_device};
 use input::Libinput;
 use smithay::{
     backend::{
@@ -13,23 +13,47 @@ use smithay::{
         session::{libseat::LibSeatSession, Session},
         udev::{UdevBackend, UdevEvent},
     },
+    output::{Output, PhysicalProperties},
     reexports::{
         calloop::{timer::Timer, EventLoop, LoopHandle},
         drm::control::{crtc, ModeTypeFlags},
     },
-    utils::Rectangle,
+    utils::{Rectangle, Transform},
 };
 
+struct Surface {
+    gbm_surface: GbmBufferedSurface<GbmAllocator<DrmDeviceFd>, ()>,
+    output: Output,
+}
+
+impl Surface {
+    fn new(gbm_surface: GbmBufferedSurface<GbmAllocator<DrmDeviceFd>, ()>) -> Self {
+        let output = Output::new(
+            "".into(),
+            PhysicalProperties {
+                size: Default::default(),
+                subpixel: smithay::output::Subpixel::None,
+                make: Default::default(),
+                model: Default::default(),
+            },
+        );
+        Self {
+            gbm_surface,
+            output,
+        }
+    }
+}
+
 struct Device {
-    drm_device: drm::DrmDevice,
-    gbm_device: gbm::GbmDevice<DrmDeviceFd>,
+    drm: drm::DrmDevice,
+    gbm: gbm::GbmDevice<DrmDeviceFd>,
     gbm_allocator: GbmAllocator<DrmDeviceFd>,
 
-    connector_scanner: drm_scanner::ConnectorScanner,
-    crtcs_scanner: drm_scanner::CrtcsScanner,
+    connectors: drm_scanner::ConnectorScanner,
+    crtcs: drm_scanner::CrtcsScanner,
 
     renderer: Gles2Renderer,
-    surfaces: HashMap<crtc::Handle, GbmBufferedSurface<GbmAllocator<DrmDeviceFd>, ()>>,
+    surfaces: HashMap<crtc::Handle, Surface>,
 }
 
 struct State {
@@ -39,39 +63,38 @@ struct State {
     devices: HashMap<DrmNode, Device>,
 }
 
+fn next_buffer(surface: &mut Surface, renderer: &mut Gles2Renderer) {
+    let (dmabuf, _age) = surface.gbm_surface.next_buffer().unwrap();
+    renderer.bind(dmabuf).unwrap();
+
+    let mut frame = renderer
+        .render((i32::MAX, i32::MAX).into(), Transform::Normal)
+        .unwrap();
+
+    frame
+        .clear(
+            [1.0, 0.0, 0.0, 1.0],
+            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+        )
+        .unwrap();
+
+    frame.finish().unwrap();
+
+    surface.gbm_surface.queue_buffer(None, ()).unwrap();
+}
+
 fn on_drm_event(
     state: &mut State,
-    device: DrmNode,
+    node: DrmNode,
     event: drm::DrmEvent,
     _meta: &mut Option<drm::DrmEventMetadata>,
 ) {
     match event {
         drm::DrmEvent::VBlank(crtc) => {
-            if let Some(device) = state.devices.get_mut(&device) {
+            if let Some(device) = state.devices.get_mut(&node) {
                 if let Some(surface) = device.surfaces.get_mut(&crtc) {
-                    surface.frame_submitted().unwrap();
-
-                    // let (dmabuf, age) = surface.next_buffer().unwrap();
-                    // device.renderer.bind(dmabuf).unwrap();
-
-                    // let mut frame = device
-                    //     .renderer
-                    //     .render(
-                    //         (i32::MAX, i32::MAX).into(),
-                    //         smithay::utils::Transform::Normal,
-                    //     )
-                    //     .unwrap();
-
-                    // frame
-                    //     .clear(
-                    //         [1.0, 0.0, 0.0, 1.0],
-                    //         &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
-                    //     )
-                    //     .unwrap();
-
-                    // frame.finish().unwrap();
-
-                    surface.queue_buffer(None, ()).unwrap();
+                    surface.gbm_surface.frame_submitted().unwrap();
+                    next_buffer(surface, &mut device.renderer);
                 }
             }
         }
@@ -88,10 +111,7 @@ fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::Conn
 
     match event {
         drm_scanner::ConnectorEvent::Connected(connector) => {
-            if let Some(crtc) = device
-                .crtcs_scanner
-                .for_connector(&device.drm_device, connector.clone())
-            {
+            if let Some(crtc) = device.crtcs.for_connector(&device.drm, &connector) {
                 let mode_id = connector
                     .modes()
                     .iter()
@@ -107,22 +127,23 @@ fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::Conn
                     .clone();
 
                 let drm_surface = device
-                    .drm_device
+                    .drm
                     .create_surface(crtc, drm_mode, &[connector.handle()])
                     .unwrap();
 
-                let mut gbm_surface =
+                let gbm_surface =
                     GbmBufferedSurface::new(drm_surface, device.gbm_allocator.clone(), formats)
                         .unwrap();
 
-                gbm_surface.next_buffer().unwrap();
-                gbm_surface.queue_buffer(None, ()).unwrap();
+                let mut surface = Surface::new(gbm_surface);
 
-                device.surfaces.insert(crtc, gbm_surface);
+                next_buffer(&mut surface, &mut device.renderer);
+
+                device.surfaces.insert(crtc, surface);
             }
         }
         drm_scanner::ConnectorEvent::Disconnected(connector) => {
-            if let Some(crtc) = device.crtcs_scanner.remove_connector(&connector) {
+            if let Some(crtc) = device.crtcs.remove_connector(&connector.handle()) {
                 device.surfaces.remove(&crtc);
             }
         }
@@ -130,7 +151,7 @@ fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::Conn
 }
 
 fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
-    let (drm_device, drm_notifier) = drm_device::new(&mut state.session, &path);
+    let (drm_device, drm_notifier) = new_drm_device(&mut state.session, &path);
 
     let mut crtcs_scanner = drm_scanner::CrtcsScanner::new();
     crtcs_scanner.scan_crtcs(&drm_device);
@@ -155,12 +176,12 @@ fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
     state.devices.insert(
         node,
         Device {
-            drm_device,
-            gbm_device,
+            drm: drm_device,
+            gbm: gbm_device,
             gbm_allocator,
 
-            connector_scanner: Default::default(),
-            crtcs_scanner,
+            connectors: Default::default(),
+            crtcs: crtcs_scanner,
 
             renderer,
             surfaces: Default::default(),
@@ -174,7 +195,7 @@ fn on_device_changed(state: &mut State, node: DrmNode) {
     if let Some(scan) = state
         .devices
         .get_mut(&node)
-        .map(|device| device.connector_scanner.scan_connectors(&device.drm_device))
+        .map(|device| device.connectors.scan_connectors(&device.drm))
     {
         for event in scan {
             on_connector_event(state, node, event);
