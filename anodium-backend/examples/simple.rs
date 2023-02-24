@@ -1,22 +1,35 @@
 use std::{collections::HashMap, path::PathBuf, time::Duration};
 
-use anodium_backend::udev::{drm_scanner, drm_device, gbm_device};
+use anodium_backend::udev::{drm_device, drm_scanner, gbm_device};
 use input::Libinput;
 use smithay::{
     backend::{
-        drm::{self, DrmNode},
+        allocator::gbm::{self, GbmAllocator, GbmBufferFlags},
+        drm::{self, DrmDeviceFd, DrmNode, GbmBufferedSurface},
+        egl::{EGLContext, EGLDisplay},
         input::{InputEvent, KeyboardKeyEvent},
         libinput::{LibinputInputBackend, LibinputSessionInterface},
+        renderer::{gles2::Gles2Renderer, Bind, Frame, Renderer},
         session::{libseat::LibSeatSession, Session},
         udev::{UdevBackend, UdevEvent},
     },
-    reexports::calloop::{timer::Timer, EventLoop, LoopHandle},
+    reexports::{
+        calloop::{timer::Timer, EventLoop, LoopHandle},
+        drm::control::{crtc, ModeTypeFlags},
+    },
+    utils::Rectangle,
 };
 
 struct Device {
-    drm_scanner: drm_scanner::ConnectorScanner,
     drm_device: drm_device::DrmDevice,
-    gbm_device: gbm_device::GbmDevice,
+    gbm_device: gbm::GbmDevice<DrmDeviceFd>,
+    gbm_allocator: GbmAllocator<DrmDeviceFd>,
+
+    connector_scanner: drm_scanner::ConnectorScanner,
+    crtcs_scanner: drm_scanner::CrtcsScanner,
+
+    renderer: Gles2Renderer,
+    surfaces: HashMap<crtc::Handle, GbmBufferedSurface<GbmAllocator<DrmDeviceFd>, ()>>,
 }
 
 struct State {
@@ -25,7 +38,7 @@ struct State {
     devices: HashMap<DrmNode, Device>,
 }
 
-fn drm_event_handler(
+fn on_drm_event(
     state: &mut State,
     device: DrmNode,
     event: drm::DrmEvent,
@@ -34,70 +47,150 @@ fn drm_event_handler(
     match event {
         drm::DrmEvent::VBlank(crtc) => {
             if let Some(device) = state.devices.get_mut(&device) {
-                device.gbm_device.vblank(crtc);
+                if let Some(surface) = device.surfaces.get_mut(&crtc) {
+                    surface.frame_submitted().unwrap();
+
+                    let (dmabuf, age) = surface.next_buffer().unwrap();
+                    device.renderer.bind(dmabuf).unwrap();
+
+                    let mut frame = device
+                        .renderer
+                        .render(
+                            (i32::MAX, i32::MAX).into(),
+                            smithay::utils::Transform::Normal,
+                        )
+                        .unwrap();
+
+                    frame
+                        .clear(
+                            [1.0, 0.0, 0.0, 1.0],
+                            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
+                        )
+                        .unwrap();
+
+                    frame.finish().unwrap();
+
+                    surface.queue_buffer(None, ()).unwrap();
+                }
             }
         }
         drm::DrmEvent::Error(_) => {}
     }
 }
 
-fn drm_connector_event_handler(
-    _state: &mut State,
-    _device: DrmNode,
+fn on_connector_event(
+    state: &mut State,
+    node: DrmNode,
     event: drm_scanner::ConnectorEvent,
 ) {
-    dbg!(&event);
+    let device = if let Some(device) = state.devices.get_mut(&node) {
+        device
+    } else {
+        return;
+    };
+
     match event {
-        drm_scanner::ConnectorEvent::Connected(_connector) => {}
-        drm_scanner::ConnectorEvent::Disconnected(_connector) => {}
+        drm_scanner::ConnectorEvent::Connected(connector) => {
+            if let Some(crtc) = device
+                .crtcs_scanner
+                .for_connector(&device.drm_device.borrow(), connector.clone())
+            {
+                let mode_id = connector
+                    .modes()
+                    .iter()
+                    .position(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
+                    .unwrap_or(0);
+
+                let drm_mode = connector.modes()[mode_id];
+
+                let mut gbm_surface = gbm_device::create_surface(
+                    &device.drm_device,
+                    device.gbm_allocator.clone(),
+                    crtc,
+                    connector.handle(),
+                    drm_mode,
+                    device
+                        .renderer
+                        .egl_context()
+                        .dmabuf_render_formats()
+                        .clone(),
+                );
+
+                gbm_surface.next_buffer().unwrap();
+                gbm_surface.queue_buffer(None, ()).unwrap();
+
+                device.surfaces.insert(crtc, gbm_surface);
+            }
+        }
+        drm_scanner::ConnectorEvent::Disconnected(connector) => {
+            if let Some(crtc) = device.crtcs_scanner.remove_connector(&connector) {
+                device.surfaces.remove(&crtc);
+            }
+        }
     }
 }
 
-fn udev_added_event_handler(state: &mut State, node: DrmNode, path: PathBuf) {
+fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
     let drm_device = drm_device::DrmDevice::new(&mut state.session, node, &path);
-    let gbm_device = gbm_device::GbmDevice::new(&drm_device);
+    let crtcs_scanner = drm_scanner::CrtcsScanner::default();
+
+    let gbm_device = gbm::GbmDevice::new(drm_device.fd()).unwrap();
+    let gbm_allocator = GbmAllocator::new(
+        gbm_device.clone(),
+        GbmBufferFlags::RENDERING | GbmBufferFlags::SCANOUT,
+    );
+
+    let display = EGLDisplay::new(gbm_device.clone()).unwrap();
+    let context = EGLContext::new(&display).unwrap();
+    let renderer = unsafe { Gles2Renderer::new(context) }.unwrap();
 
     state
         .handle
         .insert_source(drm_device.clone(), move |event, meta, state| {
-            drm_event_handler(state, node, event, meta)
+            on_drm_event(state, node, event, meta)
         })
         .unwrap();
 
     state.devices.insert(
         drm_device.node(),
         Device {
-            drm_scanner: Default::default(),
             drm_device,
             gbm_device,
+            gbm_allocator,
+
+            connector_scanner: Default::default(),
+            crtcs_scanner,
+
+            renderer,
+            surfaces: Default::default(),
         },
     );
 
-    udev_changed_event_handler(state, node);
+    on_device_changed(state, node);
 }
 
-fn udev_changed_event_handler(state: &mut State, node: DrmNode) {
+fn on_device_changed(state: &mut State, node: DrmNode) {
     if let Some(scan) = state.devices.get_mut(&node).map(|device| {
         device
-            .drm_scanner
+            .connector_scanner
             .scan_connectors(&device.drm_device.borrow())
     }) {
         for event in scan {
-            drm_connector_event_handler(state, node, event);
+            on_connector_event(state, node, event);
         }
     }
 }
 
-fn udev_event_handler(state: &mut State, event: UdevEvent) {
+fn on_udev_event(state: &mut State, event: UdevEvent) {
     match event {
         UdevEvent::Added { device_id, path } => {
             if let Ok(node) = DrmNode::from_dev_id(device_id) {
-                udev_added_event_handler(state, node, path);
+                on_device_added(state, node, path);
             }
         }
         UdevEvent::Changed { device_id } => {
             if let Ok(node) = DrmNode::from_dev_id(device_id) {
-                udev_changed_event_handler(state, node);
+                on_device_changed(state, node);
             }
         }
         UdevEvent::Removed { device_id } => {
@@ -129,7 +222,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     event_loop
         .handle()
-        .insert_source(Timer::from_duration(Duration::from_secs(20)), |_, _, _| {
+        .insert_source(Timer::from_duration(Duration::from_secs(60)), |_, _, _| {
             panic!("Aborted");
         })
         .unwrap();
@@ -142,7 +235,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn init_udev(state: &mut State) {
     let backend = UdevBackend::new(state.session.seat()).unwrap();
     for (device_id, path) in backend.device_list() {
-        udev_event_handler(
+        on_udev_event(
             state,
             UdevEvent::Added {
                 device_id,
@@ -153,7 +246,7 @@ fn init_udev(state: &mut State) {
 
     state
         .handle
-        .insert_source(backend, |event, _, state| udev_event_handler(state, event))
+        .insert_source(backend, |event, _, state| on_udev_event(state, event))
         .unwrap();
 }
 

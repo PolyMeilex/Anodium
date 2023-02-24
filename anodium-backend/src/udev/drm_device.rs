@@ -68,10 +68,6 @@ impl Inner {
 
         Self { drm, fd }
     }
-
-    pub fn scan_crtcs(&self) -> IndexMap<connector::Info, crtc::Handle> {
-        super::drm_scanner::scan_crtcs(&self.drm)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,10 +119,6 @@ impl DrmDevice {
 
     pub fn node(&self) -> DrmNode {
         self.node
-    }
-
-    pub fn scan_crtcs(&self) -> IndexMap<connector::Info, crtc::Handle> {
-        self.inner.borrow_mut().scan_crtcs()
     }
 
     pub fn borrow(&self) -> Ref<drm::DrmDevice> {

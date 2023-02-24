@@ -1,4 +1,7 @@
-use std::iter::{Chain, Map};
+use std::{
+    collections::HashMap,
+    iter::{Chain, Map},
+};
 
 use indexmap::IndexMap;
 use smithay::{
@@ -89,31 +92,57 @@ impl ConnectorScanner {
     }
 }
 
-pub fn scan_crtcs(drm: &drm::DrmDevice) -> IndexMap<connector::Info, crtc::Handle> {
-    let res_handles = drm.resource_handles().unwrap();
+#[derive(Debug, Default)]
+pub struct CrtcsScanner {
+    crtcs: HashMap<connector::Info, crtc::Handle>,
+}
 
-    let connector_info = res_handles
-        .connectors()
-        .iter()
-        .map(|conn| drm.get_connector(*conn, false).unwrap())
-        .filter(|conn| conn.state() == connector::State::Connected);
+impl CrtcsScanner {
+    pub fn scan_crtcs(&mut self, drm: &drm::DrmDevice) -> HashMap<connector::Info, crtc::Handle> {
+        let resource_handles = drm.resource_handles().unwrap();
 
-    let mut crtcs = IndexMap::new();
-    for connector in connector_info {
+        let connector_info = resource_handles
+            .connectors()
+            .iter()
+            .map(|conn| drm.get_connector(*conn, false).unwrap())
+            .filter(|conn| conn.state() == connector::State::Connected);
+
+        for connector in connector_info {
+            self.for_connector(drm, connector);
+        }
+
+        self.crtcs.clone()
+    }
+
+    pub fn for_connector(
+        &mut self,
+        drm: &drm::DrmDevice,
+        connector: connector::Info,
+    ) -> Option<crtc::Handle> {
+        if let Some(crtc) = self.crtcs.get(&connector) {
+            return Some(*crtc);
+        }
+
+        let res_handles = drm.resource_handles().unwrap();
+
         let encoder_infos = connector
             .encoders()
             .iter()
             .flat_map(|encoder_handle| drm.get_encoder(*encoder_handle));
 
-        'outer: for encoder_info in encoder_infos {
+        for encoder_info in encoder_infos {
             for crtc in res_handles.filter_crtcs(encoder_info.possible_crtcs()) {
-                if !crtcs.values().any(|v| *v == crtc) {
-                    crtcs.insert(connector, crtc);
-                    break 'outer;
+                if !self.crtcs.values().any(|v| *v == crtc) {
+                    self.crtcs.insert(connector, crtc);
+                    return Some(crtc);
                 }
             }
         }
+
+        None
     }
 
-    crtcs
+    pub fn remove_connector(&mut self, connector: &connector::Info) -> Option<crtc::Handle> {
+        self.crtcs.remove(connector)
+    }
 }
