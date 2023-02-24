@@ -46,7 +46,7 @@ fn main() {
         options.open("/dev/dri/card0").unwrap(),
     )));
 
-    let device = DrmDevice::new(fd.clone(), true).unwrap();
+    let (device, device_notifier) = DrmDevice::new(fd.clone(), true).unwrap();
     let gbm = gbm::GbmDevice::new(fd).unwrap();
 
     // Get a set of all modesetting resource handles (excluding planes):
@@ -59,6 +59,8 @@ fn main() {
         .map(|conn| device.get_connector(*conn, true).unwrap())
         .find(|conn| conn.state() == ConnectorState::Connected)
         .unwrap();
+
+    dbg!(connector_info.current_encoder());
 
     // Use the first encoder
     let encoder = connector_info.encoders().iter().next().unwrap();
@@ -110,15 +112,18 @@ fn main() {
     let mut event_loop = EventLoop::<()>::try_new().unwrap();
     event_loop
         .handle()
-        .insert_source(device, move |event, _: &mut _, _: &mut ()| match event {
-            DrmEvent::VBlank(crtc) => vblank_handler.vblank(crtc),
-            DrmEvent::Error(e) => panic!("{}", e),
-        })
+        .insert_source(
+            device_notifier,
+            move |event, _: &mut _, _: &mut ()| match event {
+                DrmEvent::VBlank(crtc) => vblank_handler.vblank(crtc),
+                DrmEvent::Error(e) => panic!("{}", e),
+            },
+        )
         .unwrap();
 
     event_loop
         .handle()
-        .insert_source(Timer::from_duration(Duration::from_secs(10)), |_, _, _| {
+        .insert_source(Timer::from_duration(Duration::from_secs(5)), |_, _, _| {
             panic!("Aborted");
         })
         .unwrap();

@@ -4,28 +4,13 @@ use indexmap::IndexMap;
 use smithay::{
     backend::drm::{self, DrmDeviceFd},
     reexports::{
-        calloop::{Dispatcher, LoopHandle},
+        calloop::LoopHandle,
         drm::control::{connector, crtc, Device as _},
     },
 };
 
-trait AsDrm {
-    fn as_drm(&self) -> Ref<drm::DrmDevice>;
-    fn as_drm_mut(&self) -> RefMut<drm::DrmDevice>;
-}
-
-impl<D> AsDrm for Dispatcher<'_, drm::DrmDevice, D> {
-    fn as_drm(&self) -> Ref<drm::DrmDevice> {
-        self.as_source_ref()
-    }
-
-    fn as_drm_mut(&self) -> RefMut<drm::DrmDevice> {
-        self.as_source_mut()
-    }
-}
-
 pub struct DrmDevice {
-    drm: Box<dyn AsDrm>,
+    drm: drm::DrmDevice,
     connectors: IndexMap<connector::Handle, connector::Info>,
 }
 
@@ -39,27 +24,29 @@ impl DrmDevice {
         F: FnMut(drm::DrmEvent, &mut Option<drm::DrmEventMetadata>, &mut D) + 'static,
         D: 'static,
     {
-        let drm = drm::DrmDevice::new(device, true)?;
+        let (drm, source) = drm::DrmDevice::new(device, true)?;
 
-        let drm = Dispatcher::new(drm, move |event, meta, data: &mut D| cb(event, meta, data));
-        let _registration_token = event_loop.register_dispatcher(drm.clone()).unwrap();
+        let _registration_token = event_loop
+            .insert_source(source, move |event, meta, data: &mut D| {
+                cb(event, meta, data)
+            });
 
         Ok(Self {
-            drm: Box::new(drm),
+            drm,
             connectors: Default::default(),
         })
     }
 
-    pub fn inner(&self) -> Ref<drm::DrmDevice> {
-        self.drm.as_drm()
+    pub fn inner(&self) -> &drm::DrmDevice {
+        &self.drm
     }
 
-    pub fn inner_mut(&self) -> RefMut<drm::DrmDevice> {
-        self.drm.as_drm_mut()
+    pub fn inner_mut(&mut self) -> &mut drm::DrmDevice {
+        &mut self.drm
     }
 
     pub fn scan_connectors(&mut self) -> ScanResult {
-        let drm = self.drm.as_drm();
+        let drm = &self.drm;
         // Get a set of all modesetting resource handles (excluding planes):
         let res_handles = drm.resource_handles().unwrap();
         let connector_handles = res_handles.connectors();
