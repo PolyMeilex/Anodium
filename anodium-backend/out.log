@@ -1,0 +1,194 @@
+warning: unused import: `smithay::backend::renderer::ImportEgl`
+   --> anodium-backend/src/drm/mod.rs:178:13
+    |
+178 |         use smithay::backend::renderer::ImportEgl;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `DrmSurface`
+  --> anodium-backend/src/udev/device.rs:13:34
+   |
+13 |         drm::{self, DrmDeviceFd, DrmSurface, GbmBufferedSurface},
+   |                                  ^^^^^^^^^^
+
+warning: unused import: `self`
+ --> anodium-backend/src/udev/gbm_device.rs:9:15
+  |
+9 |         drm::{self, DrmDeviceFd, GbmBufferedSurface},
+  |               ^^^^
+
+warning: unused variable: `renderer`
+   --> anodium-backend/src/drm/mod.rs:183:17
+    |
+183 |         let mut renderer = gpu_manager.single_renderer(&state.primary_gpu).unwrap();
+    |                 ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_renderer`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `age`
+   --> anodium-backend/src/udev/device.rs:105:26
+    |
+105 |             let (dmabuf, age) = surface.next_buffer().unwrap();
+    |                          ^^^ help: if this is intentional, prefix it with an underscore: `_age`
+
+warning: unused variable: `age`
+  --> anodium-backend/src/udev/gbm_device.rs:89:26
+   |
+89 |             let (dmabuf, age) = surface.next_buffer().unwrap();
+   |                          ^^^ help: if this is intentional, prefix it with an underscore: `_age`
+
+warning: variable does not need to be mutable
+   --> anodium-backend/src/drm/mod.rs:183:13
+    |
+183 |         let mut renderer = gpu_manager.single_renderer(&state.primary_gpu).unwrap();
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: field `pointer_images` is never read
+  --> anodium-backend/src/drm/mod.rs:64:5
+   |
+60 | pub struct DrmBackendState {
+   |            --------------- field in this struct
+...
+64 |     pointer_images: Vec<(xcursor::parser::Image, Gles2Texture)>,
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: associated function `inner_mut` is never used
+  --> anodium-backend/src/drm/device.rs:57:12
+   |
+57 |     pub fn inner_mut(&self) -> RefMut<drm::DrmDevice> {
+   |            ^^^^^^^^^
+
+warning: fields `gbm`, `allocator`, `formats`, `connectors` and `renderer` are never read
+  --> anodium-backend/src/udev/device.rs:32:5
+   |
+30 | pub struct Device {
+   |            ------ fields in this struct
+31 |     drm: drm::DrmDevice,
+32 |     gbm: gbm::GbmDevice<DrmDeviceFd>,
+   |     ^^^
+33 |     allocator: GbmAllocator<DrmDeviceFd>,
+   |     ^^^^^^^^^
+34 |     formats: HashSet<DrmFormat>,
+   |     ^^^^^^^
+35 |     connectors: IndexMap<connector::Handle, connector::Info>,
+   |     ^^^^^^^^^^
+36 |
+37 |     renderer: Gles2Renderer,
+   |     ^^^^^^^^
+
+warning: function `scan_crtcs` is never used
+   --> anodium-backend/src/udev/device.rs:189:4
+    |
+189 | fn scan_crtcs(drm: &drm::DrmDevice) -> IndexMap<connector::Handle, crtc::Handle> {
+    |    ^^^^^^^^^^
+
+warning: associated function `new` is never used
+  --> anodium-backend/src/udev/device.rs:42:12
+   |
+42 |     pub fn new(device: DrmDeviceFd) -> Self {
+   |            ^^^
+
+warning: associated function `vblank` is never used
+   --> anodium-backend/src/udev/device.rs:101:12
+    |
+101 |     pub fn vblank(&mut self, crtc: crtc::Handle) {
+    |            ^^^^^^
+
+warning: associated function `scan_connectors` is never used
+   --> anodium-backend/src/udev/device.rs:130:12
+    |
+130 |     pub fn scan_connectors(&mut self) -> ScanResult {
+    |            ^^^^^^^^^^^^^^^
+
+warning: associated function `scan_crtcs` is never used
+   --> anodium-backend/src/udev/device.rs:166:12
+    |
+166 |     pub fn scan_crtcs(&self) -> IndexMap<connector::Handle, crtc::Handle> {
+    |            ^^^^^^^^^^
+
+warning: associated function `connectors` is never used
+   --> anodium-backend/src/udev/device.rs:170:12
+    |
+170 |     pub fn connectors(&self) -> &IndexMap<connector::Handle, connector::Info> {
+    |            ^^^^^^^^^^
+
+warning: fields `gbm`, `allocator` and `formats` are never read
+  --> anodium-backend/src/udev/gbm_device.rs:20:5
+   |
+19 | pub struct GbmDevice {
+   |            --------- fields in this struct
+20 |     gbm: gbm::GbmDevice<DrmDeviceFd>,
+   |     ^^^
+21 |     allocator: GbmAllocator<DrmDeviceFd>,
+   |     ^^^^^^^^^
+22 |     formats: HashSet<DrmFormat>,
+   |     ^^^^^^^
+
+warning: `anodium-backend` (lib) generated 17 warnings
+   Compiling anodium-backend v0.1.0 (/home/poly/dev/Anodium/anodium-backend)
+warning: unreachable expression
+   --> anodium-backend/examples/simple.rs:152:13
+    |
+151 |             panic!("Aborted");
+    |             ----------------- any code following this expression is unreachable
+152 |             smithay::reexports::calloop::timer::TimeoutAction::Drop
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable expression
+    |
+    = note: `#[warn(unreachable_code)]` on by default
+
+warning: unused variable: `meta`
+  --> anodium-backend/examples/simple.rs:31:5
+   |
+31 |     meta: &mut Option<drm::DrmEventMetadata>,
+   |     ^^^^ help: if this is intentional, prefix it with an underscore: `_meta`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `connector`
+  --> anodium-backend/examples/simple.rs:53:50
+   |
+53 |         drm_device::ConnectorEvent::Disconnected(connector) => {
+   |                                                  ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_connector`
+
+warning: unused variable: `state`
+  --> anodium-backend/examples/simple.rs:44:5
+   |
+44 |     state: &mut State,
+   |     ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+
+warning: unused variable: `device`
+  --> anodium-backend/examples/simple.rs:45:5
+   |
+45 |     device: DrmNode,
+   |     ^^^^^^ help: if this is intentional, prefix it with an underscore: `_device`
+
+warning: unused variable: `node`
+   --> anodium-backend/examples/simple.rs:106:23
+    |
+106 |             if let Ok(node) = DrmNode::from_dev_id(device_id) {
+    |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_node`
+
+warning: unused variable: `data`
+   --> anodium-backend/examples/simple.rs:156:39
+    |
+156 |     event_loop.run(None, &mut state, |data| {})?;
+    |                                       ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+
+warning: `anodium-backend` (example "simple") generated 7 warnings
+    Finished dev [unoptimized + debuginfo] target(s) in 1.15s
+     Running `/home/poly/dev/Anodium/target/debug/examples/simple`
+[anodium-backend/examples/simple.rs:50] connector = connector::Handle(
+    78,
+)
+[anodium-backend/examples/simple.rs:50] connector = connector::Handle(
+    85,
+)
+thread 'main' panicked at 'exit', anodium-backend/examples/simple.rs:174:21
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

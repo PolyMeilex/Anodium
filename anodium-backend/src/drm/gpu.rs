@@ -1,4 +1,4 @@
-use std::{cell::RefCell, os::unix::prelude::FromRawFd, path::Path, rc::Rc};
+use std::{os::unix::prelude::FromRawFd, path::Path};
 
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -11,9 +11,9 @@ use smithay::{
         drm::{DrmDeviceFd, DrmEvent, DrmNode, GbmBufferedSurface},
         egl::{EGLContext, EGLDevice, EGLDisplay},
         renderer::{
-            gles2::{Gles2Renderbuffer, Gles2Renderer},
+            gles2::Gles2Renderer,
             multigpu::{gbm::GbmGlesBackend, GpuManager},
-            Bind, Frame, ImportMem, Renderer,
+            Bind, Frame, Renderer,
         },
         session::{libseat::LibSeatSession, Session},
     },
@@ -72,13 +72,10 @@ impl Gpu {
 
         let gbm = GbmDevice::new(device)?;
 
-        let res = drm.scan_connectors();
-        info!("connectors: {:#?}", &res);
-
         let formats = {
             let display = EGLDisplay::new(gbm.clone()).unwrap();
 
-            EGLDevice::device_for_display(&display)
+            let _render_node = EGLDevice::device_for_display(&display)
                 .ok()
                 .and_then(|x| x.try_get_render_node().ok());
 
@@ -93,6 +90,9 @@ impl Gpu {
         );
 
         let mut outputs: IndexMap<crtc::Handle, GpuConnector> = IndexMap::new();
+
+        let res = drm.scan_connectors();
+        info!("connectors: {:#?}", &res);
 
         for (connector, crtc) in res.map {
             let drm = drm.inner();

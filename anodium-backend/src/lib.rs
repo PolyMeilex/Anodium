@@ -12,6 +12,8 @@ pub mod winit;
 #[cfg(feature = "x11")]
 pub mod x11;
 
+pub mod udev;
+
 pub mod utils;
 
 use std::str::FromStr;

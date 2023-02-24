@@ -8,14 +8,11 @@ use std::{
 use anyhow::Result;
 use smithay::{
     backend::{
-        allocator::{
-            dmabuf::Dmabuf,
-            gbm::{GbmAllocator, GbmBufferFlags},
-        },
-        drm::{DrmDeviceFd, DrmNode},
+        allocator::dmabuf::Dmabuf,
+        drm::DrmNode,
         renderer::{
-            gles2::{Gles2Renderbuffer, Gles2Renderer, Gles2Texture},
-            multigpu::{gbm::GbmGlesBackend, GpuManager, GraphicsApi, MultiRenderer},
+            gles2::{Gles2Renderer, Gles2Texture},
+            multigpu::{gbm::GbmGlesBackend, GpuManager, MultiRenderer},
             ImportDma,
         },
         session::{libseat::LibSeatSession, Event as SessionEvent, Session},

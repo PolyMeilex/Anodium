@@ -1,7 +1,4 @@
-use std::{
-    cell::{Ref, RefMut},
-    rc::Rc,
-};
+use std::cell::{Ref, RefMut};
 
 use indexmap::IndexMap;
 use smithay::{
