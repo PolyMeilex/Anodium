@@ -14,6 +14,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bitflags",
+ "edid-rs",
  "image",
  "indexmap",
  "input",
@@ -316,6 +317,12 @@ checksum = "52ecd1ca96a64fd7444a58a2ce3aa8be79cea3c1c7f7f69a4b89624018b46377"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "edid-rs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ab5fa33485cd85ac354df485819a63360fefa312fe04cffe65e6f175be1522c"
 
 [[package]]
 name = "errno"

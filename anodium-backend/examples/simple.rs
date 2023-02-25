@@ -1,10 +1,15 @@
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anodium_backend::udev::{drm_scanner, new_drm_device};
 use input::Libinput;
 use smithay::{
     backend::{
         allocator::gbm::{self, GbmAllocator, GbmBufferFlags},
+        allocator::Format,
         drm::{self, DrmDeviceFd, DrmNode, GbmBufferedSurface},
         egl::{EGLContext, EGLDisplay},
         input::{InputEvent, KeyboardKeyEvent},
@@ -16,7 +21,7 @@ use smithay::{
     output::{Output, PhysicalProperties},
     reexports::{
         calloop::{timer::Timer, EventLoop, LoopHandle},
-        drm::control::{crtc, ModeTypeFlags},
+        drm::control::{connector, crtc, ModeTypeFlags},
     },
     utils::{Rectangle, Transform},
 };
@@ -27,14 +32,37 @@ struct Surface {
 }
 
 impl Surface {
-    fn new(gbm_surface: GbmBufferedSurface<GbmAllocator<DrmDeviceFd>, ()>) -> Self {
+    fn new(
+        crtc: crtc::Handle,
+        connector: &connector::Info,
+        formats: HashSet<Format>,
+        drm: &drm::DrmDevice,
+        gbm_allocator: GbmAllocator<DrmDeviceFd>,
+    ) -> Self {
+        let mode_id = connector
+            .modes()
+            .iter()
+            .position(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
+            .unwrap_or(0);
+
+        let drm_mode = connector.modes()[mode_id];
+
+        let drm_surface = drm
+            .create_surface(crtc, drm_mode, &[connector.handle()])
+            .unwrap();
+
+        let gbm_surface = GbmBufferedSurface::new(drm_surface, gbm_allocator, formats).unwrap();
+
+        let name = anodium_backend::udev::format_connector_name(connector);
+
+        let (w, h) = connector.size().unwrap_or((0, 0));
         let output = Output::new(
-            "".into(),
+            name,
             PhysicalProperties {
-                size: Default::default(),
-                subpixel: smithay::output::Subpixel::None,
-                make: Default::default(),
-                model: Default::default(),
+                size: (w as i32, h as i32).into(),
+                subpixel: smithay::output::Subpixel::Unknown,
+                make: "todo".into(),
+                model: "todo".into(),
             },
         );
         Self {
@@ -112,30 +140,17 @@ fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::Conn
     match event {
         drm_scanner::ConnectorEvent::Connected(connector) => {
             if let Some(crtc) = device.crtcs.for_connector(&device.drm, &connector) {
-                let mode_id = connector
-                    .modes()
-                    .iter()
-                    .position(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
-                    .unwrap_or(0);
-
-                let drm_mode = connector.modes()[mode_id];
-
-                let formats = device
-                    .renderer
-                    .egl_context()
-                    .dmabuf_render_formats()
-                    .clone();
-
-                let drm_surface = device
-                    .drm
-                    .create_surface(crtc, drm_mode, &[connector.handle()])
-                    .unwrap();
-
-                let gbm_surface =
-                    GbmBufferedSurface::new(drm_surface, device.gbm_allocator.clone(), formats)
-                        .unwrap();
-
-                let mut surface = Surface::new(gbm_surface);
+                let mut surface = Surface::new(
+                    crtc,
+                    &connector,
+                    device
+                        .renderer
+                        .egl_context()
+                        .dmabuf_render_formats()
+                        .clone(),
+                    &device.drm,
+                    device.gbm_allocator.clone(),
+                );
 
                 next_buffer(&mut surface, &mut device.renderer);
 

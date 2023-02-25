@@ -1,4 +1,5 @@
 pub mod drm_scanner;
+pub mod edid;
 
 use std::path::PathBuf;
 
