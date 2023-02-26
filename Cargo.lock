@@ -19,6 +19,7 @@ dependencies = [
  "indexmap",
  "input",
  "log",
+ "pkg-config",
  "slog",
  "smithay",
  "thiserror",

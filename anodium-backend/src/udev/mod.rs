@@ -1,5 +1,6 @@
 pub mod drm_scanner;
 pub mod edid;
+mod hwdata;
 
 use std::path::PathBuf;
 
@@ -8,37 +9,9 @@ use smithay::{
         drm::{DrmNode, NodeType},
         udev,
     },
-    reexports::drm::control::connector,
+    output::Mode as WlMode,
+    reexports::drm::control::{connector, Mode as DrmMode, ModeFlags},
 };
-
-use std::{os::unix::prelude::FromRawFd, path::Path};
-
-use smithay::{
-    backend::{
-        drm::{self, DrmDeviceFd},
-        session::Session,
-    },
-    reexports::nix::fcntl::OFlag,
-    utils::DeviceFd,
-};
-
-pub fn new_drm_device(
-    session: &mut impl Session,
-    path: &Path,
-) -> (drm::DrmDevice, drm::DrmDeviceNotifier) {
-    let fd = session
-        .open(
-            path,
-            OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
-        )
-        .unwrap();
-
-    let fd = DrmDeviceFd::new(unsafe { DeviceFd::from_raw_fd(fd) });
-
-    let (drm, drm_notifier) = drm::DrmDevice::new(fd, false).unwrap();
-
-    (drm, drm_notifier)
-}
 
 pub fn primary_gpu(seat: &str) -> (DrmNode, PathBuf) {
     udev::primary_gpu(seat)
@@ -62,21 +35,55 @@ pub fn primary_gpu(seat: &str) -> (DrmNode, PathBuf) {
 pub fn format_connector_name(connector_info: &connector::Info) -> String {
     let interface_id = connector_info.interface_id();
 
-    let tmp_short_name;
+    // TODO: Remove once supported in drm-rs
+    use connector::Interface;
     let interface_short_name = match connector_info.interface() {
-        connector::Interface::DVII => "DVI-I",
-        connector::Interface::DVID => "DVI-D",
-        connector::Interface::DVIA => "DVI-A",
-        connector::Interface::SVideo => "S-VIDEO",
-        connector::Interface::DisplayPort => "DP",
-        connector::Interface::HDMIA => "HDMI-A",
-        connector::Interface::HDMIB => "HDMI-B",
-        connector::Interface::EmbeddedDisplayPort => "eDP",
-        other => {
-            tmp_short_name = format!("{other:?}");
-            &tmp_short_name
-        }
+        Interface::Unknown => "Unknown",
+        Interface::VGA => "VGA",
+        Interface::DVII => "DVI-I",
+        Interface::DVID => "DVI-D",
+        Interface::DVIA => "DVI-A",
+        Interface::Composite => "Composite",
+        Interface::SVideo => "SVIDEO",
+        Interface::LVDS => "LVDS",
+        Interface::Component => "Component",
+        Interface::NinePinDIN => "DIN",
+        Interface::DisplayPort => "DP",
+        Interface::HDMIA => "HDMI-A",
+        Interface::HDMIB => "HDMI-B",
+        Interface::TV => "TV",
+        Interface::EmbeddedDisplayPort => "eDP",
+        Interface::Virtual => "Virtual",
+        Interface::DSI => "DSI",
+        Interface::DPI => "DPI",
     };
 
     format!("{interface_short_name}-{interface_id}")
+}
+
+pub fn drm_mode_to_wl_mode(mode: DrmMode) -> WlMode {
+    let clock = mode.clock() as u64;
+    let htotal = mode.hsync().2 as u64;
+    let vtotal = mode.vsync().2 as u64;
+
+    let mut refresh = (clock * 1_000_000 / htotal + vtotal / 2) / vtotal;
+
+    if mode.flags().contains(ModeFlags::INTERLACE) {
+        refresh *= 2;
+    }
+
+    if mode.flags().contains(ModeFlags::DBLSCAN) {
+        refresh /= 2;
+    }
+
+    if mode.vscan() > 1 {
+        refresh /= mode.vscan() as u64;
+    }
+
+    let (w, h) = mode.size();
+
+    WlMode {
+        size: (w as i32, h as i32).into(),
+        refresh: refresh as i32,
+    }
 }

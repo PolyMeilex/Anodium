@@ -29,6 +29,9 @@ features = [
   "desktop",
 ]
 
+[build-dependencies]
+pkg-config = "0.3.26"
+
 [features]
 default = ["drm", "winit", "x11", "use_system_lib"]
 

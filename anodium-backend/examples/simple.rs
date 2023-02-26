@@ -1,10 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
+    os::unix::prelude::FromRawFd,
     path::PathBuf,
     time::Duration,
 };
 
-use anodium_backend::udev::{drm_scanner, new_drm_device};
+use anodium_backend::udev::{drm_mode_to_wl_mode, drm_scanner, edid::EdidInfo};
 use input::Libinput;
 use smithay::{
     backend::{
@@ -14,7 +15,10 @@ use smithay::{
         egl::{EGLContext, EGLDisplay},
         input::{InputEvent, KeyboardKeyEvent},
         libinput::{LibinputInputBackend, LibinputSessionInterface},
-        renderer::{gles2::Gles2Renderer, Bind, Frame, Renderer},
+        renderer::{
+            damage::DamageTrackedRenderer, element::memory::MemoryRenderBufferRenderElement,
+            gles2::Gles2Renderer, Bind,
+        },
         session::{libseat::LibSeatSession, Session},
         udev::{UdevBackend, UdevEvent},
     },
@@ -22,13 +26,15 @@ use smithay::{
     reexports::{
         calloop::{timer::Timer, EventLoop, LoopHandle},
         drm::control::{connector, crtc, ModeTypeFlags},
+        nix::fcntl::OFlag,
     },
-    utils::{Rectangle, Transform},
+    utils::{DeviceFd, Transform},
 };
 
 struct Surface {
     gbm_surface: GbmBufferedSurface<GbmAllocator<DrmDeviceFd>, ()>,
     output: Output,
+    damage_tracked_renderer: DamageTrackedRenderer,
 }
 
 impl Surface {
@@ -55,19 +61,36 @@ impl Surface {
 
         let name = anodium_backend::udev::format_connector_name(connector);
 
+        let (make, model) = EdidInfo::for_connector(drm, connector.handle())
+            .map(|info| (info.manufacturer, info.model))
+            .unwrap_or_else(|| ("Unknown".into(), "Unknown".into()));
+
         let (w, h) = connector.size().unwrap_or((0, 0));
         let output = Output::new(
             name,
             PhysicalProperties {
                 size: (w as i32, h as i32).into(),
                 subpixel: smithay::output::Subpixel::Unknown,
-                make: "todo".into(),
-                model: "todo".into(),
+                make,
+                model,
             },
         );
+
+        let output_mode = drm_mode_to_wl_mode(drm_mode);
+        output.set_preferred(output_mode);
+        output.change_current_state(
+            Some(output_mode),
+            Some(Transform::Normal),
+            Some(smithay::output::Scale::Integer(1)),
+            None,
+        );
+
+        let damage_tracked_renderer = DamageTrackedRenderer::from_output(&output);
+
         Self {
             gbm_surface,
             output,
+            damage_tracked_renderer,
         }
     }
 }
@@ -92,21 +115,18 @@ struct State {
 }
 
 fn next_buffer(surface: &mut Surface, renderer: &mut Gles2Renderer) {
-    let (dmabuf, _age) = surface.gbm_surface.next_buffer().unwrap();
+    let (dmabuf, age) = surface.gbm_surface.next_buffer().unwrap();
     renderer.bind(dmabuf).unwrap();
 
-    let mut frame = renderer
-        .render((i32::MAX, i32::MAX).into(), Transform::Normal)
-        .unwrap();
-
-    frame
-        .clear(
+    surface
+        .damage_tracked_renderer
+        .render_output::<MemoryRenderBufferRenderElement<Gles2Renderer>, _>(
+            renderer,
+            age as usize,
+            &[],
             [1.0, 0.0, 0.0, 1.0],
-            &[Rectangle::from_loc_and_size((0, 0), (i32::MAX, i32::MAX))],
         )
         .unwrap();
-
-    frame.finish().unwrap();
 
     surface.gbm_surface.queue_buffer(None, ()).unwrap();
 }
@@ -166,18 +186,28 @@ fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::Conn
 }
 
 fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
-    let (drm_device, drm_notifier) = new_drm_device(&mut state.session, &path);
+    let fd = state
+        .session
+        .open(
+            &path,
+            OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
+        )
+        .unwrap();
+
+    let fd = DrmDeviceFd::new(unsafe { DeviceFd::from_raw_fd(fd) });
+
+    let (drm, drm_notifier) = drm::DrmDevice::new(fd, false).unwrap();
 
     let mut crtcs_scanner = drm_scanner::CrtcsScanner::new();
-    crtcs_scanner.scan_crtcs(&drm_device);
+    crtcs_scanner.scan_crtcs(&drm);
 
-    let gbm_device = gbm::GbmDevice::new(drm_device.device_fd().clone()).unwrap();
+    let gbm = gbm::GbmDevice::new(drm.device_fd().clone()).unwrap();
     let gbm_allocator = GbmAllocator::new(
-        gbm_device.clone(),
+        gbm.clone(),
         GbmBufferFlags::RENDERING | GbmBufferFlags::SCANOUT,
     );
 
-    let display = EGLDisplay::new(gbm_device.clone()).unwrap();
+    let display = EGLDisplay::new(gbm.clone()).unwrap();
     let context = EGLContext::new(&display).unwrap();
     let renderer = unsafe { Gles2Renderer::new(context) }.unwrap();
 
@@ -191,8 +221,8 @@ fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
     state.devices.insert(
         node,
         Device {
-            drm: drm_device,
-            gbm: gbm_device,
+            drm,
+            gbm,
             gbm_allocator,
 
             connectors: Default::default(),

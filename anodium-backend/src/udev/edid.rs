@@ -1,6 +1,9 @@
+use edid_rs::MonitorDescriptor;
 use smithay::reexports::drm::control::{
     connector, property, Device as ControlDevice, PropertyValueSet,
 };
+
+use super::hwdata;
 
 pub struct EdidInfo {
     pub model: String,
@@ -58,7 +61,7 @@ fn get_manufacturer_name(edid: &edid_rs::EDID) -> String {
     let id = edid.product.manufacturer_id;
     let code = [id.0, id.1, id.2];
 
-    hwdata::find_manufacturer(&code)
+    hwdata::pnp_id_to_name(&code)
         .map(|name| name.to_string())
         .unwrap_or_else(|| code.into_iter().collect())
 }
@@ -68,15 +71,11 @@ fn get_monitor_name(edid: &edid_rs::EDID) -> String {
         .0
         .iter()
         .find_map(|desc| {
-            if let edid_rs::MonitorDescriptor::MonitorName(name) = desc {
+            if let MonitorDescriptor::MonitorName(name) = desc {
                 Some(name.clone())
             } else {
                 None
             }
         })
         .unwrap_or_else(|| edid.product.product_code.to_string())
-}
-
-mod hwdata {
-    include!(concat!(env!("OUT_DIR"), "/hwdata_pnp_ids.rs",));
 }
