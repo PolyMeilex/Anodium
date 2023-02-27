@@ -5,7 +5,11 @@ use std::{
     time::Duration,
 };
 
-use anodium_backend::udev::{drm_mode_to_wl_mode, drm_scanner, edid::EdidInfo};
+use anodium_backend::udev::{
+    drm_mode_to_wl_mode,
+    drm_scanner::{self, DrmScanEvent},
+    edid::EdidInfo,
+};
 use input::Libinput;
 use smithay::{
     backend::{
@@ -100,7 +104,7 @@ struct Device {
     gbm: gbm::GbmDevice<DrmDeviceFd>,
     gbm_allocator: GbmAllocator<DrmDeviceFd>,
 
-    connectors: drm_scanner::ConnectorScanner,
+    drm_scanner: drm_scanner::DrmScanner,
 
     renderer: Gles2Renderer,
     surfaces: HashMap<crtc::Handle, Surface>,
@@ -149,7 +153,7 @@ fn on_drm_event(
     }
 }
 
-fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::ConnectorEvent) {
+fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::DrmScanEvent) {
     let device = if let Some(device) = state.devices.get_mut(&node) {
         device
     } else {
@@ -157,7 +161,7 @@ fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::Conn
     };
 
     match event {
-        drm_scanner::ConnectorEvent::Connected {
+        DrmScanEvent::Connected {
             connector,
             crtc: Some(crtc),
         } => {
@@ -177,7 +181,7 @@ fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::Conn
 
             device.surfaces.insert(crtc, surface);
         }
-        drm_scanner::ConnectorEvent::Disconnected {
+        DrmScanEvent::Disconnected {
             crtc: Some(crtc), ..
         } => {
             device.surfaces.remove(&crtc);
@@ -223,7 +227,7 @@ fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
             gbm,
             gbm_allocator,
 
-            connectors: Default::default(),
+            drm_scanner: Default::default(),
 
             renderer,
             surfaces: Default::default(),
@@ -235,7 +239,7 @@ fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
 
 fn on_device_changed(state: &mut State, node: DrmNode) {
     if let Some(device) = state.devices.get_mut(&node) {
-        for event in device.connectors.scan_connectors(&device.drm) {
+        for event in device.drm_scanner.scan_connectors(&device.drm) {
             on_connector_event(state, node, event);
         }
     }
