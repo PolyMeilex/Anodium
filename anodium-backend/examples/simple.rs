@@ -109,6 +109,26 @@ impl Surface {
             damage_tracked_renderer,
         }
     }
+
+    fn next_buffer<R>(&mut self, renderer: &mut R)
+    where
+        R: Renderer + ImportMem + Bind<Dmabuf>,
+        R::TextureId: 'static,
+    {
+        let (dmabuf, age) = self.gbm_surface.next_buffer().unwrap();
+        renderer.bind(dmabuf).unwrap();
+
+        self.damage_tracked_renderer
+            .render_output::<MemoryRenderBufferRenderElement<R>, _>(
+                renderer,
+                age as usize,
+                &[],
+                [1.0, 0.0, 0.0, 1.0],
+            )
+            .unwrap();
+
+        self.gbm_surface.queue_buffer(None, ()).unwrap();
+    }
 }
 
 struct Device {
@@ -121,7 +141,6 @@ struct Device {
     surfaces: HashMap<crtc::Handle, Surface>,
     render_node: DrmNode,
 }
-
 struct State {
     handle: LoopHandle<'static, Self>,
     session: LibSeatSession,
@@ -130,194 +149,175 @@ struct State {
     devices: HashMap<DrmNode, Device>,
 }
 
-fn next_buffer<R>(surface: &mut Surface, renderer: &mut R)
-where
-    R: Renderer + ImportMem + Bind<Dmabuf>,
-    R::TextureId: 'static,
-{
-    let (dmabuf, age) = surface.gbm_surface.next_buffer().unwrap();
-    renderer.bind(dmabuf).unwrap();
+// Drm
+impl State {
+    fn on_drm_event(
+        &mut self,
+        node: DrmNode,
+        event: drm::DrmEvent,
+        _meta: &mut Option<drm::DrmEventMetadata>,
+    ) {
+        match event {
+            drm::DrmEvent::VBlank(crtc) => {
+                if let Some(device) = self.devices.get_mut(&node) {
+                    if let Some(surface) = device.surfaces.get_mut(&crtc) {
+                        let mut renderer = if self.primary_gpu == device.render_node {
+                            self.gpu_manager
+                                .single_renderer(&device.render_node)
+                                .unwrap()
+                        } else {
+                            self.gpu_manager
+                                .renderer(
+                                    &self.primary_gpu,
+                                    &device.render_node,
+                                    &mut device.gbm_allocator,
+                                    surface.gbm_surface.format(),
+                                )
+                                .unwrap()
+                        };
 
-    surface
-        .damage_tracked_renderer
-        .render_output::<MemoryRenderBufferRenderElement<R>, _>(
-            renderer,
-            age as usize,
-            &[],
-            [1.0, 0.0, 0.0, 1.0],
-        )
-        .unwrap();
+                        surface.gbm_surface.frame_submitted().unwrap();
+                        surface.next_buffer(&mut renderer);
+                    }
+                }
+            }
+            drm::DrmEvent::Error(_) => {}
+        }
+    }
 
-    surface.gbm_surface.queue_buffer(None, ()).unwrap();
+    fn on_connector_event(&mut self, node: DrmNode, event: drm_scanner::DrmScanEvent) {
+        let device = if let Some(device) = self.devices.get_mut(&node) {
+            device
+        } else {
+            return;
+        };
+
+        match event {
+            DrmScanEvent::Connected {
+                connector,
+                crtc: Some(crtc),
+            } => {
+                let mut renderer = self
+                    .gpu_manager
+                    .single_renderer(&device.render_node)
+                    .unwrap();
+
+                let mut surface = Surface::new(
+                    crtc,
+                    &connector,
+                    renderer
+                        .as_mut()
+                        .egl_context()
+                        .dmabuf_render_formats()
+                        .clone(),
+                    &device.drm,
+                    device.gbm.clone(),
+                );
+
+                surface.next_buffer(renderer.as_mut());
+
+                device.surfaces.insert(crtc, surface);
+            }
+            DrmScanEvent::Disconnected {
+                crtc: Some(crtc), ..
+            } => {
+                device.surfaces.remove(&crtc);
+            }
+            _ => {}
+        }
+    }
 }
 
-fn on_drm_event(
-    state: &mut State,
-    node: DrmNode,
-    event: drm::DrmEvent,
-    _meta: &mut Option<drm::DrmEventMetadata>,
-) {
-    match event {
-        drm::DrmEvent::VBlank(crtc) => {
-            if let Some(device) = state.devices.get_mut(&node) {
-                if let Some(surface) = device.surfaces.get_mut(&crtc) {
-                    let mut renderer = if state.primary_gpu == device.render_node {
-                        state
-                            .gpu_manager
-                            .single_renderer(&device.render_node)
-                            .unwrap()
-                    } else {
-                        state
-                            .gpu_manager
-                            .renderer(
-                                &state.primary_gpu,
-                                &device.render_node,
-                                &mut device.gbm_allocator,
-                                surface.gbm_surface.format(),
-                            )
-                            .unwrap()
-                    };
-
-                    surface.gbm_surface.frame_submitted().unwrap();
-                    next_buffer(surface, &mut renderer);
+// Udev
+impl State {
+    fn on_udev_event(&mut self, event: UdevEvent) {
+        match event {
+            UdevEvent::Added { device_id, path } => {
+                if let Ok(node) = DrmNode::from_dev_id(device_id) {
+                    self.on_device_added(node, path);
+                }
+            }
+            UdevEvent::Changed { device_id } => {
+                if let Ok(node) = DrmNode::from_dev_id(device_id) {
+                    self.on_device_changed(node);
+                }
+            }
+            UdevEvent::Removed { device_id } => {
+                if let Ok(node) = DrmNode::from_dev_id(device_id) {
+                    self.on_device_removed(node);
                 }
             }
         }
-        drm::DrmEvent::Error(_) => {}
     }
-}
 
-fn on_connector_event(state: &mut State, node: DrmNode, event: drm_scanner::DrmScanEvent) {
-    let device = if let Some(device) = state.devices.get_mut(&node) {
-        device
-    } else {
-        return;
-    };
+    fn on_device_added(&mut self, node: DrmNode, path: PathBuf) {
+        let fd = self
+            .session
+            .open(
+                &path,
+                OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
+            )
+            .unwrap();
 
-    match event {
-        DrmScanEvent::Connected {
-            connector,
-            crtc: Some(crtc),
-        } => {
-            let mut renderer = state
-                .gpu_manager
-                .single_renderer(&device.render_node)
-                .unwrap();
+        let fd = DrmDeviceFd::new(unsafe { DeviceFd::from_raw_fd(fd) });
 
-            let mut surface = Surface::new(
-                crtc,
-                &connector,
-                renderer
-                    .as_mut()
-                    .egl_context()
-                    .dmabuf_render_formats()
-                    .clone(),
-                &device.drm,
-                device.gbm.clone(),
-            );
+        let (drm, drm_notifier) = drm::DrmDevice::new(fd, false).unwrap();
 
-            next_buffer(&mut surface, renderer.as_mut());
+        let gbm = gbm::GbmDevice::new(drm.device_fd().clone()).unwrap();
+        let gbm_allocator = GbmAllocator::new(gbm.clone(), GbmBufferFlags::RENDERING);
 
-            device.surfaces.insert(crtc, surface);
-        }
-        DrmScanEvent::Disconnected {
-            crtc: Some(crtc), ..
-        } => {
-            device.surfaces.remove(&crtc);
-        }
-        _ => {}
+        // Make sure display is dropped before we call add_node
+        let render_node =
+            match EGLDevice::device_for_display(&EGLDisplay::new(gbm.clone()).unwrap())
+                .ok()
+                .and_then(|x| x.try_get_render_node().ok().flatten())
+            {
+                Some(node) => node,
+                None => node,
+            };
+
+        self.gpu_manager
+            .as_mut()
+            .add_node(render_node, gbm.clone())
+            .unwrap();
+
+        self.handle
+            .insert_source(drm_notifier, move |event, meta, state| {
+                state.on_drm_event(node, event, meta)
+            })
+            .unwrap();
+
+        self.devices.insert(
+            node,
+            Device {
+                drm,
+                gbm,
+                gbm_allocator: DmabufAllocator(gbm_allocator),
+
+                drm_scanner: Default::default(),
+
+                surfaces: Default::default(),
+                render_node,
+            },
+        );
+
+        self.on_device_changed(node);
     }
-}
 
-fn on_device_added(state: &mut State, node: DrmNode, path: PathBuf) {
-    let fd = state
-        .session
-        .open(
-            &path,
-            OFlag::O_RDWR | OFlag::O_CLOEXEC | OFlag::O_NOCTTY | OFlag::O_NONBLOCK,
-        )
-        .unwrap();
-
-    let fd = DrmDeviceFd::new(unsafe { DeviceFd::from_raw_fd(fd) });
-
-    let (drm, drm_notifier) = drm::DrmDevice::new(fd, false).unwrap();
-
-    let gbm = gbm::GbmDevice::new(drm.device_fd().clone()).unwrap();
-    let gbm_allocator = GbmAllocator::new(gbm.clone(), GbmBufferFlags::RENDERING);
-
-    // Make sure display is dropped before we call add_node
-    let render_node = match EGLDevice::device_for_display(&EGLDisplay::new(gbm.clone()).unwrap())
-        .ok()
-        .and_then(|x| x.try_get_render_node().ok().flatten())
-    {
-        Some(node) => node,
-        None => node,
-    };
-
-    state
-        .gpu_manager
-        .as_mut()
-        .add_node(render_node, gbm.clone())
-        .unwrap();
-
-    state
-        .handle
-        .insert_source(drm_notifier, move |event, meta, state| {
-            on_drm_event(state, node, event, meta)
-        })
-        .unwrap();
-
-    state.devices.insert(
-        node,
-        Device {
-            drm,
-            gbm,
-            gbm_allocator: DmabufAllocator(gbm_allocator),
-
-            drm_scanner: Default::default(),
-
-            surfaces: Default::default(),
-            render_node,
-        },
-    );
-
-    on_device_changed(state, node);
-}
-
-fn on_device_changed(state: &mut State, node: DrmNode) {
-    if let Some(device) = state.devices.get_mut(&node) {
-        for event in device.drm_scanner.scan_connectors(&device.drm) {
-            on_connector_event(state, node, event);
-        }
-    }
-}
-
-fn on_device_removed(state: &mut State, node: DrmNode) {
-    if let Some(device) = state.devices.get_mut(&node) {
-        state.gpu_manager.as_mut().remove_node(&device.render_node);
-    }
-}
-
-fn on_udev_event(state: &mut State, event: UdevEvent) {
-    match event {
-        UdevEvent::Added { device_id, path } => {
-            if let Ok(node) = DrmNode::from_dev_id(device_id) {
-                on_device_added(state, node, path);
-            }
-        }
-        UdevEvent::Changed { device_id } => {
-            if let Ok(node) = DrmNode::from_dev_id(device_id) {
-                on_device_changed(state, node);
-            }
-        }
-        UdevEvent::Removed { device_id } => {
-            if let Ok(node) = DrmNode::from_dev_id(device_id) {
-                on_device_removed(state, node);
+    fn on_device_changed(&mut self, node: DrmNode) {
+        if let Some(device) = self.devices.get_mut(&node) {
+            for event in device.drm_scanner.scan_connectors(&device.drm) {
+                self.on_connector_event(node, event);
             }
         }
     }
-}
 
+    fn on_device_removed(&mut self, node: DrmNode) {
+        if let Some(device) = self.devices.get_mut(&node) {
+            self.gpu_manager.as_mut().remove_node(&device.render_node);
+        }
+    }
+}
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut event_loop = EventLoop::<State>::try_new()?;
 
@@ -356,18 +356,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn init_udev(state: &mut State) {
     let backend = UdevBackend::new(state.session.seat()).unwrap();
     for (device_id, path) in backend.device_list() {
-        on_udev_event(
-            state,
-            UdevEvent::Added {
-                device_id,
-                path: path.to_owned(),
-            },
-        );
+        state.on_udev_event(UdevEvent::Added {
+            device_id,
+            path: path.to_owned(),
+        });
     }
 
     state
         .handle
-        .insert_source(backend, |event, _, state| on_udev_event(state, event))
+        .insert_source(backend, |event, _, state| state.on_udev_event(event))
         .unwrap();
 }
 
