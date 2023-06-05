@@ -1,4 +1,5 @@
-![img](https://i.imgur.com/NBv5Jw5.png)
+![img](https://github.com/PolyMeilex/Anodium/assets/20758186/970cc148-36b7-4ffc-8335-d6de77ee1fec)
+
 
 ## A very WIP Wayland Compositor
 ---
